@@ -40,27 +40,48 @@ local function Verify()
     ns.db.verify = result
     ns.Print(string.format(ns.L["Checking %d tracks silently..."], #ids))
 
+    -- PlaySoundFile's willPlay is true even for IDs that are not sound files (70374), so
+    -- each batch is started, then checked with C_Sound.IsPlaying on the next tick and
+    -- stopped. The two control IDs show whether IsPlaying tells real files from bogus ones.
+    result.method = "isplaying"
+    result.controls = {}
+    result.silent = {}
+    local BATCH, TICK = 16, 0.25
     local i = 0
+    local pending = {}   -- { id, handle }
     local ticker
-    ticker = C_Timer.NewTicker(0.05, function()
-        for _ = 1, 8 do
+    ticker = C_Timer.NewTicker(TICK, function()
+        for _, p in ipairs(pending) do
+            local playing = p.handle ~= nil and C_Sound.IsPlaying(p.handle) == true
+            if p.handle then StopSound(p.handle) end
+            if p.id == 1 or p.id == 999999999 then
+                result.controls[tostring(p.id)] = playing
+            elseif playing then
+                result.played = result.played + 1
+            else
+                result.silent[#result.silent + 1] = p.id
+            end
+        end
+        wipe(pending)
+        if i >= #ids then
+            ticker:Cancel()
+            C_CVar.SetCVar("Sound_MasterVolume", savedMaster)
+            ns.charDB.verifyRestoreMaster = nil
+            verifying = false
+            result.done = true
+            ns.Print(string.format(ns.L["Done: %d playing, %d silent. Type /reload to save the results."],
+                result.played, #result.silent))
+            return
+        end
+        for _ = 1, BATCH do
             i = i + 1
             local id = ids[i]
-            if not id then
-                ticker:Cancel()
-                C_CVar.SetCVar("Sound_MasterVolume", savedMaster)
-                ns.charDB.verifyRestoreMaster = nil
-                verifying = false
-                result.done = true
-                ns.Print(string.format(ns.L["Done: %d of %d played, %d refused. Type /reload to save the results."],
-                    result.played, result.total, #result.refused))
-                return
-            end
+            if not id then break end
             result.checked = i
             local ok, willPlay, handle = pcall(PlaySoundFile, id, "Master")
             if ok and willPlay then
-                result.played = result.played + 1
-                if handle then StopSound(handle) else result.noHandle[#result.noHandle + 1] = id end
+                pending[#pending + 1] = { id = id, handle = handle }
+                if not handle then result.noHandle[#result.noHandle + 1] = id end
             else
                 result.refused[#result.refused + 1] = id
             end

@@ -115,6 +115,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   - `WOW_PROJECT_ID` = `WOW_PROJECT_CAMELOT` = 18 (MAINLINE 1, CLASSIC 2). TOC `[Family]/[Game]` expand to `Mainline/Camelot`.
   - `C_Secrets.HasSecretRestrictions()` returns true. `UnitHealth("player")` is secret even out of combat. `UnitHealthMax("player")` and `UnitName("player")` are **not** secret (out of combat, open world; consistent with [F-042]).
   - `StaticPopup_Show` from a slash command: the dialog didn't appear on the first run after a fresh client start, but did on the next run (after `/reload`). Cause unknown, so always print a `/reload` hint as a fallback.
+  - **[F-112]** `PlaySoundFile(id, "Master")` returns `willPlay = true` plus a handle even for IDs that are not sound files (`1`, `999999999`), so `willPlay` can't detect missing music. All 769 MusicForever catalog IDs returned true as well. Whether `C_Sound.IsPlaying(handle)` tells them apart is being tested (MusicForever `/mf verify`, with the two IDs as controls). [Probe 70374]
   - Nil: `GetSpellInfo`, `UnitAura`, `GetAddOnMetadata`, `CombatLogGetCurrentEventInfo`, `InterfaceOptions_AddCategory`, `SetDesaturation`, `require`.
   - Present: `import`, `issecretvalue`, `canaccessvalue`, `scrubsecretvalues`, `UIReload`, `loadstring`, `getfenv`/`setfenv`, `newproxy`.
   - `GetItemInfo` is a global function at runtime. The docs don't list it and 12.1.5 removed it ([F-031]). Another installed addon may define it, so keep using `C_Item.GetItemInfo`.
