@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "facts_as_of": "2026-10-14",
+  "forever_interfaces": [
+    16001
+  ],
+  "other_interfaces": {
+    "standard_live": 120100,
+    "standard_test": 120105,
+    "vanilla": 11509,
+    "tbc": 20506,
+    "wrath": 38002,
+    "cata": 40402,
+    "mists": 50504
+  },
+  "products": {
+    "wow_classic_beta": {
+      "folder": "_classic_beta_",
+      "exe": "WowB.exe",
+      "role": "Forever beta"
+    },
+    "wowf": {
+      "folder": "_forever_",
+      "exe": "Wow.exe",
+      "role": "Forever stress test / launch"
+    }
+  },
+  "client_search_roots": [
+    "C:\\Program Files (x86)\\World of Warcraft",
+    "C:\\Program Files\\World of Warcraft"
+  ],
+  "game_type_tokens": [
+    "mainline",
+    "classic",
+    "standard",
+    "camelot",
+    "forever",
+    "plunderstorm",
+    "wowhack",
+    "wowlabs",
+    "vanilla",
+    "tbc",
+    "wrath",
+    "cata",
+    "mists"
+  ],
+  "forever_game_types": [
+    "camelot",
+    "forever",
+    "mainline"
+  ],
+  "forever_toc_suffixes": [
+    "_Camelot",
+    "-Camelot",
+    "_Forever",
+    "-Forever",
+    "_Mainline",
+    "-Mainline"
+  ],
+  "upstream": {
+    "repo": "https://github.com/Gethe/wow-ui-source.git",
+    "branch": "forever",
+    "compare_branch": "live",
+    "raw": "https://raw.githubusercontent.com/Gethe/wow-ui-source/forever/"
+  },
+  "version_server": "http://us.patch.battle.net:1119/{product}/versions"
+}

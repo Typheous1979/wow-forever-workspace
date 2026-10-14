@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: |cff66ccffWowfProbe|r (dev)
+## Notes: Developer probe: records what this Forever client actually provides. /wowfprobe
+## Author: Igor (wowf tools)
+## Version: 0.1.0
+## Category: Development Tools
+## SavedVariables: WowfProbeDB
+## X-Game: [Game]
+## X-Family: [Family]
+## X-Wowf-DevOnly: 1
+
+Queries.lua
+WowfProbe.lua

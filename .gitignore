@@ -1,0 +1,18 @@
+# Machine-specific (client paths, account names) — never commit
+wowf.local.json
+
+# Generated
+.luacheckrc
+dist/
+*.zip
+__pycache__/
+*.pyc
+.cache/
+
+# Downloaded tool binary (hash is committed in tools/luacheck.sha256)
+tools/luacheck.exe
+
+# OneDrive / OS noise
+desktop.ini
+Thumbs.db
+.DS_Store

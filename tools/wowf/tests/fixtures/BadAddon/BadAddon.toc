@@ -1,0 +1,10 @@
+## Interface: 120001
+## Title: Bad Addon
+## SavedVariables: BadAddonDB
+## AllowLoadGameType: camelott
+## AddonCompartmentFunc: BadAddon_OnCompartmentClick
+
+Core.lua
+Syntax52.lua
+Bom.lua
+Missing.lua

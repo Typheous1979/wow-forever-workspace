@@ -1,0 +1,7 @@
+## Interface: 16001
+## Title: Good Addon
+## SavedVariables: GoodAddonDB
+## AddonCompartmentFunc: GoodAddon_OnAddonCompartmentClick
+
+Locales\enUS.lua
+Core.lua
