@@ -102,12 +102,15 @@ local function Meta()
     end
     m.secretRestrictions = Call(C_Secrets and C_Secrets.HasSecretRestrictions)
     -- secret checks: store only booleans
-    local okH, h = pcall(UnitHealth, "player")
-    m.healthSecret = okH and IsSecret(h) or "<error>"
-    local okM, hm = pcall(UnitHealthMax, "player")
-    m.healthMaxSecret = okM and IsSecret(hm) or "<error>"
-    local okN, n = pcall(UnitName, "player")
-    m.nameSecret = okN and IsSecret(n) or "<error>"
+    -- not "ok and IsSecret(v) or x": that turns a real false into x
+    local function SecretOf(fn, ...)
+        local ok, v = pcall(fn, ...)
+        if not ok then return "<error>" end
+        return IsSecret(v)
+    end
+    m.healthSecret = SecretOf(UnitHealth, "player")
+    m.healthMaxSecret = SecretOf(UnitHealthMax, "player")
+    m.nameSecret = SecretOf(UnitName, "player")
     m.loadstring_untainted = type(loadstring_untainted)
     m.cvars = SoundCVars()
     -- presence of interesting globals (type only)
@@ -243,10 +246,18 @@ local function Run(mode, announce)
         Say(("build %s  interface %s  WOW_PROJECT_ID %s  game %s/%s  C_ namespaces %d"):format(
             tostring(m.build), tostring(m.interface), tostring(m.WOW_PROJECT_ID),
             tostring(m.tocFamily), tostring(m.tocGame), run.quick.namespaceCount))
-        Say(("health secret: %s  name secret: %s  PlayMusic: %s  PlaySoundFile: %s"):format(
-            tostring(m.healthSecret), tostring(m.nameSecret), m.globals.PlayMusic, m.globals.PlaySoundFile))
-        Say("saved. SavedVariables are written on /reload or logout.")
-        StaticPopup_Show("WOWFPROBE_RELOAD")
+        Say(("secret? health %s  healthMax %s  name %s   PlayMusic: %s  PlaySoundFile: %s"):format(
+            tostring(m.healthSecret), tostring(m.healthMaxSecret), tostring(m.nameSecret),
+            m.globals.PlayMusic, m.globals.PlaySoundFile))
+        local ok, dialog = pcall(StaticPopup_Show, "WOWFPROBE_RELOAD")
+        -- recorded so the report can tell "not shown" from "errored"; written at that reload
+        run.popup = { ok = ok, shown = (ok and dialog ~= nil) or false,
+                              err = (not ok) and tostring(dialog) or nil }
+        if ok and dialog then
+            Say("saved. Click Reload UI (or type /reload) so the results are written to disk.")
+        else
+            Say("saved. Type /reload now so the results are written to disk.")
+        end
     end
 end
 

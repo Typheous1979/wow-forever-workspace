@@ -81,6 +81,8 @@ def main(argv):
     print(f"  secrets: health {m.get('healthSecret')}  healthMax {m.get('healthMaxSecret')}  name {m.get('nameSecret')}  (inCombat {m.get('inCombat')}, instance {m.get('inInstance')})")
     g = m.get("globals") or {}
     print("  globals: " + ", ".join(f"{k}={v}" for k, v in sorted(g.items())))
+    if isinstance(run.get("popup"), dict):
+        print(f"  last reload popup: {json.dumps(to_jsonable(run['popup']))}")
     cv = m.get("cvars") or {}
     print("  cvars: " + ", ".join(f"{k}={v}" for k, v in sorted(cv.items())))
     q = run.get("queries") or {}
@@ -90,7 +92,7 @@ def main(argv):
 
     names = surface_names(run)
     I = idx.Index(cfg["_root"])
-    doc_ns = I.namespaces()
+    doc_ns = {n for n in I.namespaces() if n.startswith("C_")}  # docs also cover math/string/table
     rt_ns = {n for n in names if n.startswith("C_") and "." not in n}
     print(f"\nC_ namespaces: documented {len(doc_ns)}, runtime {len(rt_ns)}")
     missing = sorted(doc_ns - rt_ns)
