@@ -139,6 +139,8 @@ class AddonLinter:
             dirnames[:] = [d for d in dirnames if d.lower() not in LIB_DIRS]
             for f in files:
                 if f.lower().endswith((".lua", ".xml")):
+                    if f.lower() == "bindings.xml" and os.path.samefile(dirpath, self.dir):
+                        continue  # the client loads <Addon>\Bindings.xml itself; it must not be in the TOC
                     full = os.path.normcase(os.path.normpath(os.path.join(dirpath, f)))
                     if full not in listed:
                         extra = " (OneDrive conflict copy?)" if re.search(r"-[A-Z0-9-]{3,}\.(lua|xml)$", f) else ""

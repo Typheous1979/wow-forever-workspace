@@ -16,6 +16,7 @@ Commands:
   logs ...                      client logs / crash reports (see client_logs.py --help)
   probe-report [--client K]     ingest the WowfProbe dump
   new NAME [--title ...]        scaffold a new addon (see scaffold.py --help)
+  music-catalog fetch|build|show  MusicForever catalog from Forever game tables (see music_catalog.py)
   doctor                        environment check
 """
 import argparse
@@ -205,6 +206,9 @@ def main(argv=None):
     if cmd == "new":
         import scaffold
         return scaffold.main(rest)
+    if cmd == "music-catalog":
+        import music_catalog
+        return music_catalog.main(rest)
     if cmd == "doctor":
         import doctor
         return doctor.main(rest)

@@ -1,0 +1,14 @@
+<Bindings>
+	<Binding name="MUSICFOREVER_TOGGLE" category="MusicForever">MusicForever_Binding("toggle")</Binding>
+	<Binding name="MUSICFOREVER_PLAYSTOP" category="MusicForever">MusicForever_Binding("playstop")</Binding>
+	<Binding name="MUSICFOREVER_NEXT" category="MusicForever">MusicForever_Binding("next")</Binding>
+	<Binding name="MUSICFOREVER_PREV" category="MusicForever">MusicForever_Binding("prev")</Binding>
+	<Binding name="MUSICFOREVER_REVERT" category="MusicForever">MusicForever_Binding("revert")</Binding>
+	<Binding name="MUSICFOREVER_MUSIC_UP" category="MusicForever">MusicForever_Binding("musicUp")</Binding>
+	<Binding name="MUSICFOREVER_MUSIC_DOWN" category="MusicForever">MusicForever_Binding("musicDown")</Binding>
+	<Binding name="MUSICFOREVER_MASTER_UP" category="MusicForever">MusicForever_Binding("masterUp")</Binding>
+	<Binding name="MUSICFOREVER_MASTER_DOWN" category="MusicForever">MusicForever_Binding("masterDown")</Binding>
+	<Binding name="MUSICFOREVER_MUTE_MUSIC" category="MusicForever">MusicForever_Binding("muteMusic")</Binding>
+	<Binding name="MUSICFOREVER_CYCLE_PRESET" category="MusicForever">MusicForever_Binding("cyclePreset")</Binding>
+	<Binding name="MUSICFOREVER_MINI" category="MusicForever">MusicForever_Binding("mini")</Binding>
+</Bindings>

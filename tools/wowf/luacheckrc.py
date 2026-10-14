@@ -70,6 +70,12 @@ def addon_globals(addon_dir):
         extra = t.get("X-Wowf-Globals")
         if extra:
             g.update(x.strip() for x in re.split(r"[,\s]+", extra) if x.strip())
+    bindings = os.path.join(addon_dir, "Bindings.xml")
+    if os.path.isfile(bindings):
+        # functions the binding snippets call must be global
+        text = open(bindings, encoding="utf-8", errors="replace").read()
+        for body in re.findall(r"<Binding\b[^>]*>(.*?)</Binding>", text, re.S):
+            g.update(n for n in re.findall(r"\b([A-Za-z_]\w*)\s*\(", body) if n[:1].isupper())
     for dirpath, dirnames, files in os.walk(addon_dir):
         dirnames[:] = [d for d in dirnames if d.lower() not in ("libs", "tests", ".git")]
         for f in files:

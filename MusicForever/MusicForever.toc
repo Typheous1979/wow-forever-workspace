@@ -1,0 +1,34 @@
+## Interface: 16001
+## Title: MusicForever
+## Notes: Game audio mixer and a jukebox for every piece of World of Warcraft Forever music.
+## Author: Typheous
+## Version: 0.1.0
+## Category: Audio & Video
+## IconTexture: Interface\Icons\INV_Misc_Note_01
+## SavedVariables: MusicForeverDB
+## SavedVariablesPerCharacter: MusicForeverCharDB
+## AddonCompartmentFunc: MusicForever_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: MusicForever_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: MusicForever_OnAddonCompartmentLeave
+## X-Game: [Game]
+## X-Family: [Family]
+
+Locales\enUS.lua
+Data\Catalog.lua
+Data\Presets.lua
+Core.lua
+Mixer.lua
+Library.lua
+Player.lua
+UI\Widgets.lua
+UI\TrackList.lua
+UI\LibraryView.lua
+UI\PlaylistView.lua
+UI\MixerView.lua
+UI\PlayerBar.lua
+UI\MiniPlayer.lua
+UI\MainFrame.lua
+Options.lua
+Slash.lua
+Bindings.lua
+Compartment.lua

@@ -12,6 +12,9 @@ __pycache__/
 # Downloaded tool binary (hash is committed in tools/luacheck.sha256)
 tools/luacheck.exe
 
+# Personal screenshots kept next to an addon (never part of it)
+Screenshots/
+
 # OneDrive / OS noise
 desktop.ini
 Thumbs.db
