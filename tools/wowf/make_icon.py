@@ -153,7 +153,7 @@ def main(argv):
     p = argparse.ArgumentParser(prog="wowf make-icon")
     p.add_argument("--out", help="TGA path (default MusicForever/Media/Icon.tga)")
     p.add_argument("--preview", help="also write a PNG preview here")
-    p.add_argument("--size", type=int, default=64, choices=[32, 64, 128, 256])
+    p.add_argument("--size", type=int, default=64, choices=[32, 64, 128, 256, 512])
     a = p.parse_args(argv)
     out = a.out or os.path.join(config.load()["_root"], "MusicForever", "Media", "Icon.tga")
     rows = render(a.size)

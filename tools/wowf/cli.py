@@ -18,6 +18,7 @@ Commands:
   new NAME [--title ...]        scaffold a new addon (see scaffold.py --help)
   music-catalog fetch|build|show  MusicForever catalog from Forever game tables (see music_catalog.py)
   make-icon [--out PATH] [--preview PNG]  draw MusicForever's icon (Media/Icon.tga)
+  package ADDON                 lint, then zip to dist/<Addon>-<Version>.zip for CurseForge
   doctor                        environment check
 """
 import argparse
@@ -213,6 +214,9 @@ def main(argv=None):
     if cmd == "make-icon":
         import make_icon
         return make_icon.main(rest)
+    if cmd == "package":
+        import package
+        return package.main(rest)
     if cmd == "doctor":
         import doctor
         return doctor.main(rest)
