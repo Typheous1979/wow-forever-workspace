@@ -8,7 +8,7 @@ Facts for building sound and music features (MusicForever and alerts). Each fact
 | `PlaySound(soundKitID [, channel, forceNoDuplicates, runFinishCallback])` | **SoundKitID number** (`SOUNDKIT.X`); never a string | default "SFX" | `success, soundHandle` | [Source]; alias of `C_Sound.PlaySound` |
 | `C_Sound.PlaySound(id, uiSoundSubType, forceNoDuplicates=false, runFinishCallback=false, overridePriority, volumeOverride)` | SoundKitID | `uiSoundSubType` (channel string) | `success, soundHandle` | [Source]; `volumeOverride` 12.1.0+ |
 | `C_Sound.PlaySoundWithOptions({soundKitID=…, uiSoundSubType=…, runFinishCallback=…, volumeOverride=…})` | SoundKitID | field | `success, soundHandle` | [Source] |
-| `PlaySoundFile(fileID or "Interface\\AddOns\\Me\\x.ogg" [, channel])` | **FileDataID** or **addon-folder path** (.ogg/.mp3) | default "SFX" | `willPlay, soundHandle` (`willPlay` is true even for bogus IDs [F-112]) | undocumented, used on Forever [F-035] |
+| `PlaySoundFile(fileID or "Interface\\AddOns\\Me\\x.ogg" [, channel])` | **FileDataID** or **addon-folder path** (.ogg/.mp3) | default "SFX" | `willPlay, soundHandle` (`willPlay` is true even for bogus IDs; test with `C_Sound.IsPlaying(handle)` instead [F-112]) | undocumented, used on Forever [F-035] |
 | `PlayMusic(fileID or addon path)` | FileDataID or addon path | always "Music" | `willPlay` (always true, even for bad paths) | undocumented; custom MP3s confirmed playing [F-102] |
 | `StopMusic()` | — | Music | — | stops **only** `PlayMusic` music, immediately |
 | `StopSound(soundHandle [, fadeoutMs])` | handle | — | — | Blizzard Forever code uses it [Source] |

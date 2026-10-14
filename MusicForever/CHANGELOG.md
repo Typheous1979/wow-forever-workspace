@@ -6,7 +6,10 @@
   Named so minimap-button collectors such as MinimapButtonButton gather it. Toggle in options
   or with /mf minimap.
 - Signature: "MusicForever by Typheous" in the AddOn list, options page, tooltips and window.
-- /mf verify saves its progress as it runs, so a reload mid-check keeps a partial result.
+- /mf verify saves its progress as it runs, so a reload mid-check keeps a partial result, and it now
+  tests with C_Sound.IsPlaying (willPlay is always true on Forever).
+- Catalog: 747 tracks. 22 encrypted Classic Era files that Forever can't play were removed
+  (tools/wowf/data/music_unplayable.json).
 - Slider labels and checkboxes no longer overlap; new playlists are named after their folder.
 
 ## 0.1.0 (unreleased)

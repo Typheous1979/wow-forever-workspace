@@ -121,6 +121,14 @@ class Hierarchy(unittest.TestCase):
         self.assertIsNone(self.find(root, "Test Dungeon"))
         self.assertEqual(self.find(root, "Other Music")["tracks"], [9007])
 
+    def test_prune_unplayable(self):
+        root = mc.prune_tree(mc.build_tree(mc.Data("test")), [9004, 9007])
+        all_ids = {f for n in mc._walk(root) for f in n["tracks"]}
+        self.assertFalse({9004, 9007} & all_ids)
+        self.assertIsNone(self.find(root, "Jerod's Landing"), "folders left empty are dropped")
+        self.assertIsNone(self.find(root, "Other Music"))
+        self.assertIsNotNone(self.find(root, "Elwynn Forest"))
+
     def test_lua_output(self):
         root = mc.build_tree(mc.Data("test"))
         meta = {str(i): {"title": f"Song {i}", "file": f"mus_{i}.mp3", "seconds": 60.5} for i in range(9001, 9008)}

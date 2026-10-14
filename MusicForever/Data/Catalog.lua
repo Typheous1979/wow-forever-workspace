@@ -357,28 +357,6 @@ T[6074947] = {"Warcraft Battle H", 124.9, 0}
 T[6075186] = {"Thewarwithin Maintitle", 976.8, 0}
 T[6075204] = {"Nerubian Raid H", 172.8, 0}
 T[6382930] = {"Plunderstorm 2 H", 143.3, 0}
-T[6653571] = {"Karazhan Crypts 1", 185.9, 1}
-T[6653573] = {"Karazhan Crypts 2", 181.9, 1}
-T[6653575] = {"Karazhan Crypts 3", 161.5, 1}
-T[6861009] = {"Scarlet Enclave Chapel Walk 1", 83.2, 1}
-T[6861011] = {"Scarlet Enclave Chapel Walk 1 (2)", 54.2, 1}
-T[6861013] = {"Scarlet Enclave Chapel Walk 1 (3)", 117.8, 1}
-T[6865468] = {"Scarlet Enclave New Avalon Walk", 213.5, 1}
-T[6865470] = {"Scarlet Enclave New Avalon Walk (2)", 133.6, 1}
-T[6865472] = {"Scarlet Enclave New Avalon Walk (3)", 133.7, 1}
-T[6865474] = {"Scarlet Enclave Boss Battle", 76.2, 1}
-T[6865476] = {"Scarlet Enclave Boss Battle (2)", 76.2, 1}
-T[6865478] = {"Scarlet Enclave Boss Battle (3)", 76.2, 1}
-T[6865480] = {"Scarlet Enclave Boss Battle (4)", 76.2, 1}
-T[6865482] = {"Scarlet Enclave Boss Battle (5)", 76.2, 1}
-T[6865484] = {"Scarlet Enclave General Walk", 140.5, 1}
-T[6865486] = {"Scarlet Enclave General Walk (2)", 140.5, 1}
-T[6865488] = {"Scarlet Enclave Boss Battle (6)", 67.3, 1}
-T[6865490] = {"Scarlet Enclave Boss Battle (7)", 117.5, 1}
-T[6865492] = {"Scarlet Enclave Boss Battle (8)", 93.6, 1}
-T[6865494] = {"Scarlet Enclave Boss Battle (9)", 96, 1}
-T[6865498] = {"Scarlet Enclave Epilogue", 78.8, 1}
-T[6865500] = {"Scarlet Enclave Epilogue (2)", 82.1, 1}
 T[7670482] = {"Midnight Maintitle Beta", 124.4, 0}
 T[7681064] = {"Devouring Host H", 199.6, 0}
 T[7681130] = {"Silvermoon City H", 127.2, 0}
@@ -891,7 +869,7 @@ ns.CatalogTree = {
             }, nil},
             {"Eastern Plaguelands", {
                 {"Music", nil, {8180744, 8180746, 8180748}},
-                {"New Avalon", nil, {53243, 53244, 53245, 6865468, 6865470, 6865472}},
+                {"New Avalon", nil, {53243, 53244, 53245}},
                 {"Quel'Lithien Lodge", nil, {8180752, 8180754, 8180756}},
                 {"Tyr's Hand", {
                     {"Music", nil, {8180738, 8180742}},
@@ -1694,9 +1672,9 @@ ns.CatalogTree = {
         }, nil},
         {"Ruins of Ahn'Qiraj", nil, {8176626, 8176628, 8176630, 8176632}},
         {"Scarlet Enclave", {
-            {"Music", nil, {53240, 53241, 53242, 6865484, 6865486}},
-            {"Arcane Sanctum", nil, {53243, 53244, 53245, 6865468, 6865470, 6865472}},
-            {"New Avalon", nil, {53243, 53244, 53245, 6865468, 6865470, 6865472}},
+            {"Music", nil, {53240, 53241, 53242}},
+            {"Arcane Sanctum", nil, {53243, 53244, 53245}},
+            {"New Avalon", nil, {53243, 53244, 53245}},
         }, nil},
         {"Storm Cliffs", nil, {8181053}},
         {"The Crystal Vale", nil, {8181053}},
@@ -1838,7 +1816,6 @@ ns.CatalogTree = {
             {"Ahn Qiraj Triangle Room", nil, {8176689, 8176691, 8176693, 8176695, 8176697, 8176699, 8176701}},
             {"Ahn Qiraj Walking", nil, {8176671, 8176673, 8176675}},
             {"Darkmoon Faire Music", nil, {53257}},
-            {"Dungeon Karazhan Crypts General Walk", nil, {6653571, 6653573, 6653575}},
             {"Ghost Music (DONOTRENAME)", nil, {8181321}},
             {"Intro Ahn Qiraj Interior", nil, {8176683}},
             {"MUS C60 Drowned City Boss", nil, {8200642, 8200644, 8200646, 8200648}},
@@ -1882,13 +1859,11 @@ ns.CatalogTree = {
         }, nil},
         {"Raid", {
             {"MUS C60 Raid Barrow Deeps", nil, {8158682, 8158684, 8282581}},
-            {"Raid Scarlet Enclave Boss Battle", nil, {6865488, 6865490, 6865492, 6865494, 6865474, 6865476, 6865478, 6865480, 6865482}},
-            {"Raid Scarlet Enclave Chapel Walk 1", nil, {53246, 53247, 6861009, 6861011, 6861013, 53249}},
-            {"Raid Scarlet Enclave Epilogue", nil, {6865498, 6865500}},
-            {"Raid Scarlet Enclave General Walk", nil, {53240, 53241, 53242, 6865484, 6865486}},
+            {"Raid Scarlet Enclave Chapel Walk 1", nil, {53246, 53247, 53249}},
+            {"Raid Scarlet Enclave General Walk", nil, {53240, 53241, 53242}},
             {"Raid Scarlet Enclave Monastery [PH]", nil, {8180899}},
-            {"Raid Scarlet Enclave New Avalon Walk", nil, {53243, 53244, 53245, 6865468, 6865470, 6865472}},
-            {"Raid Scarlet Enclave Tyr's Hand Walk", nil, {53240, 53241, 53242, 6865484, 6865486}},
+            {"Raid Scarlet Enclave New Avalon Walk", nil, {53243, 53244, 53245}},
+            {"Raid Scarlet Enclave Tyr's Hand Walk", nil, {53240, 53241, 53242}},
         }, nil},
         {"Zone", {
             {"Barren Dry", nil, {8181055, 8181057, 8181051, 8181053, 8181059, 8181049}},

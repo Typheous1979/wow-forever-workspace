@@ -550,6 +550,73 @@ def emit_lua(root, meta, build, live_ids, generated):
     return "\n".join(lines) + "\n", len(used)
 
 
+# ---------------------------------------------------------------- unplayable files
+
+def excluded_path():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "music_unplayable.json")
+
+
+def load_excluded():
+    path = excluded_path()
+    if not os.path.isfile(path):
+        return {"ids": []}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def prune_tree(root, excluded):
+    """Drop excluded FileDataIDs everywhere, then empty folders."""
+    bad = set(excluded)
+    for n in _walk(root):
+        n["tracks"] = [f for f in n["tracks"] if f not in bad]
+    root["children"] = [c for c in root["children"] if _prune(c)]
+    return root
+
+
+def verify_results(cfg):
+    """MusicForeverDB.verify from every client's account SavedVariables."""
+    import savedvars
+    out = []
+    for key, client in config.discover_clients(cfg).items():
+        for scope, label, path in savedvars.find_sv_files(client["dir"], "MusicForever"):
+            if scope != "account":
+                continue
+            v = (savedvars.load_sv(path).get("MusicForeverDB") or {}).get("verify")
+            if isinstance(v, dict):
+                out.append((key, path, v))
+    return out
+
+
+def prune_from_probe(cfg, log=print):
+    """Merge silent IDs from a trustworthy /mf verify run into data/music_unplayable.json."""
+    data = load_excluded()
+    ids = set(data.get("ids", []))
+    used = 0
+    for key, path, v in verify_results(cfg):
+        controls = v.get("controls") or {}
+        if v.get("method") != "isplaying" or not v.get("done") or not controls \
+                or any(bool(x) for x in controls.values()):
+            log(f"{key}: skipping {path}: run not complete, or its controls did not come back silent")
+            continue
+        silent = v.get("silent") or {}
+        silent = list(silent.values()) if isinstance(silent, dict) else list(silent)
+        ids.update(int(x) for x in silent)
+        data.setdefault("evidence", {})[f"{key} {v.get('version')}.{v.get('build')}"] = {
+            "catalog": v.get("catalog"), "playing": v.get("played"), "silent": len(silent)}
+        used += 1
+    if not used:
+        log("no usable /mf verify results found")
+        return 1
+    data["ids"] = sorted(ids)
+    data["note"] = ("FileDataIDs that C_Sound.IsPlaying reports silent on Forever (encrypted or absent "
+                    "on the client), from MusicForever /mf verify. Excluded from Data/Catalog.lua.")
+    with open(excluded_path(), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+        f.write("\n")
+    log(f"wrote {excluded_path()}: {len(data['ids'])} unplayable IDs")
+    return 0
+
+
 # ---------------------------------------------------------------- CLI
 
 def _print_tree(n, depth, maxd, meta):
@@ -571,7 +638,11 @@ def main(argv):
     p.add_argument("--zones", help="comma-separated zone names (spike/testing)")
     p.add_argument("--depth", type=int, default=2)
     p.add_argument("--out", help="output Lua path (default: MusicForever/Data/Catalog.lua)")
+    p.add_argument("--prune-from-probe", action="store_true",
+                   help="first merge silent IDs from the client's /mf verify results into data/music_unplayable.json")
     a = p.parse_args(argv)
+    if a.prune_from_probe and prune_from_probe(config.load()):
+        return 1
     fetch_tables(a.build)
     d = Data(a.build)
     if a.action == "fetch":
@@ -580,7 +651,7 @@ def main(argv):
         print(f"{len(meta)} files described; {len(bad)} without a length")
         return 0
     only = set(a.zones.split(",")) if a.zones else None
-    root = build_tree(d, only)
+    root = prune_tree(build_tree(d, only), load_excluded().get("ids", []))
     meta_file = meta_path(a.build)
     meta = {}
     if os.path.isfile(meta_file):

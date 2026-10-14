@@ -1,0 +1,34 @@
+{
+  "evidence": {
+    "beta 1.60.1.70374": {
+      "catalog": "1.60.1.70245",
+      "playing": 747,
+      "silent": 22
+    }
+  },
+  "ids": [
+    6653571,
+    6653573,
+    6653575,
+    6861009,
+    6861011,
+    6861013,
+    6865468,
+    6865470,
+    6865472,
+    6865474,
+    6865476,
+    6865478,
+    6865480,
+    6865482,
+    6865484,
+    6865486,
+    6865488,
+    6865490,
+    6865492,
+    6865494,
+    6865498,
+    6865500
+  ],
+  "note": "FileDataIDs that C_Sound.IsPlaying reports silent on Forever (encrypted or absent on the client), from MusicForever /mf verify. Excluded from Data/Catalog.lua."
+}

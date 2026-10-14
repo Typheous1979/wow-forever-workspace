@@ -4,7 +4,7 @@
 
 A game audio mixer and a jukebox for every piece of music in World of Warcraft Forever.
 
-- **Library**: browse 769 tracks by Zones › Continent › Zone › Day/Night/Intro, Cities (districts
+- **Library**: browse 747 tracks by Zones › Continent › Zone › Day/Night/Intro, Cities (districts
   and taverns), Dungeons, Raids, Battlegrounds, Music Sets, and Other Music. Search finds tracks
   and folders at every level. Forever's new and remastered music is marked with a blue `*`.
 - **Player**: double-click to play; Play all, Shuffle, Repeat (all/one/off), Previous/Next, and a
