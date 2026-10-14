@@ -1,5 +1,7 @@
 # MusicForever
 
+*by Typheous*
+
 A game audio mixer and a jukebox for every piece of music in World of Warcraft Forever.
 
 - **Library**: browse 769 tracks by Zones › Continent › Zone › Day/Night/Intro, Cities (districts
@@ -16,10 +18,12 @@ A game audio mixer and a jukebox for every piece of music in World of Warcraft F
 - **Key bindings** (Options › Keybindings › MusicForever): open/close, play/stop, next, previous,
   return to game music, music and master volume up/down, game music on/off, next preset, mini player.
 - **Mini player**: a small movable bar (Options › AddOns › MusicForever, or `/mf mini`).
+- **Minimap button**: left-click opens, right-click options, Shift-click play/stop, drag to move.
+  Minimap-button collectors such as MinimapButtonButton pick it up automatically.
 
 ## Commands
 `/mf` opens the window. `/mf help` lists the rest: `play`, `stop`, `next`, `prev`, `revert`,
-`mixer`, `playlists`, `preset <name>`, `mini`, `options`.
+`mixer`, `playlists`, `preset <name>`, `mini`, `minimap`, `options`.
 
 ## How it works
 The catalog (`Data/Catalog.lua`) is generated from Forever's own game tables by

@@ -7,7 +7,9 @@ local addonName, ns = ...
 function ns.BuildOptions(db)
     local L = ns.L
     local s = db.settings
-    local category = Settings.RegisterVerticalLayoutCategory("MusicForever")
+    local category, layout = Settings.RegisterVerticalLayoutCategory("MusicForever")
+    layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(
+        "MusicForever |cff9d9d9d" .. L["by Typheous"] .. "|r"))
 
     local defaults = ns.SettingDefaults
     local function Checkbox(key, label, tooltip, onChange)
@@ -19,6 +21,9 @@ function ns.BuildOptions(db)
         end
     end
 
+    Checkbox("minimapButton", L["Show minimap button"],
+        L["The MusicForever button on the minimap. Minimap button collectors such as MinimapButtonButton pick it up."],
+        function(value) ns.MinimapButton.SetShown(value) end)
     Checkbox("miniPlayer", L["Show mini player"],
         L["A small movable now-playing bar with play, next and Return to game music."],
         function(value) ns.MiniPlayer.SetEnabled(value) end)

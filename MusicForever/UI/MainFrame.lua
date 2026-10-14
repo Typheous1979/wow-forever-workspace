@@ -34,6 +34,10 @@ local function Build()
     UI.RestorePosition(frame, ns.charDB.window)
     UI.MakeMovable(frame, function() return ns.charDB.window end)
     tinsert(UISpecialFrames, "MusicForeverFrame")   -- Escape closes it
+
+    local signature = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    signature:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", -12, -6)
+    signature:SetText(ns.L["by Typheous"])
     frame:Hide()
 
     -- content area between the title bar and the player bar

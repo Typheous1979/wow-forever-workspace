@@ -17,6 +17,7 @@ Commands:
   probe-report [--client K]     ingest the WowfProbe dump
   new NAME [--title ...]        scaffold a new addon (see scaffold.py --help)
   music-catalog fetch|build|show  MusicForever catalog from Forever game tables (see music_catalog.py)
+  make-icon [--out PATH] [--preview PNG]  draw MusicForever's icon (Media/Icon.tga)
   doctor                        environment check
 """
 import argparse
@@ -209,6 +210,9 @@ def main(argv=None):
     if cmd == "music-catalog":
         import music_catalog
         return music_catalog.main(rest)
+    if cmd == "make-icon":
+        import make_icon
+        return make_icon.main(rest)
     if cmd == "doctor":
         import doctor
         return doctor.main(rest)

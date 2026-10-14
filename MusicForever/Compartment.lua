@@ -14,6 +14,7 @@ end
 function MusicForever_OnAddonCompartmentEnter(_, menuButtonFrame)
     GameTooltip:SetOwner(menuButtonFrame, "ANCHOR_LEFT")
     GameTooltip:SetText("MusicForever")
+    GameTooltip:AddLine(ns.L["by Typheous"], 0.62, 0.62, 0.62)
     local id = ns.Player.GetNowPlaying()
     if id and ns.Player.IsPlaying() then
         GameTooltip:AddLine(ns.Library.TrackName(id), 0.4, 0.8, 1)

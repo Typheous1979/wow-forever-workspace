@@ -62,7 +62,9 @@ local defaults = {
         revertOnZone = false,
         revertOnCombat = false,
         miniPlayer = false,
+        minimapButton = true,
     },
+    minimap = { angle = 200 },   -- minimap button position (degrees around the minimap)
 }
 ns.SettingDefaults = defaults.settings
 
@@ -110,6 +112,7 @@ function events:ADDON_LOADED(loaded)
     CopyDefaults(charDefaults, MusicForeverCharDB)
     ns.charDB = MusicForeverCharDB
     if ns.Library then ns.Library.Init() end
+    if ns.MinimapButton then ns.MinimapButton.Init() end
     if ns.BuildOptions then ns.BuildOptions(db) end
     self:UnregisterEvent("ADDON_LOADED")
 end

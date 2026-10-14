@@ -10,6 +10,7 @@ local function Help()
     ns.Print("/mf mixer | playlists  " .. L["open a tab"])
     ns.Print("/mf preset <name>  " .. L["apply a mixer preset"])
     ns.Print("/mf mini  " .. L["show or hide the mini player"])
+    ns.Print("/mf minimap  " .. L["show or hide the minimap button"])
     ns.Print("/mf options  " .. L["open the settings"])
     ns.Print("/mf verify  " .. L["check which catalog tracks this client can play (silent, ~10 s)"])
 end
@@ -32,8 +33,11 @@ local function Verify()
     local savedMaster = C_CVar.GetCVar("Sound_MasterVolume")
     ns.charDB.verifyRestoreMaster = savedMaster
     C_CVar.SetCVar("Sound_MasterVolume", "0")
+    -- saved from the start and updated as it goes, so a reload mid-run keeps a partial result
     local result = { build = select(2, GetBuildInfo()), version = (GetBuildInfo()),
-                     catalog = ns.CatalogBuild, total = #ids, played = 0, refused = {}, noHandle = {} }
+                     catalog = ns.CatalogBuild, total = #ids, checked = 0, played = 0, done = false,
+                     refused = {}, noHandle = {} }
+    ns.db.verify = result
     ns.Print(string.format(ns.L["Checking %d tracks silently..."], #ids))
 
     local i = 0
@@ -47,11 +51,12 @@ local function Verify()
                 C_CVar.SetCVar("Sound_MasterVolume", savedMaster)
                 ns.charDB.verifyRestoreMaster = nil
                 verifying = false
-                ns.db.verify = result
+                result.done = true
                 ns.Print(string.format(ns.L["Done: %d of %d played, %d refused. Type /reload to save the results."],
                     result.played, result.total, #result.refused))
                 return
             end
+            result.checked = i
             local ok, willPlay, handle = pcall(PlaySoundFile, id, "Master")
             if ok and willPlay then
                 result.played = result.played + 1
@@ -98,6 +103,8 @@ SlashCmdList["MUSICFOREVER"] = function(msg)
         end
     elseif cmd == "mini" then
         ns.MiniPlayer.Toggle()
+    elseif cmd == "minimap" then
+        ns.MinimapButton.Toggle()
     elseif cmd == "options" then
         ns.OpenOptions()
     elseif cmd == "verify" then
