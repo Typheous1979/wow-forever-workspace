@@ -8,6 +8,7 @@ local UI = {}
 ns.UI = UI
 
 UI.ROW_HEIGHT = 20
+UI.SLIDER_LABEL_SPACE = 48   -- room for a slider's "100%" label
 UI.HIGHLIGHT = "Interface\\QuestFrame\\UI-QuestTitleHighlight"
 UI.BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 
@@ -30,8 +31,11 @@ function UI.Tooltip(frame, title, text)
 end
 
 function UI.Check(parent, label, onClick)
+    -- keep the template's own size: its check art is drawn at atlas size, so a smaller
+    -- button would put the label on top of the box
     local c = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    c:SetSize(24, 24)
+    c.Text:ClearAllPoints()
+    c.Text:SetPoint("LEFT", c, "RIGHT", 2, 1)
     c.Text:SetText(label)
     c.Text:SetFontObject("GameFontHighlight")
     if onClick then
@@ -44,7 +48,8 @@ function UI.Check(parent, label, onClick)
 end
 
 -- 0..1 slider showing a percentage on the right. onChange(value) only fires for
--- user changes, not for SetValueSilently.
+-- user changes, not for SetValueSilently. The percentage label is drawn OUTSIDE the
+-- frame, to the right: leave UI.SLIDER_LABEL_SPACE free after it.
 function UI.Slider(parent, width, onChange)
     local s = CreateFrame("Frame", nil, parent, "MinimalSliderWithSteppersTemplate")
     s:SetWidth(width or 220)

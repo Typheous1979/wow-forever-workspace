@@ -121,9 +121,9 @@ function UI.TrackList(parent, options)
     return list
 end
 
--- "Add to playlist" submenu: existing playlists plus "New playlist…" (named after
--- the tracks' location, renamable later on the Playlists tab).
-function UI.AddPlaylistSubmenu(root, text, fileIDs)
+-- "Add to playlist" submenu: existing playlists plus "New playlist" (named after the
+-- folder the tracks came from, else the first track's location; renamable later).
+function UI.AddPlaylistSubmenu(root, text, fileIDs, suggestedName)
     local sub = root:CreateButton(text)
     for _, pl in ipairs(Library.Playlists()) do
         sub:CreateButton(pl.name, function()
@@ -133,7 +133,7 @@ function UI.AddPlaylistSubmenu(root, text, fileIDs)
     end
     sub:CreateDivider()
     sub:CreateButton(ns.L["New playlist"], function()
-        local base = fileIDs[1] and Library.Where(fileIDs[1]) or ns.L["Playlist"]
+        local base = suggestedName or (fileIDs[1] and Library.Where(fileIDs[1])) or ns.L["Playlist"]
         local name, n = base, 1
         while Library.FindPlaylist(name) do
             n = n + 1

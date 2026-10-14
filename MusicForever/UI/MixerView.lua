@@ -29,8 +29,10 @@ function MixerView.Build(parent)
             local check = UI.Check(volumes, ns.L[ch.label], function(on) Mixer.SetEnabled(ch.key, on) end)
             check:SetPoint("TOPLEFT", 12, y)
             UI.Tooltip(check, ns.L[ch.label], ns.L["Turn this sound channel on or off."])
-            local slider = UI.Slider(volumes, 230, function(value) Mixer.SetVolume(ch.key, value) end)
-            slider:SetPoint("TOPRIGHT", -14, y)
+            -- label column on the left, slider after it, its "%" label inside the panel
+            local slider = UI.Slider(volumes, 210, function(value) Mixer.SetVolume(ch.key, value) end)
+            slider:SetPoint("TOPLEFT", volumes, "TOPLEFT", 160, y)
+            slider:SetPoint("TOPRIGHT", volumes, "TOPRIGHT", -(UI.SLIDER_LABEL_SPACE + 4), y)
             rows[#rows + 1] = { ch = ch, check = check, slider = slider }
             y = y - 34
         end
@@ -52,7 +54,7 @@ function MixerView.Build(parent)
             check:SetPoint("TOPLEFT", 12, y)
             UI.Tooltip(check, ns.L[opt.label], ns.L[opt.tip])
             options[#options + 1] = { opt = opt, check = check }
-            y = y - 26
+            y = y - 28
         end
     end
 

@@ -56,7 +56,7 @@ function LibraryView.Build(parent, searchBox)
     addAll:SetScript("OnClick", function(self)
         if #tracks.ids == 0 then return end
         MenuUtil.CreateContextMenu(self, function(_, root)
-            UI.AddPlaylistSubmenu(root, ns.L["Add all to playlist"], tracks.ids)
+            UI.AddPlaylistSubmenu(root, ns.L["Add all to playlist"], tracks.ids, tracks.label)
         end)
     end)
 
@@ -114,7 +114,7 @@ function LibraryView.Build(parent, searchBox)
                         ns.Player.SetShuffle(true)
                         ns.Player.PlayList(ids, math.random(math.max(1, #ids)), node.name)
                     end)
-                    UI.AddPlaylistSubmenu(root, ns.L["Add all to playlist"], ids)
+                    UI.AddPlaylistSubmenu(root, ns.L["Add all to playlist"], ids, node.name)
                 end)
                 return
             end
