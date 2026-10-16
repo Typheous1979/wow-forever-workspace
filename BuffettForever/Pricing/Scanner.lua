@@ -1,14 +1,16 @@
 local addonName, ns = ...
 
 -- Auction House full scan (wowf-addon-dev auction-house.md):
---   Scanner.Start() -> C_AuctionHouse.ReplicateItems() -> REPLICATE_ITEM_LIST_UPDATE
+--   Scanner.Start() -> C_AuctionHouse.ReplicateItems() -> the first REPLICATE_ITEM_LIST_UPDATE
 --   -> read every row, time-sliced (needs the AH open; closing it aborts and stores nothing)
 --   -> price each item, time-sliced (finishes even if the AH closes) -> PriceDB.Record.
--- States: idle -> waiting -> reading -> pricing -> idle. No data within REPLICATE_TIMEOUT
+-- States: idle -> waiting -> reading -> pricing -> idle. Inside the full-scan cooldown the
+-- server ignores the request (no event at all [F-121]), so no data within REPLICATE_TIMEOUT
 -- seconds ends the scan with a message; data that arrives late is still read.
 -- The scanner also fills BuffettForeverDB.diag, which answers the open AH probes in CLAUDE.md:
--- the replicate index base, the ReplicateItems cooldown, scan timings, rows missing info,
--- the market-key inputs per character, SupportsCopperValues, and which reagents are commodities.
+-- the replicate index base, the cooldown (every request, with bounds derived from them),
+-- scan timings, rows missing info, the market-key inputs per character, SupportsCopperValues,
+-- and which reagents are commodities.
 
 local L = ns.L
 local Scanner = {}
@@ -17,6 +19,7 @@ local events = ns.events
 
 local BUDGET_MS = 8            -- work per frame
 local REPLICATE_TIMEOUT = 60   -- seconds to wait for REPLICATE_ITEM_LIST_UPDATE
+local COOLDOWN_GUESS = 15 * 60 -- retail's full-scan cooldown; Forever's is over 2 min [F-121]
 local DIAG_KEEP = 20           -- entries kept in each diagnostics list
 -- Linen Cloth, Copper Ore, Copper Bar, Peacebloom, Light Leather: are reagents commodities?
 local PROBE_ITEMS = { 2589, 2770, 2840, 2447, 2318 }
@@ -30,12 +33,32 @@ local function NowMs()
     return debugprofilestop()
 end
 
+-- Cooldown bounds from the request log, for logs written before diag.cooldown existed:
+-- a request that got data after s seconds proves cooldown <= s; one that got none, > s.
+local function SeedCooldown(diag)
+    local cooldown, lastData = {}, nil
+    for _, r in ipairs(diag.requests) do
+        if lastData and r.t and r.data ~= nil then
+            local since = r.t - lastData
+            if r.data then
+                cooldown.atMost = math.min(cooldown.atMost or since, since)
+            else
+                cooldown.over = math.max(cooldown.over or 0, since)
+            end
+        end
+        if r.data then lastData = r.t end
+    end
+    diag.cooldown = cooldown
+    diag.lastData = diag.lastData or lastData
+end
+
 local function Diag()
     local diag = ns.db.diag
     diag.requests = diag.requests or {}
     diag.scans = diag.scans or {}
     diag.chars = diag.chars or {}
     diag.probeItems = diag.probeItems or {}
+    if not diag.cooldown then SeedCooldown(diag) end
     return diag
 end
 
@@ -51,6 +74,29 @@ end
 
 local function Progress(phase, done, total)
     ns.Fire("SCAN_PROGRESS", phase, done, total)
+end
+
+-- A request's outcome narrows the cooldown: data after s seconds means cooldown <= s.
+local function NoteOutcome(request, gotData)
+    local diag = Diag()
+    local cooldown = diag.cooldown
+    local since = request.sinceData
+    if since then
+        if gotData then
+            cooldown.atMost = math.min(cooldown.atMost or since, since)
+        else
+            cooldown.over = math.max(cooldown.over or 0, since)
+        end
+    end
+    if gotData then diag.lastData = request.t end
+end
+
+-- A timed-out request whose data never came: count it as "no data" once we stop waiting.
+local function ExpireLateRequest()
+    if lateRequest then
+        NoteOutcome(lateRequest, false)
+        lateRequest = nil
+    end
 end
 
 -- "First Surname" (names are two-part on Forever [F-080]); nil if unreadable.
@@ -103,7 +149,7 @@ end
 
 -- ---------------------------------------------------------------- full scan
 
--- One row's interesting returns, or nil when the call errors (out of range).
+-- One row's interesting returns, or nil when the call errors.
 local function PeekRow(i)
     local ok, _, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemID, hasAllInfo =
         pcall(C_AuctionHouse.GetReplicateItemInfo, i)
@@ -113,12 +159,16 @@ local function PeekRow(i)
              link = linkOK and link or nil }
 end
 
--- Rows are 0..n-1 (retail) or 1..n. Look at rows 0 and n and read only the range that holds
--- data, so the loop works with either base and the answer lands in the diagnostics [F-121].
+local function IsRow(row)
+    return row ~= nil and type(row.itemID) == "number" and row.itemID > 0
+end
+
+-- Rows are 0..n-1 on 70425; past the end a row reads itemID 0, count -1 [F-121]. Look at rows
+-- 0 and n and read only the range that holds data, so the loop works with either base, and
+-- the answer stays in the diagnostics.
 local function FindRange(n)
     local row0, rowN = PeekRow(0), PeekRow(n)
-    local has0 = row0 and row0.itemID ~= nil
-    local hasN = rowN and rowN.itemID ~= nil
+    local has0, hasN = IsRow(row0), IsRow(rowN)
     local first = has0 and 0 or 1
     local last = hasN and n or n - 1
     local base = "?"
@@ -166,7 +216,7 @@ local function ReadStep(s)
     while s.i <= s.last and NowMs() < stop do
         local _, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemID, hasAllInfo = GetInfo(s.i)
         s.rows = s.rows + 1
-        if not itemID then
+        if not itemID or itemID == 0 then
             s.noItemID = s.noItemID + 1
         else
             if not hasAllInfo then s.missing = s.missing + 1 end
@@ -215,7 +265,7 @@ Finish = function(s)
         t = s.t, n = s.n, rows = s.rows, items = s.items, missing = s.missing, noItemID = s.noItemID,
         bidOnly = s.bidOnly, waitMs = s.request.waitMs, readMs = s.readMs,
         pricingMs = s.pricingStarted and math.floor(NowMs() - s.pricingStarted) or 0,
-        totalMs = math.floor(NowMs() - s.started), late = s.late,
+        totalMs = math.floor(NowMs() - s.started), late = s.late, updates = s.updates,
     }
     if s.items == 0 then summary.empty = true end
     Push(Diag().scans, summary)
@@ -242,6 +292,7 @@ local function BeginRead(s)
     s.request.data = true
     s.request.n = n
     if not s.late then s.request.waitMs = math.floor(NowMs() - s.started) end
+    NoteOutcome(s.request, true)
     s.first, s.last = FindRange(n)
     s.i, s.total = s.first, math.max(0, s.last - s.first + 1)
     s.acc, s.rows, s.items, s.missing, s.noItemID, s.bidOnly = {}, 0, 0, 0, 0, 0
@@ -254,7 +305,7 @@ local function OnTimeout(s)
     if scan ~= s or state ~= "waiting" then return end
     s.request.data = false
     s.request.waitMs = REPLICATE_TIMEOUT * 1000
-    lateRequest = s.request
+    lateRequest = s.request   -- NoteOutcome waits: the data may still come
     state = "idle"
     scan = nil
     Push(Diag().scans, { t = s.t, timeout = true })
@@ -278,9 +329,10 @@ function events:REPLICATE_ITEM_LIST_UPDATE()
         ns.Print(L["Auction data arrived late; reading it now."])
         BeginRead(scan)
     elseif state ~= "idle" then
-        -- A second update for the same request (does Forever stream the list?)
+        -- Fires again, thousands of times, as item data for the rows being read arrives [F-121].
         local diag = Diag()
         diag.extraUpdates = (diag.extraUpdates or 0) + 1
+        if scan then scan.updates = (scan.updates or 0) + 1 end
     else
         -- Someone else's ReplicateItems, or an update after our scan finished.
         local diag = Diag()
@@ -298,6 +350,25 @@ function Scanner.IsBusy()
     return state ~= "idle"
 end
 
+-- Seconds until a full scan is likely to get data again (0: now), and the cooldown estimate:
+-- the smallest gap that has worked, else the retail 15 min unless a longer gap has failed.
+function Scanner.CooldownLeft()
+    if not ns.db then return 0, COOLDOWN_GUESS end
+    local diag = Diag()
+    local cooldown = diag.cooldown
+    local estimate = cooldown.atMost or math.max(COOLDOWN_GUESS, (cooldown.over or 0) + 60)
+    if not diag.lastData then return 0, estimate end
+    return math.max(0, estimate - (GetServerTime() - diag.lastData)), estimate
+end
+
+-- "Next full scan in about 12 min." while the cooldown probably runs, else nil.
+function Scanner.CooldownHint()
+    local left, estimate = Scanner.CooldownLeft()
+    if left <= 0 then return nil end
+    return string.format(L["Next full scan in about %d min (the Auction House allows one about every %d min)."],
+        math.ceil(left / 60), math.floor(estimate / 60 + 0.5))
+end
+
 -- Whether a full scan can start now, and why not.
 function Scanner.CanScan()
     if not ns.db then return false, L["Still loading."] end
@@ -313,13 +384,16 @@ function Scanner.Start()
         ns.Print(why)
         return false
     end
+    local hint = Scanner.CooldownHint()
+    if hint then ns.Print(hint .. " " .. L["Trying anyway; it will probably get no data."]) end
+    ExpireLateRequest()
     local now = GetServerTime()
     local diag = Diag()
     local request = { t = now }
     if diag.lastRequest then request.sincePrev = now - diag.lastRequest end
+    if diag.lastData then request.sinceData = now - diag.lastData end
     diag.lastRequest = now
     Push(diag.requests, request)
-    lateRequest = nil
     SetNotice(nil)
     local s = { t = now, started = NowMs(), request = request }
     scan = s
@@ -357,7 +431,12 @@ function Scanner.StatusText()
     else
         text = L["No auction data yet. Open the Auction House to scan."]
     end
-    if notice then text = text .. "  " .. notice end
+    if notice then
+        text = text .. "  " .. notice
+    elseif ns.ahOpen then
+        local hint = Scanner.CooldownHint()
+        if hint then text = text .. "  " .. hint end
+    end
     return text
 end
 
@@ -378,18 +457,23 @@ function Scanner.PrintDiag()
     end
     for i = math.max(1, #diag.requests - 4), #diag.requests do
         local q = diag.requests[i]
-        out("request %s: %s s after the previous, data %s, wait %s ms, n %s%s", date("%H:%M:%S", q.t),
-            tostring(q.sincePrev or "-"), tostring(q.data), tostring(q.waitMs or "-"), tostring(q.n or "-"),
-            q.lateSeconds and (", late " .. q.lateSeconds .. " s") or "")
+        out("request %s: %s s after the last data, data %s, wait %s ms, n %s%s%s", date("%H:%M:%S", q.t),
+            tostring(q.sinceData or "-"), tostring(q.data), tostring(q.waitMs or "-"), tostring(q.n or "-"),
+            q.lateSeconds and (", late " .. q.lateSeconds .. " s") or "", q.aborted and ", AH closed" or "")
     end
+    local cooldown = diag.cooldown
+    out("cooldown: over %s s, at most %s s; next scan in about %d s", tostring(cooldown.over or "?"),
+        tostring(cooldown.atMost or "?"), (Scanner.CooldownLeft()))
     local s = diag.scans[#diag.scans]
     if s then
         if s.timeout then
             out("last scan: timed out")
+        elseif s.aborted then
+            out("last scan: stopped while %s", tostring(s.aborted))
         else
-            out("last scan: %d rows, %d items, %d missing info, %d bid-only, %d without itemID; wait %s ms, read %s ms, price %s ms",
+            out("last scan: %d rows, %d items, %d missing info, %d bid-only, %d without itemID; wait %s ms, read %s ms, price %s ms; %s extra updates",
                 s.rows or 0, s.items or 0, s.missing or 0, s.bidOnly or 0, s.noItemID or 0,
-                tostring(s.waitMs), tostring(s.readMs), tostring(s.pricingMs))
+                tostring(s.waitMs), tostring(s.readMs), tostring(s.pricingMs), tostring(s.updates or 0))
         end
     end
     for _, itemID in ipairs(PROBE_ITEMS) do
@@ -411,9 +495,13 @@ ns.On("AH_OPEN", function()
 end)
 
 ns.On("AH_CLOSED", function()
-    lateRequest = nil
+    ExpireLateRequest()
     if scan and (state == "waiting" or state == "reading") then
         if scan.timer then scan.timer:Cancel() end
+        if state == "waiting" then
+            scan.request.waitMs = math.floor(NowMs() - scan.started)
+            scan.request.aborted = true
+        end
         Push(Diag().scans, { t = scan.t, aborted = state })
         state = "idle"
         scan = nil

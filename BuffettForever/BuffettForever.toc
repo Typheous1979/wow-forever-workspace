@@ -19,10 +19,14 @@ Util\Money.lua
 Economics\Econ.lua
 Pricing\PriceDB.lua
 Pricing\Scanner.lua
+Pricing\Search.lua
+Pricing\Merchant.lua
 UI\Widgets.lua
 UI\MainFrame.lua
 UI\AHButton.lua
 UI\MinimapButton.lua
+Bags.lua
+Tooltip.lua
 Options.lua
 Slash.lua
 Compartment.lua

@@ -31,6 +31,8 @@ SlashCmdList["BUFFETTFOREVER"] = function(msg)
         ns.Scanner.Start()
     elseif cmd == "diag" then
         ns.Scanner.PrintDiag()
+        ns.Search.PrintDiag()
+        ns.Merchant.PrintDiag()
     elseif cmd == "selftest" then
         SelfTest()
     elseif cmd == "options" then

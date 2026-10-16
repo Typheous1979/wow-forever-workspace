@@ -136,6 +136,8 @@ local function Build()
         GameTooltip:AddLine(L["Reads every listing on the Auction House and updates the stored prices."], nil, nil, nil, true)
         local ok, why = ns.Scanner.CanScan()
         if not ok then GameTooltip:AddLine(why, 1, 0.3, 0.3, true) end
+        local hint = ns.Scanner.CooldownHint()
+        if hint then GameTooltip:AddLine(hint, 1, 0.82, 0, true) end
         GameTooltip:Show()
     end)
     scan:SetScript("OnLeave", GameTooltip_Hide)
