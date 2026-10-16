@@ -2,8 +2,8 @@ local addonName, ns = ...
 
 -- Main window. Three panes: the reagent tray and the top pick (left), the craftable items
 -- with their cost, sale values and ROI (middle), the selected item's details (right), and a
--- status line for the auction data. 0.1.0 draws the layout only; the panes fill in as the
--- milestones in CLAUDE.md land. Built on first open.
+-- status line for the auction data with the Scan button (enabled only at an auctioneer).
+-- The status line works since M1; the panes fill in from M3 (see CLAUDE.md). Built on first open.
 
 local UI = ns.UI
 local L = ns.L
@@ -127,11 +127,25 @@ local function Build()
     signature:SetText(L["by Typheous"])
     frame:Hide()
 
+    local scan = UI.Button(frame, L["Scan"], 90, function() ns.Scanner.Start() end)
+    scan:SetPoint("TOPRIGHT", -14, -31)
+    scan:SetMotionScriptsWhileDisabled(true)   -- the tooltip explains why it is disabled
+    scan:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText(L["Full scan"], 1, 1, 1)
+        GameTooltip:AddLine(L["Reads every listing on the Auction House and updates the stored prices."], nil, nil, nil, true)
+        local ok, why = ns.Scanner.CanScan()
+        if not ok then GameTooltip:AddLine(why, 1, 0.3, 0.3, true) end
+        GameTooltip:Show()
+    end)
+    scan:SetScript("OnLeave", GameTooltip_Hide)
+    frame.ScanButton = scan
+
     local status = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     status:SetPoint("TOPLEFT", 18, -36)
-    status:SetPoint("TOPRIGHT", -18, -36)
+    status:SetPoint("TOPRIGHT", scan, "TOPLEFT", -8, -5)
     status:SetJustifyH("LEFT")
-    status:SetText(L["No auction data yet. Open the Auction House to scan."])
+    status:SetWordWrap(false)
     frame.Status = status
 
     local content = CreateFrame("Frame", nil, frame)
@@ -145,8 +159,12 @@ local function Build()
     frame.Details = BuildDetails(content)
     frame.Results = BuildResults(content, frame.Tray, frame.Details)
 
-    frame:SetScript("OnShow", function() PlaySound(SOUNDKIT.IG_MAINMENU_OPEN) end)
+    frame:SetScript("OnShow", function()
+        PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
+        Main.RefreshStatus()
+    end)
     frame:SetScript("OnHide", function() PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE) end)
+    Main.RefreshStatus()
     ns.Fire("MAIN_BUILT", frame, content)
 end
 
@@ -173,6 +191,13 @@ function Main.GetFrame()
     return frame
 end
 
-function Main.SetStatus(text)
-    if frame then frame.Status:SetText(text) end
+-- Status line and Scan button, from the scanner's state.
+function Main.RefreshStatus()
+    if not frame then return end
+    frame.Status:SetText(ns.Scanner.StatusText())
+    frame.ScanButton:SetEnabled((ns.Scanner.CanScan()))
+end
+
+for _, message in ipairs({ "SCAN_PROGRESS", "SCAN_DONE", "AH_OPEN", "AH_CLOSED", "READ_ONLY" }) do
+    ns.On(message, Main.RefreshStatus)
 end

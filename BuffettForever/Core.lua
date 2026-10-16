@@ -36,6 +36,15 @@ function ns.SafeText(value, fallback)
     return tostring(value)
 end
 
+-- "<1 min", "12 min", "5 h", "3 d" for a number of seconds (reads well before "ago").
+function ns.FormatAge(seconds)
+    if type(seconds) ~= "number" then return "?" end
+    if seconds < 60 then return L["<1 min"] end
+    if seconds < 3600 then return string.format(L["%d min"], math.floor(seconds / 60)) end
+    if seconds < 172800 then return string.format(L["%d h"], math.floor(seconds / 3600)) end
+    return string.format(L["%d d"], math.floor(seconds / 86400))
+end
+
 -- Run protected-frame changes only out of combat.
 local combatQueue = {}
 function ns.RunOutOfCombat(fn)
@@ -50,6 +59,12 @@ end
 local DB_VERSION = 1
 local defaults = {
     minimap = { angle = 200, shown = true },   -- minimap button: degrees around the edge, visible
+    settings = {
+        historyDays = 14,                       -- days of price history kept per item (pruned at login)
+    },
+    markets = {},   -- [marketKey] = { items = { [itemID] = price row }, scan = last full scan } (Pricing/PriceDB.lua)
+    vendor = {},    -- [itemID] = { p = unit buy price, t, lim } (Pricing/Merchant.lua)
+    diag = {},      -- scanner diagnostics for the open AH probes (Pricing/Scanner.lua)
 }
 local charDefaults = {
     window = {},   -- main window position (per character)
@@ -75,8 +90,13 @@ ns.events = events
 local frame = CreateFrame("Frame")
 ns.eventFrame = frame
 
+-- Stays registered after our own load: other modules hear about Blizzard's LoadOnDemand
+-- addons (the Auction House UI) through ns.On("ADDON_LOADED", fn).
 function events:ADDON_LOADED(loaded)
-    if loaded ~= addonName then return end
+    if loaded ~= addonName then
+        ns.Fire("ADDON_LOADED", loaded)
+        return
+    end
     BuffettForeverDB = BuffettForeverDB or {}
     local db = BuffettForeverDB
     local from = db.dbVersion or DB_VERSION
@@ -95,7 +115,16 @@ function events:ADDON_LOADED(loaded)
     ns.charDB = BuffettForeverCharDB
     if ns.MinimapButton then ns.MinimapButton.Init() end
     if ns.BuildOptions then ns.BuildOptions(db) end
-    self:UnregisterEvent("ADDON_LOADED")
+end
+
+-- Fires after ADDON_LOADED when the saved file is too big: the game won't save it this
+-- session [F-127]. Stop growing it and tell the player.
+function events:SAVED_VARIABLES_TOO_LARGE(loaded)
+    if loaded ~= addonName then return end
+    ns.readOnlyDB = true
+    ns.svTooLarge = true
+    ns.Print(L["The saved price data is too large: the game won't save it this session. Scanning is paused."])
+    ns.Fire("READ_ONLY")
 end
 
 function events:PLAYER_LOGIN()
@@ -113,11 +142,26 @@ function events:PLAYER_REGEN_ENABLED()
     wipe(combatQueue)
 end
 
+-- At an auctioneer: scanning and searching are only possible in between.
+function events:AUCTION_HOUSE_SHOW()
+    ns.ahOpen = true
+    ns.Fire("AH_OPEN")
+end
+
+function events:AUCTION_HOUSE_CLOSED()
+    if not ns.ahOpen then return end
+    ns.ahOpen = false
+    ns.Fire("AH_CLOSED")
+end
+
 frame:SetScript("OnEvent", function(self, event, ...)
     local handler = events[event]
     if handler then handler(self, ...) end
 end)
 frame:RegisterEvent("ADDON_LOADED")
+frame:RegisterEvent("SAVED_VARIABLES_TOO_LARGE")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_LOGOUT")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+frame:RegisterEvent("AUCTION_HOUSE_SHOW")
+frame:RegisterEvent("AUCTION_HOUSE_CLOSED")

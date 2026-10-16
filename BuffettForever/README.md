@@ -5,7 +5,7 @@
 Auction House scanner and crafting ROI advisor for World of Warcraft: Forever: what to craft, where to sell
 it, and the return on every gold piece.
 
-> **Status: 0.1.0, early development.** The window, icon, minimap button and commands are in place; the
+> **Status: 0.2.0, early development.** Full Auction House scans and price storage work; the rest of the
 > features below arrive over the next releases.
 
 - **Auction House prices:** scan the whole Auction House while you talk to an auctioneer, or price-check one item
@@ -20,7 +20,10 @@ it, and the return on every gold piece.
 
 ## Commands
 - `/bf` or `/buffett`: open or close the window
+- `/bf scan`: scan the whole Auction House (at an auctioneer; also the **Scan** buttons in the window and under
+  the Auction House frame)
 - `/bf options`: settings
+- `/bf diag`: scanner diagnostics; `/bf selftest`: check the price math
 - `/bf minimap`: show or hide the minimap button
 - `/bf help`: list commands
 

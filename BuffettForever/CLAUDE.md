@@ -13,7 +13,11 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 
 ## Status
 - 0.1.0 (2026-10-16): scaffold + raw window (layout only), coin icon, minimap button, compartment, `/bf` and
-  `/buffett`, Settings panel (minimap toggle). Lints clean. **Not yet tested in game**: fill in the build.
+  `/buffett`, Settings panel (minimap toggle). Lints clean. Tested in game on 1.60.1.70425: works.
+- 0.2.0 M1 pass 1 (2026-10-16): full scan (Scanner), PriceDB, Econ.MarketValue/BuildLadder, diagnostics, Scan
+  buttons in the window and under the AH frame, `/bf scan | diag | selftest`. Tested on 70425: 61,933 listings,
+  2,998 items in 5.5 s; selftest 6/6; abort on AH close and the cooldown timeout work. Pass 2 (searches, bags,
+  merchant, tooltips) next.
 
 ## Decisions (2026-10-16, Justin)
 - **Bag clicks:** Alt+Right-click is context-aware. At the AH it price-checks the item (targeted search) and adds it
@@ -26,6 +30,17 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 - **No Auctionator code or design** (All Rights Reserved; its authors forbid use as a reference). Blizzard's
   source only.
 - **Inform, don't automate:** posting and buying are restricted APIs; the player clicks.
+
+## Decisions (2026-10-16, M1)
+- **AH frame button:** yes (`UI\AHButton.lua`), under Blizzard's AH frame right of its tabs; our window is usually
+  closed at the AH. Plain button, no hooks.
+- **Econ.lua started in M1:** PriceDB needs `MarketValue` and `BuildLadder`; `/bf selftest` runs their vectors. M3 adds
+  the rest.
+- **Ladder:** 8 levels, more until 100 units are covered, at most 16.
+- **Abort rule:** closing the AH aborts the read (nothing stored); once read, pricing finishes anyway.
+- **Items keyed by itemID only:** suffix variants of green gear ("of the Bear") merge. Fine for reagents; revisit
+  for gear in M4.
+- **Market key:** normalized realm + faction (+ ":HC"); the beta gives `ClassicBetaPvP2-Horde` [F-083].
 
 ## Architecture (planned files; build in this order)
 | File | Job |
@@ -74,8 +89,15 @@ Cut 5% until measured; sale chance per listing 0.5; margin of safety 20%; minimu
 14 days, half-life 3 days; stale after 48 h; make-or-buy depth 3; owned materials at opportunity cost.
 
 ## Open questions and probes (run in game; record Forever facts in forever-facts.md, decisions here)
-- Replicate index base and the ReplicateItems cooldown; are reagents commodities; the AH cut (seller invoice).
-- Realm/faction values and who shares an AH (sets `marketKey`).
+- Answered on 70425 by the scanner's `diag` [F-121]:
+  - the replicate index is 0-based;
+  - reagents are commodities;
+  - copper values are supported;
+  - the cooldown is over 2 min.
+- Still open:
+  - the cooldown's exact length (the `diag.requests` log measures it);
+  - the AH cut (seller invoice);
+  - who shares an AH (sets `marketKey`): scan with an Alliance character and compare the ladders.
 - `GetRecipeSchematic` with the profession window closed, and for recipes the character doesn't know.
 - `GetAllRecipeIDs` signature; does `IsPlayerSpell(recipeID)` report learned recipes without the window?
 - Merchant `numAvailable` for unlimited stock.
