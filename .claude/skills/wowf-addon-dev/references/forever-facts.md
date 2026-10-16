@@ -1,6 +1,6 @@
 # WoW Forever facts ledger
 
-Facts as of **2026-10-14**. Status tags:
+Facts as of **2026-10-16** (§13 added; earlier sections last checked 2026-10-14). Status tags:
 - **[Probe]**: measured in the client (WowfProbe or a community probe);
 - **[Source]**: Blizzard UI source, `forever` branch of Gethe/wow-ui-source;
 - **[Wiki]**: warcraft.wiki.gg;
@@ -23,7 +23,8 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
 10. Comms and chat
 11. Audio
 12. World data (zones, races)
-13. Retest checklist for every new build
+13. Economy: auction house, professions, vendors
+14. Retest checklist for every new build
 
 ## 1. Client, builds and products
 - **[F-001]** Forever = game type **Camelot** in the Mainline family. Blizzard: "Forever and modern WoW (Midnight) are two game types within the Mainline code family: Camelot (to be renamed before launch) and Standard." It shares "the vast majority of APIs available in 12.1.5"; Midnight's addon disarmament, secrets included, is active; the 12.1.0 AuraContainer/AuraButton changes are included. [Official, WoW UI Discord via Wowhead, 2026-09-16]
@@ -192,7 +193,62 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
 
   Don't assume every zone has a Kalimdor or Eastern Kingdoms parent. [Official; Community]
 
-## 13. Retest checklist (run on every new build)
+## 13. Economy: auction house, professions, vendors
+Details and code: auction-house.md, professions-and-vendors.md; pricing math: the `wowf-economics` skill.
+- **[F-120]** Only the **modern** auction house exists. All 85 `C_AuctionHouse` functions are documented and
+  present at runtime; `Blizzard_AuctionHouseUI` is LoadOnDemand (`AllowLoadGameType: mainline, cata, mists`)
+  with a Forever category file `Camelot\Blizzard_AuctionData.lua` (vanilla weapon and armor types, soul bags,
+  quivers, ammo pouches, Trade Goods, Recipes, WoW Token). Every Classic AH global (`QueryAuctionItems`,
+  `GetAuctionItemInfo`, `CanSendAuctionQuery`, …) and the global `CloseAuctionHouse` are absent; `AuctionFrame`
+  is nil. `Enum.PlayerInteractionType.Auctioneer = 21`. Search queries are capped at 100 per minute (docs).
+  Scanning has no restriction flags; post, bid, buy and cancel are `HasRestrictions`. [Source; Probe 70374]
+- **[F-121]** AH prices are copper (`BigUInteger`). `GetReplicateItemInfo(index)` has 18 returns; `buyoutPrice`
+  is for the whole stack and `hasAllInfo` is nilable. The replicate index is typed `number` (0-based on retail):
+  **probe**. Commodity status by itemID: `GetItemKeyInfo(MakeItemKey(id)).isCommodity`;
+  `GetItemCommodityStatus` takes an ItemLocation. [Source 70374]
+- **[F-122]** There is **no AH cut API or constant**. Measure it from seller invoices: `GetInboxInvoiceInfo`
+  (undocumented, present) → `consignment / bid`. Deposits: `CalculateCommodityDeposit` /
+  `CalculateItemDeposit`. `Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5`.
+  The cut rate and the ReplicateItems cooldown on Forever: **unmeasured**. [Source; Probe 70374]
+- **[F-123]** Professions use the modern `Blizzard_Professions` (LoadOnDemand) with Camelot overrides; Forever
+  forces "show unlearned" off. `Blizzard_TradeSkillUI` and `Blizzard_CraftUI` don't exist; Enchanting uses the
+  normal window. `C_TradeSkillUI`: 89 documented + 57 runtime-only functions (`GetAllRecipeIDs`,
+  `GetFilteredRecipeIDs`, `GetTradeSkillLineForRecipe`, `IsTradeSkillReady`, `GetRecipeCooldown`, …). Reagents come
+  from `GetRecipeSchematic(id, isRecraft)`; Blizzard's recipe tracker calls it with no profession window open.
+  All Classic tradeskill and craft APIs are gone and `C_Professions` doesn't exist. `GetProfessions()` returns 7
+  values (2 primary, 5 secondary). [Source; Probe 70374]
+- **[F-124]** Vendors: `C_MerchantFrame.GetItemInfo(i)` → `{price (for stackCount units), stackCount,
+  numAvailable, hasExtendedCost, …}`; `GetMerchantNumItems`, `GetMerchantItemID`, `GetMerchantItemLink` are
+  undocumented but present; `GetMerchantItemInfo` is absent. [Source; Probe 70374]
+- **[F-125]** Items and item UI:
+  - `C_Item.GetItemInfo`: `sellPrice` 11th, `bindType` 14th, `isCraftingReagent` 17th return.
+  - Absent: `PickupItem` (use `C_Item.PickupItem`), the `ItemButtonTemplate` template (use
+    `CreateFrame("ItemButton")`, `LargeItemButtonTemplate` or `SmallItemButtonTemplate`),
+    `ContainerFrameItemButton_OnModifiedClick`, and the globals `GetCoinTextureString` / `GetCoinText`
+    (`C_CurrencyInfo` has both). `COPPER_PER_GOLD` exists only in FrameXML.
+  - Bag clicks: any modified click goes to `ContainerFrameItemButtonMixin:OnModifiedClick` →
+    `HandleModifiedItemClick(link, itemLocation)` and never uses, sells or posts the item
+    (`Mainline\ContainerFrame.lua`). `Bindings_Camelot.xml` binds ALT only to SELFCAST, SHOWITEMFLYOUT and
+    SHOWMULTICASTFLYOUT, so Alt+click on bag items is free. Hook `HandleModifiedItemClick`, not the mixin.
+  - `ChatEdit_InsertLink` is a deprecated alias of `ChatFrameUtil.InsertLink`. `GameTooltip:SetItemByID` can
+    return false silently.
+
+  [Source 70374]
+- **[F-126]** Forever's game tables on wago.tools (build **1.60.1.70245**, read 2026-10-16) hold all recipe data:
+  SpellReagents (3,300 rows), SkillLineAbility, SpellEffect (Effect 24 → `EffectItemType`, count in
+  `EffectBasePointsF`), ItemSparse (`SellPrice`, `BuyPrice`, `VendorStackCount`, `Bonding`).
+  - 2,340 profession recipes create an item; 2,011 have their output and every reagent in ItemSparse (1,157 with
+    Classic-range output IDs). 182 enchant-only spells, 388 BoP outputs, 213 multi-output recipes (bars ×2,
+    bullets ×200).
+  - 1,169 outputs have IDs ≥ 200000, many with Season-of-Discovery-era names; whether they're obtainable on
+    Forever is **unconfirmed**. Items missing from ItemSparse are encrypted in that build.
+  - Profession skill lines are the Classic IDs (164 … 393, 129), each with a Forever child line 2937–2948.
+
+  [Source: wago.tools DB2 70245]
+- **[F-127]** `SAVED_VARIABLES_TOO_LARGE(addOnName)` exists; Blizzard shows a popup (`GameEvent.HandleSavedVariablesTooLarge`).
+  Whether data is dropped at load or at save is unverified on Forever. [Source 70374]
+
+## 14. Retest checklist (run on every new build)
 
 Use `/wowfprobe full`, then `cli.py probe-report`.
 1. Build, interface, `WOW_PROJECT_ID`, `[Game]`/`[Family]`, Forever preset.
@@ -203,3 +259,9 @@ Use `/wowfprobe full`, then `cli.py probe-report`.
 6. Run a real secure snippet ([F-061]).
 7. `GetCurrentRegion()` value ([F-064]).
 8. The documented-vs-runtime namespace diff ([F-034]).
+9. Economy probes (lines in auction-house.md and professions-and-vendors.md): replicate index base and the
+   ReplicateItems cooldown ([F-121]); are reagents commodities; the AH cut from a seller invoice ([F-122]);
+   realm/faction keys and which characters share an AH ([F-081]); `GetRecipeSchematic` with the window closed
+   and for an unknown recipe; `GetAllRecipeIDs` signature; `IsPlayerSpell(recipeID)` for learned recipes
+   ([F-123]); merchant `numAvailable` for unlimited stock ([F-124]).
+10. Regenerate recipe data from the new build's tables and diff the counts against [F-126].

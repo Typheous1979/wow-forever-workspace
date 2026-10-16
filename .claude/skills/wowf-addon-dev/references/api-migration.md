@@ -19,6 +19,12 @@ The machine-readable list behind lint rule API002 is `tools/wowf/data/removed_ap
 | `EasyMenu`, `UIDropDownMenu_*` menus | `MenuUtil.CreateContextMenu(owner, function(owner, root) ... end)` |
 | `SendAddonMessage`, `RegisterAddonMessagePrefix` | `C_ChatInfo.SendAddonMessage/RegisterAddonMessagePrefix` |
 | `GetCoinTextureString`, `GetCoinText` | `C_CurrencyInfo.GetCoinTextureString/GetCoinText` |
+| `QueryAuctionItems` (incl. getAll), `GetAuctionItemInfo`, `GetNumAuctionItems`, `GetAuctionItemLink`, `CanSendAuctionQuery` | full scan: `C_AuctionHouse.ReplicateItems` + `GetNumReplicateItems`/`GetReplicateItemInfo`; one item: `MakeItemKey` + `SendSearchQuery` + `Get*SearchResultInfo`; throttle: `IsThrottledMessageSystemReady` (auction-house.md) [F-120] |
+| `PostAuction`, `StartAuction`, `PlaceAuctionBid`, `CalculateAuctionDeposit`, `CloseAuctionHouse` | `C_AuctionHouse.PostItem/PostCommodity/PlaceBid` (restricted: player-initiated only), `CalculateCommodityDeposit/CalculateItemDeposit`, `C_AuctionHouse.CloseAuctionHouse` |
+| `GetNumTradeSkills`, `GetTradeSkillInfo`, `GetTradeSkillReagentInfo`, `GetTradeSkillItemLink`, `GetCraftInfo`, `DoTradeSkill`, `DoCraft` | `C_TradeSkillUI.GetAllRecipeIDs` (runtime-only), `GetRecipeInfo`, `GetRecipeSchematic(id, false)`, `GetRecipeOutputItemData`, `CraftRecipe` (professions-and-vendors.md) [F-123] |
+| `GetMerchantItemInfo` | `C_MerchantFrame.GetItemInfo(i)` → table; `price` buys `stackCount` units [F-124] |
+| `PickupItem` | `C_Item.PickupItem` [F-125] |
+| `ChatEdit_InsertLink` | `ChatFrameUtil.InsertLink` (the old name is a deprecated alias) |
 | `PlayVocalErrorSoundID` | `C_Sound.PlayVocalErrorSound` |
 | `SetDesaturation(tex, on)` | `tex:SetDesaturated(on)` |
 | `InterfaceOptions_AddCategory`, `InterfaceOptionsFrame_OpenToCategory` | the Settings API (ui-patterns.md) |

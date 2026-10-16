@@ -14,6 +14,7 @@ silent protected-call failures). Stress test Oct 19 2026, launch Nov 4 2026.
 - `wowf-deploy` — junction an addon into the client's Interface\AddOns
 - `wowf-debug` — diagnose from errors, SavedVariables, logs, crash reports; WowfProbe dev addon
 - `wowf-refresh` — `/wowf-refresh` when a new build lands
+- `wowf-economics` — price estimation, crafting cost, ROI and recommendation math for gold-making addons
 
 ## Rules
 - Never invent APIs. If unsure, check with `wowf-api`; if still unknown, give a safe `type()` probe.
@@ -28,3 +29,21 @@ silent protected-call failures). Stress test Oct 19 2026, launch Nov 4 2026.
 - Start sessions at `AddOns\` or below so skills load. MusicForever publishes to its own repo later
   via `git subtree split`.
 - Python tooling is stdlib-only (Python 3.12+). Run tests: `python -m unittest discover -s tools/wowf/tests`.
+  After editing a skill: `python tools/wowf/validate_skills.py` (also run by the tests).
+
+## Working from an addon folder
+- A session opened in `AddOns\<Addon>\` still loads these rules, every wowf skill and the shared memory
+  (Claude Code walks up to the git root), plus that addon's own `CLAUDE.md`. Prefer this for addon work.
+- `<Addon>\.claude\settings.json` (scaffold feature `claude`) grants `..`, so the shared skills and tools
+  are readable and editable from there; edits under `.claude\` still ask first (protected path).
+- Paths in these rules are relative to the workspace root. From an addon folder use
+  `python ../tools/wowf/cli.py …`, or the skill shims, which find the root themselves.
+
+## Knowledge capture (finish every task with this)
+Put each lesson where the next addon will find it, and say what you recorded in your summary:
+- Forever fact (build-specific behaviour) → `wowf-addon-dev/references/forever-facts.md` with ID, tag, build.
+- Reusable API flow or UI pattern → the matching `wowf-addon-dev/references/*.md`.
+- Domain knowledge (economics, audio, …) → a domain skill such as `wowf-economics`.
+- Tool gap or a manual step done twice → `tools/wowf/` plus a test.
+- A decision that only matters to one addon → that addon's `CLAUDE.md`.
+- Commit shared changes separately from addon code: `skills: …`, `tools: …`, `<Addon>: …`.

@@ -1,12 +1,12 @@
 ---
 name: wowf-addon-dev
-description: Core knowledge for World of Warcraft Forever addons (game type Camelot/forever, TOC Interface 16001, Mainline 12.1.5 API with Midnight secret values and no combat log). Golden rules, TOC format, Lua 5.1 environment, SavedVariables lifecycle, secret values, protected and restricted calls, Settings panel, addon compartment, slash commands, audio and music APIs, and porting Midnight or Classic addons. Use whenever writing, editing, planning, reviewing or porting WoW Forever addon Lua, TOC or XML, or answering how Forever addons work, even if the user just says WoW addon.
-when_to_use: Forever, Camelot, 16001, WOW_PROJECT_CAMELOT, wow forever addon, make X work on Forever, port to Forever, MusicForever
+description: Core knowledge for World of Warcraft Forever addons (game type Camelot/forever, TOC Interface 16001, Mainline 12.1.5 API with Midnight secret values and no combat log). Golden rules, TOC format, Lua 5.1 environment, SavedVariables lifecycle, secret values, protected and restricted calls, Settings panel, addon compartment, slash commands, audio and music APIs, auction house scanning, professions and recipe data, vendor prices, and porting Midnight or Classic addons. Use whenever writing, editing, planning, reviewing or porting WoW Forever addon Lua, TOC or XML, or answering how Forever addons work, even if the user just says WoW addon.
+when_to_use: Forever, Camelot, 16001, WOW_PROJECT_CAMELOT, wow forever addon, make X work on Forever, port to Forever, MusicForever, BuffettForever, auction house, crafting, recipes, vendor
 ---
 
 # WoW Forever addon development
 
-**Facts as of 2026-10-14.** Beta server 1.60.1.70374, Justin's installed client 70338, `wowf` stress-test/launch product 70245. Facts drift between beta builds. Each one carries a status tag and a build; see `references/forever-facts.md` (IDs like [F-012]). When the build in front of you is newer than these facts, suggest `/wowf-refresh`.
+**Facts as of 2026-10-16.** Beta server 1.60.1.70374, Justin's installed client 70374, `wowf` stress-test/launch product 70245. Facts drift between beta builds. Each one carries a status tag and a build; see `references/forever-facts.md` (IDs like [F-012]). When the build in front of you is newer than these facts, suggest `/wowf-refresh`.
 
 **What Forever is:** the original Azeroth (cap 60, new zones and races) running the **modern Mainline UI and API, 12.1.5 family**, as the game type **Camelot** (TOC alias `forever`). Midnight's addon disarmament is fully active: **secret values**, **no combat log**, and protected calls that fail silently. Forever is NOT Classic Era. Classic tutorials, Classic WeakAuras and most AI training data are wrong for it.
 
@@ -59,6 +59,8 @@ Read `references/porting.md`. It covers:
 | `references/ui-patterns.md` | Frames, backdrop, movable panels, Settings panel, addon compartment, slash commands, popups, tooltips, localization |
 | `references/protected-and-restricted.md` | Taint, protected or forbidden calls, combat lockdown, addon messages and chat limits |
 | `references/audio.md` | Sounds, music, SOUNDKIT, FileDataIDs, shipping .ogg/.mp3, sound CVars, zone, day/night and weather triggers |
+| `references/auction-house.md` | Anything touching the auction house: full scans (ReplicateItems), searches, throttles, commodities, deposits, the cut, storing price history |
+| `references/professions-and-vendors.md` | Recipes and reagents (C_TradeSkillUI, the Forever recipe tables on wago.tools), vendor buy/sell prices, money formatting, item slots, drag-and-drop, Alt+click bag hooks |
 | `references/porting.md` | Bringing an existing addon to Forever |
 | `references/what-to-build.md` | Deciding whether a feature is allowed, useful, or already built in |
 | `references/sources.md` | Where facts come from and how to re-fetch them |

@@ -5,7 +5,7 @@
 | Bags, bank, vendor, tooltips, mail | **Build** | presents data the UI already shows |
 | Quest log helpers, route and guide addons, map pins | **Build** | use `C_Map.SetUserWaypoint`, not super-track [F-050] |
 | Audio and music (zone/event soundtracks, alert sounds) | **Build** | sound APIs aren't restricted; see audio.md |
-| Notes, journals, collections, professions, AH helpers | **Build** | the modern `C_AuctionHouse` is present |
+| Notes, journals, collections, professions, AH helpers | **Build** | the modern `C_AuctionHouse` is present [F-120]; see auction-house.md, professions-and-vendors.md and the `wowf-economics` skill. Inform, don't automate: posting and buying are restricted |
 | UI skins, fonts, layout, minimap tidy-up | **Build carefully** | don't move Blizzard Edit Mode frames; style your own |
 | Nameplate art | **Build carefully** | the unit may not be ready at `NAME_PLATE_UNIT_ADDED` [F-063]; names can be secret |
 | Personal status strips (health and power bars) | **Build** | StatusBar accepts secrets; no math |
@@ -22,6 +22,6 @@ Before building anything, ask "does Blizzard already ship this?", and check `pyt
 
 ## License etiquette
 - Read other addons only to learn behaviour unless their license allows reuse.
-- Never copy All-Rights-Reserved code.
+- Never copy All-Rights-Reserved code. Auctionator is All Rights Reserved and its authors forbid using it as a reference; check any other AH addon's license (TSM is a commercial product) before reading it. Blizzard's own UI source covers the same APIs.
 - Credit MIT/BSD sources.
 - Ship only audio and art you have rights to.

@@ -4,5 +4,5 @@ local addonName, ns = ...
 ns.queries = {
     functions = {},
     events = {},
-    addons = {},
+    addons = { "Blizzard_AuctionHouseUI", "Blizzard_Professions", "Blizzard_ProfessionsTemplates" },
 }
