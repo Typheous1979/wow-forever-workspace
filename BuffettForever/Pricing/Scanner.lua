@@ -351,12 +351,12 @@ function Scanner.IsBusy()
 end
 
 -- Seconds until a full scan is likely to get data again (0: now), and the cooldown estimate:
--- the smallest gap that has worked, else the retail 15 min unless a longer gap has failed.
+-- retail's 15 min, kept inside the measured bounds (over < cooldown <= atMost).
 function Scanner.CooldownLeft()
     if not ns.db then return 0, COOLDOWN_GUESS end
     local diag = Diag()
     local cooldown = diag.cooldown
-    local estimate = cooldown.atMost or math.max(COOLDOWN_GUESS, (cooldown.over or 0) + 60)
+    local estimate = math.min(cooldown.atMost or math.huge, math.max(COOLDOWN_GUESS, cooldown.over or 0))
     if not diag.lastData then return 0, estimate end
     return math.max(0, estimate - (GetServerTime() - diag.lastData)), estimate
 end

@@ -9,7 +9,9 @@ local addonName, ns = ...
 -- Results arrive as COMMODITY_SEARCH_RESULTS_UPDATED/ADDED or ITEM_SEARCH_RESULTS_UPDATED/ADDED;
 -- up to MAX_PAGES pages are read, then PriceDB.Record stores them like a scan.
 --   Search.Request(itemID, itemKey or nil, callback(itemID, result, problem))
---   result = { mv, min, q, n, full } (full = every listing was read), or nil with a problem.
+--   result = { mv, min, q, n or prices, full } (full = every listing was read), or nil with a
+--   problem. Commodity rows are grouped by unit price [F-121], so a commodity result counts
+--   prices, not auctions (n stays nil).
 
 local L = ns.L
 local Search = {}
@@ -107,9 +109,11 @@ local function Finish(q, problem)
         if not listings or #listings == 0 then
             problem = (q.n or 0) == 0 and L["none listed."] or L["listed, but bid-only."]
         else
-            local mv, min, qty, auctions = ns.Econ.MarketValue(listings)
-            result = { mv = mv, min = min, q = qty, n = auctions, full = q.full }
-            ns.PriceDB.Record(q.itemID, listings)
+            local mv, min, qty, rows = ns.Econ.MarketValue(listings)
+            local commodity = q.kind == "commodity"
+            result = { mv = mv, min = min, q = qty, full = q.full }
+            if commodity then result.prices = rows else result.n = rows end
+            ns.PriceDB.Record(q.itemID, listings, nil, commodity)
         end
     end
     if ns.db and not ns.readOnlyDB then

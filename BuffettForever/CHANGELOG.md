@@ -25,6 +25,11 @@
 - Fixes: row `n` of a full scan (itemID 0) no longer counts as a listing, so the index base reads 0. A scan stopped
   while waiting now records how long it waited.
 - Pass 2 (searches, bags, merchant, tooltips) tested on build 1.60.1.70425, 2026-10-16.
+- From the pass 2 diagnostics:
+  - A commodity search no longer overwrites the auction count: its rows are grouped by price, so it reports "listed at
+    N prices" and keeps the full scan's count.
+  - The next-scan hint keeps retail's 15 min inside the measured cooldown bounds instead of jumping to the upper
+    bound (38 min).
 
 ## 0.1.0 (not released)
 - Scaffolded with the workspace generator: window (layout only: reagent tray, top pick, craftable items,

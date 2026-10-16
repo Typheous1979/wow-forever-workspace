@@ -8,7 +8,8 @@ local addonName, ns = ...
 --     scan = { t, items, n } }                      -- the last full scan of this market
 -- Prices are copper per unit, kept to 0.01 copper. A day is floor(serverTime / 86400). In the
 -- day string, mv is the mean of that day's scans, min the lowest, q and n the latest, and k
--- counts the scans.
+-- counts the scans. n (auctions) comes from full scans; it can be missing ("mv:min:q::k") for an
+-- item seen only in a commodity search.
 
 local PriceDB = {}
 ns.PriceDB = PriceDB
@@ -81,8 +82,10 @@ function PriceDB.Market(create)
     return market
 end
 
--- Store one item's listings from a scan or search. Returns the row, or nil.
-function PriceDB.Record(itemID, listings, now)
+-- Store one item's listings from a scan or search. Returns the row, or nil. keepAuctions: the
+-- listings are commodity search rows, grouped by unit price, so they hold no auction count;
+-- keep the one from the last full scan.
+function PriceDB.Record(itemID, listings, now, keepAuctions)
     if ns.readOnlyDB then return nil end
     local mv, min, q, n = ns.Econ.MarketValue(listings)
     if not mv then return nil end
@@ -94,6 +97,7 @@ function PriceDB.Record(itemID, listings, now)
         row = {}
         market.items[itemID] = row
     end
+    if keepAuctions then n = row.n end
     row.t, row.mv, row.min, row.q, row.n = now, Round2(mv), Round2(min), q, n
     row.ladder = PackLadder(ns.Econ.BuildLadder(listings))
 
@@ -108,7 +112,7 @@ function PriceDB.Record(itemID, listings, now)
         end
         if pmin and pmin < dayMin then dayMin = pmin end
     end
-    row.h[day] = table.concat({ Num(dayMV), Num(dayMin), q, n, k }, ":")
+    row.h[day] = table.concat({ Num(dayMV), Num(dayMin), q, n or "", k }, ":")
     return row
 end
 
