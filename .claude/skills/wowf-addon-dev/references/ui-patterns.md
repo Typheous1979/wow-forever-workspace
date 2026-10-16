@@ -157,6 +157,7 @@ StaticPopup_Show("MYADDON_CONFIRM_RESET")
 
 ## Tooltips
 - Add lines to Blizzard tooltips with `TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data) ... end)`, not by hooking `OnTooltipSetItem`.
+- Post-calls run just before Blizzard's `tooltip:Show()` (`TooltipDataHandler.lua`), so add lines and don't call Show yourself.
 - Tooltip setters are secure delegates; don't call them on Blizzard tooltips from insecure code during combat.
 
 ## Localization

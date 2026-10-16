@@ -87,8 +87,9 @@ That's a probe; if it works, check known recipes at login instead.
   `i = 1, GetMerchantNumItems()` (runtime-only): `C_MerchantFrame.GetItemInfo(i)` →
   `{name?, texture, price, stackCount, numAvailable, isPurchasable, isUsable, hasExtendedCost, currencyID?, ...}` and
   `GetMerchantItemID(i)`. `price` buys `stackCount` units, so unit price = price / stackCount. Skip
-  `hasExtendedCost` items (token or currency costs). A limited supply shows in `numAvailable` (retail uses -1 for
-  unlimited; verify). Reputation discounts are already applied.
+  `hasExtendedCost` items (token or currency costs). A limited supply shows in `numAvailable`; **-1 means
+  unlimited** (confirmed on 70425 [F-124]). Reputation discounts are already applied.
+- Working code: BuffettForever `Pricing\Merchant.lua` (MERCHANT_SHOW/UPDATE, 0.2 s debounce, tested on 70425).
 - `GetMerchantItemInfo` is gone; Blizzard's own merchant frame uses `C_MerchantFrame.GetItemInfo`.
 
 ## Money
@@ -115,6 +116,10 @@ That's a probe; if it works, check known recipes at login instead.
 ## Tooltips
 - `TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data) ... end)`; `data.id`
   is the itemID (ui-patterns.md). `TooltipUtil.GetDisplayedItem(tooltip)` → name, link, id.
+- Blizzard's own sell-price line is a `data.lines` entry with `type == Enum.TooltipDataLineType.SellPrice` (11)
+  and a `price` (`TooltipDataRules.SellPrice`). Check for it before adding your own "vendor pays" line.
+- Skip `tooltip.isShopping` (comparison tooltips), and limit lines to `GameTooltip` / `ItemRefTooltip` unless you
+  want them everywhere. Working code: BuffettForever `Tooltip.lua` (tested on 70425).
 - `GameTooltip:SetItemByID` / `:SetHyperlink` can return false silently [F-125].
 
 ## Probes (paste in game; record results in forever-facts.md with the build)

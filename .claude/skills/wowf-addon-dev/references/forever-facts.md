@@ -216,20 +216,28 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   Measured by BuffettForever's scanner [Probe 70425]:
   - **The replicate index is 0-based:** rows are `0 .. n-1` with `n = GetNumReplicateItems()`. Index `n` doesn't
     error or return nil: it returns `itemID 0, count -1, buyout 0`. Treat `itemID == 0` as "no row".
-  - `REPLICATE_ITEM_LIST_UPDATE` came **4.7 s** after `ReplicateItems()` for 61,933 rows. It then fired **3,117 more
-    times** while the rows were read, as item data for uncached rows arrived. Act on the first one only.
+  - `REPLICATE_ITEM_LIST_UPDATE` came **4.7 s** after `ReplicateItems()` for 61,933 rows (4.2 s for 62,341). It then
+    fired **3,117 more times** (3,113 the next scan) while the rows were read: about once per distinct item, as item
+    data for uncached rows arrived. Act on the first one only.
   - 5,390 of the 61,933 rows (8.7%) had `hasAllInfo` false when read, but `itemID`, `count` and `buyoutPrice` were
     always valid. Pricing by itemID doesn't need to wait for the item data.
-  - **Cooldown:** a second `ReplicateItems()` 121 s after a successful one got **no event at all** within 60 s. So the
-    cooldown is over 2 min; its exact length is unmeasured (retail: 15 min). A request inside the cooldown is ignored,
-    not queued, so use a timeout.
+  - **Cooldown:** a second `ReplicateItems()` 121 s after a successful one got **no event at all** within 60 s. One
+    2,300 s (38 min) after the last data got data in 4.2 s. So the cooldown is **between 2 and 38 min** (retail:
+    15 min). A request inside the cooldown is ignored, not queued, so use a timeout.
+  - **Targeted searches** at one query in flight:
+    - Commodity results are **grouped by unit price**: Light Leather returned 41 result rows while the full scan
+      showed 295 auctions. A commodity search gives quantity per price, not an auction count.
+    - It came in one page (`HasFullCommoditySearchResults` true) in 0.08–0.16 s.
+    - Equipment through `SendSellSearchQuery` (item level and suffix cleared) returned all 7 listings in one page in
+      0.16–0.41 s.
+    - `IsThrottledMessageSystemReady()` never held a query back.
   - The reagents Linen Cloth 2589, Copper Ore 2770, Copper Bar 2840, Peacebloom 2447 and Light Leather 2318 are all
     **commodities**: search them with commodity searches.
   - `C_AuctionHouse.SupportsCopperValues()` = **true**: prices can carry copper.
 - **[F-122]** There is **no AH cut API or constant**. Measure it from seller invoices: `GetInboxInvoiceInfo`
   (undocumented, present) → `consignment / bid`. Deposits: `CalculateCommodityDeposit` /
   `CalculateItemDeposit`. `Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5`.
-  The cut rate on Forever: **unmeasured**. The ReplicateItems cooldown is over 2 min ([F-121]). [Source; Probe 70374, 70425]
+  The cut rate on Forever: **unmeasured**. The ReplicateItems cooldown is between 2 and 38 min ([F-121]). [Source; Probe 70374, 70425]
 - **[F-123]** Professions use the modern `Blizzard_Professions` (LoadOnDemand) with Camelot overrides; Forever
   forces "show unlearned" off. `Blizzard_TradeSkillUI` and `Blizzard_CraftUI` don't exist; Enchanting uses the
   normal window. `C_TradeSkillUI`: 89 documented + 57 runtime-only functions (`GetAllRecipeIDs`,
@@ -240,6 +248,9 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
 - **[F-124]** Vendors: `C_MerchantFrame.GetItemInfo(i)` → `{price (for stackCount units), stackCount,
   numAvailable, hasExtendedCost, …}`; `GetMerchantNumItems`, `GetMerchantItemID`, `GetMerchantItemLink` are
   undocumented but present; `GetMerchantItemInfo` is absent. [Source; Probe 70374]
+  - **`numAvailable` = -1 means unlimited stock** (37 of 37 items at a trade-goods vendor). `price` buys
+    `stackCount` units: one item cost 10c for a stack of 5. A limited item hasn't been seen yet. Harvesting from
+    `MERCHANT_SHOW`/`MERCHANT_UPDATE` (0.2 s debounce) worked. [Probe 70425]
 - **[F-125]** Items and item UI:
   - `C_Item.GetItemInfo`: `sellPrice` 11th, `bindType` 14th, `isCraftingReagent` 17th return.
   - Absent: `PickupItem` (use `C_Item.PickupItem`), the `ItemButtonTemplate` template (use
@@ -250,6 +261,8 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     `HandleModifiedItemClick(link, itemLocation)` and never uses, sells or posts the item
     (`Mainline\ContainerFrame.lua`). `Bindings_Camelot.xml` binds ALT only to SELFCAST, SHOWITEMFLYOUT and
     SHOWMULTICASTFLYOUT, so Alt+click on bag items is free. Hook `HandleModifiedItemClick`, not the mixin.
+    Confirmed in game: an Alt+Right-click post-hook works at the AH and at a vendor, while plain right-click still
+    posts and sells. [Probe 70425]
   - `ChatEdit_InsertLink` is a deprecated alias of `ChatFrameUtil.InsertLink`. `GameTooltip:SetItemByID` can
     return false silently.
 

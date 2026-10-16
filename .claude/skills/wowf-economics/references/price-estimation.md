@@ -134,6 +134,9 @@ When the ladder can't fill Q, say so ("only 160 listed"); don't extrapolate sile
 ```
 A day can hold several scans. `k` counts them, so the day's `mv` stays the mean of its scans
 (`(mv * k + new) / (k + 1)`); `min` is the day's lowest, and `qty` and `n` the latest. Keep prices to 0.01 copper.
+`n` (auctions) comes from full scans, one row per auction. A **commodity search returns rows grouped by unit
+price** (41 rows for 295 auctions on 70425), so it has no auction count. Keep the scan's `n` and let the search update
+the prices, quantity and ladder. The quantity-weighted market value is the same either way.
 Pack days into strings, prune at login, and keep the file small: about 185 bytes per item plus 33 per day on
 70425 (auction-house.md has the measurements and the `SAVED_VARIABLES_TOO_LARGE` note). Store aggregates only,
 never every listing.

@@ -78,19 +78,37 @@ end
   - No secure attributes, no hooks, and nothing written into Blizzard's frame table.
 
 ## Targeted searches (one item, current prices)
-- `itemKey = C_AuctionHouse.MakeItemKey(itemID)` → `{itemID, itemLevel = 0, itemSuffix = 0, battlePetSpeciesID = 0}`.
-- Commodity or item? `C_AuctionHouse.GetItemKeyInfo(itemKey).isCommodity`; the info can be nil until
-  `ITEM_KEY_ITEM_INFO_RECEIVED(itemID)`. `GetItemCommodityStatus` takes an ItemLocation (a bag slot), not an ID.
-  Blizzard's frame branches the same way (`Blizzard_AuctionHouseFrame.lua`, `SelectBrowseResult`).
-- Send: `C_AuctionHouse.SendSearchQuery(itemKey, sorts, separateOwnerItems)` with
-  `sorts = { { sortOrder = Enum.AuctionHouseSortOrder.Price, reverseSort = false } }`. The docs cap search
-  queries at **100 per minute** and say not to use them for full scans.
-- Commodity results: `COMMODITY_SEARCH_RESULTS_UPDATED(itemID)` → `GetNumCommoditySearchResults(itemID)` and
-  `GetCommoditySearchResultInfo(itemID, i)` (1-based) → `{quantity, unitPrice, auctionID, owners, ...}`.
-- Item results: `ITEM_SEARCH_RESULTS_UPDATED(itemKey, newAuctionID?)` → `GetNumItemSearchResults(itemKey)` and
-  `GetItemSearchResultInfo(itemKey, i)` → `{quantity, buyoutAmount?, itemLink?, ...}`; `buyoutAmount` is nil
-  for bid-only auctions.
-- More rows: `RequestMoreCommoditySearchResults` / `RequestMoreItemSearchResults` until `HasFull*SearchResults`.
+Working code: BuffettForever `Pricing\Search.lua` (tested on 70425).
+- **The key:**
+  - `itemKey = C_AuctionHouse.MakeItemKey(itemID)` → `{itemID, itemLevel = 0, itemSuffix = 0, battlePetSpeciesID = 0}`.
+  - For a bag item, take Blizzard's exact key: `C_AuctionHouse.GetItemKeyFromItem(itemLocation)`. That's what the
+    sell frame does.
+- **Commodity, equipment or item?**
+  - `C_AuctionHouse.GetItemKeyInfo(itemKey)` → `.isCommodity`, `.isEquipment`. The info can be nil until
+    `ITEM_KEY_ITEM_INFO_RECEIVED(itemID)`.
+  - Without it, item class 2/4 (`Enum.ItemClass.Weapon/Armor` from `C_Item.GetItemInfoInstant`) means equipment.
+    For anything else, the results event tells commodity from item.
+  - `GetItemCommodityStatus` takes an ItemLocation (a bag slot), not an ID. Blizzard's frame branches the same way
+    (`Blizzard_AuctionHouseFrame.lua`, `SelectBrowseResult`).
+- **Send:**
+  - Commodities and plain items: `C_AuctionHouse.SendSearchQuery(itemKey, sorts, separateOwnerItems)` with
+    `sorts = { { sortOrder = Enum.AuctionHouseSortOrder.Price, reverseSort = false } }`.
+  - Equipment: `C_AuctionHouse.SendSellSearchQuery(key, sorts, false)` with `itemLevel` and `itemSuffix` set to 0.
+    That returns every variant, as Blizzard's sell frame does (`AuctionHouseUtil.ConvertItemSellItemKey`).
+  - The docs cap search queries at **100 per minute** and say not to use them for full scans.
+- **Commodity results:** `COMMODITY_SEARCH_RESULTS_UPDATED(itemID)` (or `_ADDED`) →
+  `GetNumCommoditySearchResults(itemID)` and `GetCommoditySearchResultInfo(itemID, i)` (1-based) →
+  `{quantity, unitPrice, auctionID, owners, ...}`.
+  - Rows are **grouped by unit price**: 41 rows for 295 auctions on 70425 [F-121]. Sum the quantities, and don't
+    count the rows as auctions.
+- **Item results:** `ITEM_SEARCH_RESULTS_UPDATED(itemKey, newAuctionID?)` (or `_ADDED`) →
+  `GetNumItemSearchResults(itemKey)` and `GetItemSearchResultInfo(itemKey, i)` → `{quantity, buyoutAmount?,
+  itemLink?, ...}`.
+  - `buyoutAmount` pays for the whole auction (Blizzard's buy frame bids it), so the unit price is
+    `buyoutAmount / quantity`. It's nil for bid-only auctions.
+- **More rows:** `RequestMoreCommoditySearchResults` / `RequestMoreItemSearchResults` (each returns
+  `hasFullResults`; when true no event follows) until `HasFull*SearchResults`. The next page arrives as `*_ADDED`.
+  On 70425 every test search came in one page in 0.1–0.4 s.
 - Throttle: send only when `C_AuctionHouse.IsThrottledMessageSystemReady()` is true; otherwise wait for
   `AUCTION_HOUSE_THROTTLED_SYSTEM_READY`. Keep your own queue with one query in flight (Blizzard's sell frame
   checks the same function before posting).
@@ -149,4 +167,5 @@ index base, every request (cooldown), timings, rows missing info, the realm keys
   seen by an Alliance and a Horde character, and across realms of one ruleset. 70425 values: [F-083]; sharing is
   still open.
 - Full-scan cooldown: call `ReplicateItems` twice a few minutes apart and note whether the second returns data.
-  → 70425: nothing 121 s after a success; the exact length is still open.
+  → 70425: nothing 121 s after a success, data 2,300 s after one, so the cooldown is between 2 and 38 min. A
+  request log that narrows the bounds (BuffettForever `diag.cooldown`) settles it without extra effort.
