@@ -468,7 +468,8 @@ class AddonLinter:
             guard_lines = set()
             for m in range(k + 1, min(n, k + 400)):
                 tm = toks[m]
-                if tm.kind == "name" and tm.value in ("issecretvalue", "canaccessvalue", "scrubsecretvalues"):
+                # IsSecret: the scaffold's ns.IsSecret(v) wrapper around issecretvalue
+                if tm.kind == "name" and tm.value in ("issecretvalue", "canaccessvalue", "scrubsecretvalues", "IsSecret"):
                     guard_lines.add(tm.line)
                 if tm.kind == "name" and tm.value == var:
                     if any(abs(tm.line - g) <= 5 for g in guard_lines):

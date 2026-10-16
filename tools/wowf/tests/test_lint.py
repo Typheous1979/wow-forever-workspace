@@ -55,6 +55,25 @@ class LintGolden(unittest.TestCase):
         findings, _, _ = lint.lint_dir(probe, CFG, I, use_luacheck=False)
         self.assertEqual([f.text(CFG["_root"]) for f in findings if f.sev in ("E", "W")], [])
 
+    def test_secret_guard_through_ns_issecret(self):
+        # The scaffold's ns.IsSecret(v) counts as a guard, like a literal issecretvalue(v).
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            a = os.path.join(d, "Guard")
+            os.makedirs(a)
+            with open(os.path.join(a, "Guard.toc"), "w") as f:
+                f.write("## Interface: 16001\n\nCore.lua\n")
+            with open(os.path.join(a, "Core.lua"), "w") as f:
+                f.write("local addonName, ns = ...\n"
+                        "function ns.Key()\n"
+                        "    local first, surname = UnitFullName(\"player\")\n"
+                        "    if not first or ns.IsSecret(first) or ns.IsSecret(surname) then return nil end\n"
+                        "    if surname and surname ~= \"\" then return first .. \" \" .. surname end\n"
+                        "    return first\n"
+                        "end\n")
+            findings, _, _ = lint.lint_dir(a, CFG, I, use_luacheck=False)
+            self.assertNotIn("SEC001", {x.id for x in findings})
+
     def test_suppression(self):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
