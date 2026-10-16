@@ -5,14 +5,15 @@ local addonName, ns = ...
 
 function ns.BuildOptions(db)
     local L = ns.L
-    local category = Settings.RegisterVerticalLayoutCategory("$TITLE")
-
+    local category, layout = Settings.RegisterVerticalLayoutCategory("$TITLE")
+$OPTIONS_HEADER
     local enabled = Settings.RegisterAddOnSetting(category, "${NAME}_Enabled", "enabled", db,
         type(true), L["Enable"], true)
     Settings.CreateCheckbox(category, enabled, L["Turn $TITLE on or off."])
-
+$OPTIONS_MINIMAP
     Settings.RegisterAddOnCategory(category)
     ns.settingsCategory = category
+    ns.settingsLayout = layout
 end
 
 function ns.OpenOptions()

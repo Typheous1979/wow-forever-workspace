@@ -1,0 +1,33 @@
+# $NAME — addon notes
+
+Addon-only context for Igor. The workspace CLAUDE.md, the wowf skills and the shared memory load
+from the parent folders (the workspace root is `..`), so this file holds only what is specific to
+$NAME. Keep it short; it loads at the start of every session opened here. It is not shipped
+(package.py leaves CLAUDE.md out).
+
+## Purpose
+$NOTES
+
+## Status
+- 0.1.0 scaffolded. Not yet tested in game; fill in the build after the first test.
+
+## Layout
+- `$NAME.toc` — the file list is the load order.
+- `Core.lua` — namespace helpers, SavedVariables (`$SVNAME`), event dispatch, `ns.On`/`ns.Fire` bus.
+
+## Decisions
+<!-- One line each: date, decision, why. -->
+
+## Open questions and probes
+<!-- Things to measure in game. When an answer is a Forever fact, move it to
+     ../.claude/skills/wowf-addon-dev/references/forever-facts.md with an ID, status and build. -->
+
+## Working here
+- Tools run from this folder through the skill shims, or directly:
+  `python ../tools/wowf/cli.py lint $NAME`, `python ../tools/wowf/cli.py package .`,
+  deploy with the wowf-deploy skill.
+- `.claude/settings.json` grants `..` as a working directory, so the shared skills and tools are
+  readable and editable; edits under `.claude/` still ask first (protected path).
+- Knowledge capture (see the workspace CLAUDE.md): Forever facts to forever-facts.md, reusable API
+  flows to the wowf-addon-dev references, domain knowledge to a domain skill, tool gaps to
+  `tools/wowf` with a test, addon-only decisions here. Commit shared changes separately.

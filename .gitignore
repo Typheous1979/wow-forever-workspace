@@ -1,5 +1,8 @@
 # Machine-specific (client paths, account names) — never commit
 wowf.local.json
+# Claude Code's personal approvals; on Windows they land in each session's start folder
+**/.claude/settings.local.json
+CLAUDE.local.md
 
 # Generated
 .luacheckrc

@@ -1,4 +1,4 @@
-"""Shim: runs `python tools/wowf/cli.py api ...` from anywhere inside the workspace."""
+"""Shim: runs `python tools/wowf/cli.py new ...` from anywhere inside the workspace."""
 import os
 import sys
 

@@ -71,11 +71,8 @@ class LintGolden(unittest.TestCase):
 
 @unittest.skipUnless(I.loaded, "API index not built")
 class ScaffoldTests(unittest.TestCase):
-    def test_scaffold_lints_clean(self):
+    def _lint_scaffold(self, files):
         import tempfile
-        import scaffold
-        _, files = scaffold.build(CFG["_root"], "ScaffoldProbe", 'Scaffold "Probe"', "notes", "Justin", "Media", None,
-                                  scaffold.ALL_FEATURES)
         with tempfile.TemporaryDirectory() as d:
             dest = os.path.join(d, "ScaffoldProbe")
             for rel, content in files.items():
@@ -84,7 +81,38 @@ class ScaffoldTests(unittest.TestCase):
                 with open(p, "w", encoding="utf-8", newline="\n") as f:
                     f.write(content)
             findings, _, _ = lint.lint_dir(dest, CFG, I, use_luacheck=False)
-            self.assertEqual([f.text(CFG["_root"]) for f in findings if f.sev in ("E", "W")], [])
+            return [f.text(CFG["_root"]) for f in findings if f.sev in ("E", "W")]
+
+    def test_scaffold_lints_clean(self):
+        import scaffold
+        _, files = scaffold.build(CFG["_root"], "ScaffoldProbe", 'Scaffold "Probe"', "notes", "Justin", "Media", None,
+                                  scaffold.ALL_FEATURES)
+        self.assertEqual(self._lint_scaffold(files), [])
+
+    def test_scaffold_window_signature_icon_lints_clean(self):
+        import json
+        import scaffold
+        _, files = scaffold.build(CFG["_root"], "ScaffoldProbe", "Scaffold Probe", "notes", "Typheous", "Miscellaneous",
+                                  "sp,scaffoldprobe", scaffold.ALL_FEATURES, signature="Typheous", icon=True)
+        self.assertEqual(self._lint_scaffold(files), [])
+        toc = files["ScaffoldProbe.toc"]
+        self.assertIn("## Title: Scaffold Probe |cff9d9d9dby Typheous|r", toc)
+        self.assertIn("## IconTexture: Interface\\AddOns\\ScaffoldProbe\\Media\\Icon.tga", toc)
+        self.assertLess(toc.index("UI\\Widgets.lua"), toc.index("UI\\MainFrame.lua"))
+        self.assertIn('signature:SetText(ns.L["by Typheous"])', files["UI\\MainFrame.lua"])
+        self.assertIn('SLASH_SCAFFOLDPROBE2 = "/scaffoldprobe"', files["Slash.lua"])
+        self.assertIn("ns.Main.Toggle()", files["Compartment.lua"])
+        settings = json.loads(files[".claude\\settings.json"])
+        self.assertEqual(settings["permissions"]["additionalDirectories"], [".."])
+        self.assertIn("# ScaffoldProbe", files["CLAUDE.md"])
+
+    def test_scaffold_minimal_lints_clean(self):
+        import scaffold
+        _, files = scaffold.build(CFG["_root"], "ScaffoldProbe", "Scaffold Probe", "notes", "Typheous", "Miscellaneous",
+                                  None, ["slash", "compartment"])
+        self.assertEqual(self._lint_scaffold(files), [])
+        self.assertNotIn("CLAUDE.md", files)
+        self.assertIn("ns.db.enabled = not ns.db.enabled", files["Compartment.lua"])
 
 
 class ProbeReportTests(unittest.TestCase):

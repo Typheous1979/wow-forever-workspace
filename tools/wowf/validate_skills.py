@@ -38,7 +38,8 @@ def check(skill_dir):
     path = os.path.join(skill_dir, "SKILL.md")
     if not os.path.isfile(path):
         return [f"{name}: SKILL.md missing"]
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
     fm, body = parse_frontmatter(text)
     if fm is None:
         return [f"{name}: no frontmatter"]

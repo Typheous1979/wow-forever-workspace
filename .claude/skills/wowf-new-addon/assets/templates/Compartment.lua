@@ -15,7 +15,7 @@ end
 function ${NAME}_OnAddonCompartmentEnter(_, menuButtonFrame)
     GameTooltip:SetOwner(menuButtonFrame, "ANCHOR_LEFT")
     GameTooltip:SetText("$TITLE")
-    GameTooltip:AddLine(ns.L["Left-click: toggle. Right-click: options."], 1, 1, 1)
+$TOOLTIP_SIGNATURE    GameTooltip:AddLine(ns.L["Left-click: toggle. Right-click: options."], 1, 1, 1)
     GameTooltip:Show()
 end
 

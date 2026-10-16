@@ -30,6 +30,34 @@ class PackageTests(unittest.TestCase):
             names = sorted(zipfile.ZipFile(zip_path).namelist())
             self.assertEqual(names, ["MyAddon/Core.lua", "MyAddon/Media/Icon.tga", "MyAddon/MyAddon.toc"])
 
+    def test_skips_agent_notes_and_dot_folders(self):
+        with tempfile.TemporaryDirectory() as d:
+            addon = os.path.join(d, "MyAddon")
+            write(os.path.join(addon, "MyAddon.toc"), "## Interface: 16001\n## Version: 0.1.0\n\nCore.lua\n")
+            write(os.path.join(addon, "Core.lua"), "local addonName, ns = ...\n")
+            write(os.path.join(addon, "CLAUDE.md"), "# notes for the agent\n")
+            write(os.path.join(addon, "AGENTS.md"), "x")
+            write(os.path.join(addon, ".claude", "settings.json"), "{}")
+            write(os.path.join(addon, "README.md"), "# MyAddon\n")
+            zip_path, _, _ = package.build_zip(addon, os.path.join(d, "dist"))
+            names = sorted(zipfile.ZipFile(zip_path).namelist())
+            self.assertEqual(names, ["MyAddon/Core.lua", "MyAddon/MyAddon.toc", "MyAddon/README.md"])
+
+    def test_resolve_addon(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = os.path.join(d, "AddOns")
+            addon = os.path.join(root, "MyAddon")
+            write(os.path.join(addon, "MyAddon.toc"), "## Version: 1\n")
+            old = os.getcwd()
+            try:
+                os.chdir(addon)       # a session opened inside the addon folder
+                self.assertEqual(os.path.normcase(package.resolve_addon(".", root)), os.path.normcase(addon))
+                self.assertEqual(os.path.normcase(package.resolve_addon("MyAddon", root)), os.path.normcase(addon))
+                os.chdir(root)
+                self.assertEqual(os.path.normcase(package.resolve_addon("MyAddon", root)), os.path.normcase(addon))
+            finally:
+                os.chdir(old)
+
     def test_refuses_dev_only(self):
         with tempfile.TemporaryDirectory() as d:
             addon = os.path.join(d, "Probe")

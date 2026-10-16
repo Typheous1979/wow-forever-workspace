@@ -2,10 +2,13 @@
 
   python tools/wowf/cli.py package ADDON [--skip-lint]
 
+- ADDON is a workspace folder name, an absolute path, or a path from the current
+  directory (`.` inside the addon's own folder)
 - lint gate: refuses to package while the Forever lint reports errors
 - refuses dev-only addons (## X-Wowf-DevOnly: 1)
 - writes dist/<Addon>-<Version>.zip with ONE root folder named like the TOC
-  (CurseForge and its app require this), leaving out personal and dev files
+  (CurseForge and its app require this), leaving out personal and dev files,
+  dot-folders (.claude) and the agent notes (CLAUDE.md, AGENTS.md)
 """
 import argparse
 import fnmatch
@@ -19,7 +22,8 @@ import config  # noqa: E402
 
 EXCLUDE_DIRS = {"screenshots", ".git", ".github", "tests", "dist", "__pycache__", ".vscode", ".idea"}
 EXCLUDE_FILES = ["*.psd", "*.xcf", "*.bak", "*.tmp", "desktop.ini", "Thumbs.db", ".DS_Store", ".luacheckrc",
-                 ".pkgmeta", ".gitignore", ".gitattributes", "*-conflict*", "*.orig"]
+                 ".pkgmeta", ".gitignore", ".gitattributes", "*-conflict*", "*.orig",
+                 "CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"]
 
 
 def toc_fields(path):
@@ -64,6 +68,17 @@ def build_zip(addon_dir, out_dir):
     return zip_path, version, files
 
 
+def resolve_addon(arg, root):
+    """Absolute path, a folder from the current directory that holds its own TOC
+    (so `.` works inside the addon), else a folder name under the workspace root."""
+    if os.path.isabs(arg):
+        return os.path.normpath(arg)
+    here = os.path.abspath(arg)
+    if os.path.isfile(os.path.join(here, os.path.basename(here) + ".toc")):
+        return here
+    return os.path.normpath(os.path.join(root, arg))
+
+
 def main(argv):
     p = argparse.ArgumentParser(prog="wowf package")
     p.add_argument("addon")
@@ -71,7 +86,7 @@ def main(argv):
     a = p.parse_args(argv)
     cfg = config.load()
     root = cfg["_root"]
-    addon_dir = a.addon if os.path.isabs(a.addon) else os.path.join(root, a.addon)
+    addon_dir = resolve_addon(a.addon, root)
     if not a.skip_lint:
         import index as idx
         import lint

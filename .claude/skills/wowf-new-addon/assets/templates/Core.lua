@@ -12,6 +12,20 @@ function ns.Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage(PREFIX .. msg)
 end
 
+-- Tiny internal message bus: ns.On("NAME", fn) listens, ns.Fire("NAME", ...) notifies.
+local listeners = {}
+function ns.On(message, fn)
+    listeners[message] = listeners[message] or {}
+    table.insert(listeners[message], fn)
+end
+
+function ns.Fire(message, ...)
+    for _, fn in ipairs(listeners[message] or {}) do
+        local ok, err = pcall(fn, ...)
+        if not ok then geterrorhandler()(err) end
+    end
+end
+
 -- Secret-value helpers: never do math, comparisons or print on secrets.
 function ns.IsSecret(value)
     return type(issecretvalue) == "function" and issecretvalue(value) == true
@@ -36,7 +50,8 @@ end
 local DB_VERSION = 1
 local defaults = {
     enabled = true,
-}
+$DEFAULTS_EXTRA}
+$CHAR_DEFAULTS
 local migrations = {
     -- [1] = function(db) ... end,   -- upgrades data written by version 1 to version 2
 }
@@ -72,13 +87,18 @@ function events:ADDON_LOADED(loaded)
     end
     CopyDefaults(defaults, db)
     ns.db = db
-$CHARDB_INIT    if ns.BuildOptions then ns.BuildOptions(db) end
+$CHARDB_INIT$INIT_CALLS    if ns.BuildOptions then ns.BuildOptions(db) end
     self:UnregisterEvent("ADDON_LOADED")
 end
 
 function events:PLAYER_LOGIN()
     local version = C_AddOns.GetAddOnMetadata(addonName, "Version") or "dev"
     ns.Print(L["loaded"] .. " v" .. version)
+    ns.Fire("LOGIN")
+end
+
+function events:PLAYER_LOGOUT()
+    ns.Fire("LOGOUT")
 end
 
 function events:PLAYER_REGEN_ENABLED()
@@ -92,4 +112,5 @@ frame:SetScript("OnEvent", function(self, event, ...)
 end)
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
+frame:RegisterEvent("PLAYER_LOGOUT")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
