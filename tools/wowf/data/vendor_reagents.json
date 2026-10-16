@@ -1,0 +1,161 @@
+{
+  "items": {
+    "2320": {
+      "name": "Coarse Thread",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "2321": {
+      "name": "Fine Thread",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "2324": {
+      "name": "Bleach",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "2325": {
+      "name": "Black Dye",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "2604": {
+      "name": "Red Dye",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "2605": {
+      "name": "Green Dye",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "2678": {
+      "name": "Mild Spices",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "2692": {
+      "name": "Hot Spices",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "2880": {
+      "name": "Weak Flux",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "3371": {
+      "name": "Empty Vial",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "3372": {
+      "name": "Leaded Vial",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "3466": {
+      "name": "Strong Flux",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "3713": {
+      "name": "Soothing Spices",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "3857": {
+      "name": "Coal",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "4289": {
+      "name": "Salt",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "4291": {
+      "name": "Silken Thread",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "4340": {
+      "name": "Gray Dye",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "4341": {
+      "name": "Yellow Dye",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "4342": {
+      "name": "Purple Dye",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "4399": {
+      "name": "Wooden Stock",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "4400": {
+      "name": "Heavy Stock",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "4536": {
+      "name": "Shiny Red Apple",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "6217": {
+      "name": "Copper Rod",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "6260": {
+      "name": "Blue Dye",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "6530": {
+      "name": "Nightcrawlers",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    },
+    "8343": {
+      "name": "Heavy Silken Thread",
+      "evidence": [
+        "harvest beta 70425 2026-10-16"
+      ]
+    }
+  },
+  "note": "Reagents a vendor sells, with the evidence for each. 'harvest' = BuffettForever's merchant harvest saw it on sale. Prices come from ItemSparse at build time."
+}
