@@ -6,7 +6,7 @@ when_to_use: Forever, Camelot, 16001, WOW_PROJECT_CAMELOT, wow forever addon, ma
 
 # WoW Forever addon development
 
-**Facts as of 2026-10-16.** Beta server 1.60.1.70425, Justin's installed client 70425 (API index 70425, WowfProbe dump 70374), `wowf` stress-test/launch product 70245. Facts drift between beta builds. Each one carries a status tag and a build; see `references/forever-facts.md` (IDs like [F-012]). When the build in front of you is newer than these facts, suggest `/wowf-refresh`.
+**Facts as of 2026-10-16.** Beta server 1.60.1.70450, Justin's installed client 70425 (API index 70450, WowfProbe dump 70374), `wowf` stress-test/launch product 70245. Facts drift between beta builds. Each one carries a status tag and a build; see `references/forever-facts.md` (IDs like [F-012]). When the build in front of you is newer than these facts, suggest `/wowf-refresh`.
 
 **What Forever is:** the original Azeroth (cap 60, new zones and races) running the **modern Mainline UI and API, 12.1.5 family**, as the game type **Camelot** (TOC alias `forever`). Midnight's addon disarmament is fully active: **secret values**, **no combat log**, and protected calls that fail silently. Forever is NOT Classic Era. Classic tutorials, Classic WeakAuras and most AI training data are wrong for it.
 

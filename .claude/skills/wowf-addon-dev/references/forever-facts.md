@@ -55,6 +55,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   | 70338 | Oct 9–10 | |
   | 70374 | Oct 13 | |
   | 70425 | Oct 16 | beta server and Justin's client; API index rebuilt |
+  | 70450 | Oct 16 (late) | beta server; API index rebuilt (no AH, profession or merchant API changes) |
 
   [Source: forever branch commits]
 - **[F-005]** Version server, Oct 14:
@@ -62,7 +63,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   - `wowf` = **1.60.1.70245** (the stress-test/launch product);
   - retail `wow` = 12.1.5.70391.
 
-  Oct 16: `wow_classic_beta` = **1.60.1.70425**; `wowf` still 1.60.1.70245.
+  Oct 16: `wow_classic_beta` = **1.60.1.70425**, then **1.60.1.70450** the same evening; `wowf` still 1.60.1.70245.
 
   Endpoint: `http://us.patch.battle.net:1119/<product>/versions`. [Official data]
 - **[F-006]** Client folders:
