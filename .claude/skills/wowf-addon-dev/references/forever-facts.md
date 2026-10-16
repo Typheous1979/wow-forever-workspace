@@ -246,6 +246,14 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   from `GetRecipeSchematic(id, isRecraft)`; Blizzard's recipe tracker calls it with no profession window open.
   All Classic tradeskill and craft APIs are gone and `C_Professions` doesn't exist. `GetProfessions()` returns 7
   values (2 primary, 5 secondary). [Source; Probe 70374]
+  - Blizzard's Camelot code confirms these runtime-only signatures:
+    - `GetProfessionInfo(i)` → 11 values (`Camelot\Blizzard_ProfessionsFrame.lua`);
+    - `GetFilteredRecipeIDs()` → a list;
+    - `IsTradeSkillLinked()` → linked, linkedName;
+    - `GetTradeSkillLineForRecipe(id)` → tradeSkillID, name, parentTradeSkillID. [Source 70450]
+  - **`IsPlayerSpell` is only a deprecation fallback** (`Blizzard_DeprecatedSpellBook`, loaded only when the CVar
+    `loadDeprecationFallbacks` is on). Use `C_SpellBook.IsSpellKnown(spellID, Enum.SpellBookSpellBank.Player)`.
+    [Source 70450]
 - **[F-124]** Vendors: `C_MerchantFrame.GetItemInfo(i)` → `{price (for stackCount units), stackCount,
   numAvailable, hasExtendedCost, …}`; `GetMerchantNumItems`, `GetMerchantItemID`, `GetMerchantItemLink` are
   undocumented but present; `GetMerchantItemInfo` is absent. [Source; Probe 70374]
@@ -279,6 +287,27 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   - Profession skill lines are the Classic IDs (164 … 393, 129), each with a Forever child line 2937–2948.
 
   [Source: wago.tools DB2 70245]
+  - **On 70450** (`tools/wowf/recipe_catalog.py`):
+    - **1,976 complete recipes:** Leatherworking 482, Blacksmithing 419, Tailoring 405, Engineering 242, Alchemy
+      181, Cooking 129, Enchanting 60, First Aid 32, Mining 17. Dropped: 331 with an output missing from
+      ItemSparse, 4 with a missing reagent, 182 enchant-only, 172 with no item. All recipe rows still sit on the
+      parent lines.
+    - **An output count of 0 means 1:** 107 recipes, including every transmute. No recipe has two create-item
+      effects, and every profession effect has DifficultyID 0.
+    - `MinSkillLineRank` is **not** the skill needed to learn (it's 1 for transmutes); the trainer or recipe holds
+      that. `TrivialSkillLineRankLow/High` are the yellow and grey thresholds.
+    - **ID bands of the 860 recipes added after Classic:**
+      - 23 Season-of-Discovery recipes (spells 400k–1M; 2 outputs seen on the AH);
+      - 1 Classic spell with a new item ID;
+      - **836 Forever-new recipes** (spells ≥ 1.2M, many with items ≥ 250k such as Fish Bowl, Basic Campfire,
+        Camp Chair, Mana Well, plus new versions of the Classic healing potions). **117 of their outputs were on
+        the beta AH** (70425), so they're crafted on Forever. Confirm the rest in game.
+    - **`BuyPrice / VendorStackCount` equals what a merchant charges** (37 of 37 items checked against a harvest on
+      70425). ItemSparse doesn't say *which* items a vendor sells.
+    - SkillLine and SkillLineAbility CSVs don't start with the `ID` column, so check the header, not
+      `startswith("ID,")`.
+
+    [Source: wago.tools DB2 70450; Probe 70425]
 - **[F-127]** `SAVED_VARIABLES_TOO_LARGE(addOnName)` exists; Blizzard shows a popup (`GameEvent.HandleSavedVariablesTooLarge`).
   Whether data is dropped at load or at save is unverified on Forever, and so is the size limit. [Source 70374]
   - SavedVariables are written **without indentation**, one key per line. 2,998 price rows with one day of history
@@ -309,4 +338,5 @@ Use `/wowfprobe full`, then `cli.py probe-report`.
    realm/faction keys and which characters share an AH ([F-081]); `GetRecipeSchematic` with the window closed
    and for an unknown recipe; `GetAllRecipeIDs` signature; `IsPlayerSpell(recipeID)` for learned recipes
    ([F-123]); merchant `numAvailable` for unlimited stock ([F-124]).
-10. Regenerate recipe data from the new build's tables and diff the counts against [F-126].
+10. Regenerate recipe data from the new build's tables and diff the counts against [F-126]:
+    `python tools/wowf/cli.py recipe-catalog build --build <build>` (then `git diff --stat BuffettForever/Data`).

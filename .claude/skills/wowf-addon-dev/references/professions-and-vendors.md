@@ -50,8 +50,9 @@ function ns.events:TRADE_SKILL_LIST_UPDATE()
     if not pending then pending = C_Timer.NewTimer(0.5, Harvest) end
 end
 ```
-Recipes are spells, so `IsPlayerSpell(recipeID)` (runtime-only) may answer "known?" without opening the window.
-That's a probe; if it works, check known recipes at login instead.
+Recipes are spells, so `C_SpellBook.IsSpellKnown(recipeID, Enum.SpellBookSpellBank.Player)` may answer "known?"
+without opening the window. That's a probe; if it works, check known recipes at login instead. Don't use
+`IsPlayerSpell`: it's a deprecation fallback that exists only when `loadDeprecationFallbacks` is on [F-123].
 
 ## Recipe data offline: the Forever game tables [F-126]
 `tools/wowf/music_catalog.py` fetches DB2 CSVs for a Forever build from
@@ -73,11 +74,25 @@ That's a probe; if it works, check known recipes at login instead.
   the rogue class skill, not a profession.
 - Gotchas:
   - An item missing from ItemSparse is encrypted (unreleased) in that build: drop its recipes until a later build.
-  - Season-of-Discovery-era item IDs (≥ 200000) appear. Whether each recipe is obtainable on Forever is unknown, so
-    mark recipes "confirmed" only after an in-game profession window lists them.
+  - **An output count (`EffectBasePointsF`) of 0 means 1** (every transmute) [F-126].
+  - `MinSkillLineRank` isn't the skill needed to learn a recipe. `TrivialSkillLineRankLow/High` are the yellow and
+    grey thresholds.
+  - IDs added after Classic: Season-of-Discovery spells (400k–1M) and **Forever-new recipes** (spells ≥ 1.2M). 117 of
+    the Forever-new outputs were on the beta AH, so many are real. Mark a recipe confirmed only when a character
+    knows it, a profession window lists it, or its output is seen on the AH.
   - Enchants (Effect 53) create no item; only wands, oils and rods do.
-  - `BuyPrice` exists on every item. It does **not** mean a vendor sells it; vendor inventories are server-side.
+  - `BuyPrice / VendorStackCount` is what a merchant charges (checked on 70425). But `BuyPrice` exists on every
+    item, and **which** items a vendor sells is server-side, so keep an evidence list.
+  - SkillLine and SkillLineAbility CSVs don't start with `ID`: validate the header by column name.
   - Regenerate when a new build lands (part of `/wowf-refresh`).
+- **The tool:** `python tools/wowf/cli.py recipe-catalog fetch | build | show [--item ID] | vendor-merge [--build B]`
+  (`tools/wowf/recipe_catalog.py`, with tests).
+  - It writes BuffettForever's `Data/Recipes.lua`, one numeric row per recipe:
+    `{profession, minRank, yellowAt, greyAt, flags, output, count, reagent, count, ...}`. Flag 1 = added after
+    Classic, 2 = BoP output.
+  - It also writes `Data/Vendor.lua`: unit prices for the reagents in `tools/wowf/data/vendor_reagents.json`.
+  - `vendor-merge` adds every reagent BuffettForever's merchant harvest saw on sale (from SavedVariables), with
+    evidence. It also lists cheap reagents that look vendor-sold but are still unconfirmed.
 
 ## Vendor prices [F-124]
 - **What a vendor pays you:** `sellPrice`, the 11th return of `C_Item.GetItemInfo(itemID)` (nil until cached; see the
@@ -129,7 +144,8 @@ That's a probe; if it works, check known recipes at login instead.
   `/run local ok,s=pcall(C_TradeSkillUI.GetRecipeSchematic,2330,false) if ok and s then for _,r in ipairs(s.reagentSlotSchematics) do local g=r.reagents[1] print(s.name,r.quantityRequired,g and g.itemID) end else print(ok,s) end`
 - Recipe info with the window closed: `/run local ok,i=pcall(C_TradeSkillUI.GetRecipeInfo,2330) print(ok,i and i.name,i and i.learned)`
 - `GetAllRecipeIDs`, once closed and once open: `/run local t=C_TradeSkillUI.GetAllRecipeIDs() print(type(t),type(t)=="table" and #t)`
-- Learned recipes without the window (a tailor who knows Bolt of Linen Cloth): `/run print(IsPlayerSpell(2963))`
+- Learned recipes without the window (a tailor who knows Bolt of Linen Cloth):
+  `/run print(C_SpellBook.IsSpellKnown(2963, Enum.SpellBookSpellBank.Player))`
 - Merchant data: `/run local i=C_MerchantFrame.GetItemInfo(1) print(i and i.name,i and i.price,i and i.stackCount,i and i.numAvailable,GetMerchantItemID(1))`
 - Bag hook: `/run hooksecurefunc("HandleModifiedItemClick",function(l) print("HMIC",l,IsAltKeyDown(),GetMouseButtonClicked()) end)`,
   then Alt+Right-click a bag item (stays until `/reload`).
