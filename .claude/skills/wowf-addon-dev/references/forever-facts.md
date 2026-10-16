@@ -1,6 +1,6 @@
 # WoW Forever facts ledger
 
-Facts as of **2026-10-16** (§13 added; earlier sections last checked 2026-10-14). Status tags:
+Facts as of **2026-10-16** (§13 added and its AH probes run on 70425; earlier sections last checked 2026-10-14). Status tags:
 - **[Probe]**: measured in the client (WowfProbe or a community probe);
 - **[Source]**: Blizzard UI source, `forever` branch of Gethe/wow-ui-source;
 - **[Wiki]**: warcraft.wiki.gg;
@@ -54,6 +54,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   | 70334 | | |
   | 70338 | Oct 9–10 | |
   | 70374 | Oct 13 | |
+  | 70425 | Oct 16 | beta server and Justin's client; API index rebuilt |
 
   [Source: forever branch commits]
 - **[F-005]** Version server, Oct 14:
@@ -61,13 +62,15 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   - `wowf` = **1.60.1.70245** (the stress-test/launch product);
   - retail `wow` = 12.1.5.70391.
 
+  Oct 16: `wow_classic_beta` = **1.60.1.70425**; `wowf` still 1.60.1.70245.
+
   Endpoint: `http://us.patch.battle.net:1119/<product>/versions`. [Official data]
 - **[F-006]** Client folders:
   - beta: `World of Warcraft\_classic_beta_\` with `WowB.exe`;
   - `wowf` (stress test/launch): **`_forever_`** with `Wow.exe`.
 
   Interface, WTF and Cache are **per folder**, so addons and SavedVariables don't carry over. [Official CDN product config]
-- **[F-007]** Justin's beta client was on build 70338 (Oct 12). Its install path lives in the gitignored `wowf.local.json`. Per-character data lives under `WTF\Account\<acct>\<region-id>\<Char-Realm>\`. [Probe, local disk]
+- **[F-007]** Justin's beta client was on build 70338 (Oct 12), **70425** on Oct 16. Its install path lives in the gitignored `wowf.local.json`. Per-character data lives under `WTF\Account\<acct>\<region-id>\<Char-Realm>\`; on 70425 the "Char-Realm" folder is `<First>-<Surname>` (the surname takes the realm slot, [F-080]) under region-id `70`. Folders from older builds (`<Realm Name>\<First>`) stay beside it. [Probe, local disk 70425]
 
 ## 2. Detection constants
 - **[F-010]** `WOW_PROJECT_CAMELOT = 18` and `WOW_PROJECT_ID = WOW_PROJECT_CAMELOT` since **70170** (`Blizzard_ProjectConstants/Camelot/ProjectConstants.lua`). Other values: `WOW_PROJECT_MAINLINE = 1`, `WOW_PROJECT_CLASSIC = 2`. On 69913–70124 the ID was 1, the same as Mainline. [Source; Wiki Patch 1.60.1/API changes]
@@ -102,6 +105,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
 - **[F-022]** Suffix precedence on Forever: `_Camelot`/`_Forever` > `_Mainline` > bare `Name.toc`. Shipped addons use `_Camelot.toc` (Questie, MapUtils, MoveAny), `-Camelot.toc` (Guidelime) and multi-value Interface lines (RXP, TomTom). `_Forever.toc` is unverified in the wild. [Wiki; observed]
 - **[F-023]** Inline `[AllowLoadGameType camelot]`: if **no** listed type is recognized, the line STILL LOADS. Pair it with `[ExcludeLoadGameType ...]`. [Wiki]
 - **[F-024]** New addon folder: the wiki says `/reload` detects new addons (9.0.1+); the community says Forever needs a full client restart. Treat restart as the safe default and **record what Justin observes**. [Wiki vs Community — conflict]
+  - An **existing** addon's changed TOC (five new Lua files, a new `## Version`) was re-read on `/reload`, no restart (BuffettForever 0.2.0). [Probe 70425] A brand-new folder is still unrecorded.
 - **[F-025]** Out-of-date: an addon whose Interface doesn't match is flagged out of date. Whether Forever force-blocks them, as Midnight does below 120000, is undocumented. [Wiki TODO]
 - **[F-026]** `## LoadSavedVariablesFirst: 1` (11.1.5+) loads SVs before your files. Questie's Forever TOC uses it. [Wiki; observed]
 
@@ -171,6 +175,10 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
 - **[F-080]** Two-part names ("First Surname"), unique per region. On **70009+**, `UnitFullName("player")` returns `"First", "Surname"` (the surname sits in the realm slot). `UnitName` returns the first name. `GetNormalizedRealmName()` is still the realm. Whisper and ignore need the full name. `C_PlayerInfo.ShouldDisplaySurname()`. [Community probe 70009]
 - **[F-081]** "Super districts" and rulesets replace realms: Normal, PvP, Roleplaying, Hardcore (later). The auction house is per ruleset. `/who` can be disabled (`IngameWhoListDisabled` game rule). [Official; Source]
 - **[F-082]** Races include **Windshaper Skyborne** (Horde) and **High Order Skyborne** (Alliance); race ID 96 was seen. [Community]
+- **[F-083]** Realm values on the beta: `GetRealmName()` = `"Classic Beta PvP 2"`, `GetNormalizedRealmName()` =
+  `"ClassicBetaPvP2"`, `UnitFactionGroup("player")` = `"Horde"`, `C_GameRules.IsHardcoreActive()` = false;
+  `UnitFullName("player")` returned the first name and the surname, as [F-080] says. Launch super-district names
+  and whether the AH is shared across factions or realms of one ruleset: **unmeasured**. [Probe 70425]
 
 ## 10. Comms and chat
 - **[F-090]** `C_ChatInfo.SendAddonMessage(prefix ≤16, message ≤255, chatType, target)` → `Enum.SendAddonMessageResult` (11 = AddOnMessageLockdown). Throttle: 10 per prefix, regaining 1 per second. Register the prefix every session. There's a lockdown during encounters, M+ and PvP. [Wiki; Source]
@@ -203,13 +211,25 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   is nil. `Enum.PlayerInteractionType.Auctioneer = 21`. Search queries are capped at 100 per minute (docs).
   Scanning has no restriction flags; post, bid, buy and cancel are `HasRestrictions`. [Source; Probe 70374]
 - **[F-121]** AH prices are copper (`BigUInteger`). `GetReplicateItemInfo(index)` has 18 returns; `buyoutPrice`
-  is for the whole stack and `hasAllInfo` is nilable. The replicate index is typed `number` (0-based on retail):
-  **probe**. Commodity status by itemID: `GetItemKeyInfo(MakeItemKey(id)).isCommodity`;
-  `GetItemCommodityStatus` takes an ItemLocation. [Source 70374]
+  is for the whole stack and `hasAllInfo` is nilable. Commodity status by itemID:
+  `GetItemKeyInfo(MakeItemKey(id)).isCommodity`; `GetItemCommodityStatus` takes an ItemLocation. [Source 70374]
+  Measured by BuffettForever's scanner [Probe 70425]:
+  - **The replicate index is 0-based:** rows are `0 .. n-1` with `n = GetNumReplicateItems()`. Index `n` doesn't
+    error or return nil: it returns `itemID 0, count -1, buyout 0`. Treat `itemID == 0` as "no row".
+  - `REPLICATE_ITEM_LIST_UPDATE` came **4.7 s** after `ReplicateItems()` for 61,933 rows. It then fired **3,117 more
+    times** while the rows were read, as item data for uncached rows arrived. Act on the first one only.
+  - 5,390 of the 61,933 rows (8.7%) had `hasAllInfo` false when read, but `itemID`, `count` and `buyoutPrice` were
+    always valid. Pricing by itemID doesn't need to wait for the item data.
+  - **Cooldown:** a second `ReplicateItems()` 121 s after a successful one got **no event at all** within 60 s. So the
+    cooldown is over 2 min; its exact length is unmeasured (retail: 15 min). A request inside the cooldown is ignored,
+    not queued, so use a timeout.
+  - The reagents Linen Cloth 2589, Copper Ore 2770, Copper Bar 2840, Peacebloom 2447 and Light Leather 2318 are all
+    **commodities**: search them with commodity searches.
+  - `C_AuctionHouse.SupportsCopperValues()` = **true**: prices can carry copper.
 - **[F-122]** There is **no AH cut API or constant**. Measure it from seller invoices: `GetInboxInvoiceInfo`
   (undocumented, present) → `consignment / bid`. Deposits: `CalculateCommodityDeposit` /
   `CalculateItemDeposit`. `Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5`.
-  The cut rate and the ReplicateItems cooldown on Forever: **unmeasured**. [Source; Probe 70374]
+  The cut rate on Forever: **unmeasured**. The ReplicateItems cooldown is over 2 min ([F-121]). [Source; Probe 70374, 70425]
 - **[F-123]** Professions use the modern `Blizzard_Professions` (LoadOnDemand) with Camelot overrides; Forever
   forces "show unlearned" off. `Blizzard_TradeSkillUI` and `Blizzard_CraftUI` don't exist; Enchanting uses the
   normal window. `C_TradeSkillUI`: 89 documented + 57 runtime-only functions (`GetAllRecipeIDs`,
@@ -246,7 +266,17 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
 
   [Source: wago.tools DB2 70245]
 - **[F-127]** `SAVED_VARIABLES_TOO_LARGE(addOnName)` exists; Blizzard shows a popup (`GameEvent.HandleSavedVariablesTooLarge`).
-  Whether data is dropped at load or at save is unverified on Forever. [Source 70374]
+  Whether data is dropped at load or at save is unverified on Forever, and so is the size limit. [Source 70374]
+  - SavedVariables are written **without indentation**, one key per line. 2,998 price rows with one day of history
+    took **556 KB**: about 185 bytes per item, plus about 33 bytes per extra day. [Probe 70425]
+- **[F-128]** The beta AH is **well stocked**, not empty. On Oct 16 (Classic Beta PvP 2, Horde) a full scan saw
+  61,933 listings of 2,998 items with buyouts. Linen Cloth had 8,884 units in 300 auctions.
+  - **404 of the 2,998 items have IDs ≥ 200000** (210781–287063): high-ID items exist and trade on Forever (see
+    [F-126]).
+  - At 8 ms per frame, 61,933 rows took 0.7 s to read and 2,998 items 0.15 s to price; the scan took 5.5 s in all,
+    4.7 s of it waiting for the server.
+
+  [Probe 70425]
 
 ## 14. Retest checklist (run on every new build)
 
@@ -259,7 +289,8 @@ Use `/wowfprobe full`, then `cli.py probe-report`.
 6. Run a real secure snippet ([F-061]).
 7. `GetCurrentRegion()` value ([F-064]).
 8. The documented-vs-runtime namespace diff ([F-034]).
-9. Economy probes (lines in auction-house.md and professions-and-vendors.md): replicate index base and the
+9. Economy probes (lines in auction-house.md and professions-and-vendors.md; BuffettForever's `/bf diag` and its
+   `diag` SavedVariables answer the AH ones): replicate index base and the
    ReplicateItems cooldown ([F-121]); are reagents commodities; the AH cut from a seller invoice ([F-122]);
    realm/faction keys and which characters share an AH ([F-081]); `GetRecipeSchematic` with the window closed
    and for an unknown recipe; `GetAllRecipeIDs` signature; `IsPlayerSpell(recipeID)` for learned recipes

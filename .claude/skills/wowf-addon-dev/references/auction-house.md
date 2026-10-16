@@ -21,17 +21,21 @@ AH frame code shows every flow below.
 ## Full scan: ReplicateItems
 Blizzard's docs: "This function should be used in place of an 'allItem' QueryAuctionItems call to query the
 entire auction house."
-1. `C_AuctionHouse.ReplicateItems()`, once. The cooldown on Forever is unknown (retail: one per 15 minutes);
-   record what you observe in forever-facts.md.
-2. Wait for `REPLICATE_ITEM_LIST_UPDATE`.
-3. `n = C_AuctionHouse.GetNumReplicateItems()`, then `GetReplicateItemInfo(i)` for `i = 0 .. n-1`. The index
-   is typed `number`, not `luaIndex`, and is 0-based on retail; confirm it with the probe below [F-121].
+1. `C_AuctionHouse.ReplicateItems()`, once. Inside the cooldown (over 2 min on 70425; retail: 15 min) the request
+   is **ignored**: no event ever comes. Start a timeout and tell the player; 60 s is plenty, since 62k rows arrived in
+   4.7 s [F-121].
+2. Wait for the **first** `REPLICATE_ITEM_LIST_UPDATE`. It fires again, thousands of times, as item data arrives
+   for the rows you read, so ignore repeats while you read (a state flag).
+3. `n = C_AuctionHouse.GetNumReplicateItems()`, then `GetReplicateItemInfo(i)` for `i = 0 .. n-1`. The index is
+   typed `number`, not `luaIndex`, and is **0-based** on 70425. Index `n` returns `itemID 0, count -1`, not nil, so
+   skip `itemID == 0` if you probe past the end [F-121].
 4. The 18 returns: `name?, texture?, count, qualityID, usable?, level, levelType?, minBid, minIncrement,
    buyoutPrice, bidAmount, highBidder?, bidderFullName?, owner?, ownerFullName?, saleStatus, itemID, hasAllInfo?`.
    - `buyoutPrice` is for the whole stack: unit price = `buyoutPrice / count`. 0 means bid-only; skip it.
-   - `name`, `texture` and `GetReplicateItemLink(i)` stay nil until the item is cached (`hasAllInfo`). Pricing
-     by `itemID` doesn't need them; load names later only for items you display.
-5. Process in time slices so the client never freezes, and abort if the AH closes.
+   - `name`, `texture` and `GetReplicateItemLink(i)` stay nil until the item is cached (`hasAllInfo`; 8.7% of rows
+     on the beta). Pricing by `itemID` doesn't need them; load names later only for items you display.
+5. Process in time slices so the client never freezes, and abort if the AH closes. At 8 ms per frame, 62k rows took
+   0.7 s to read [F-128].
 
 ```lua
 local addonName, ns = ...
@@ -59,6 +63,19 @@ function ns.ProcessReplicate(onDone)
     step()
 end
 ```
+
+## Blizzard's AH frame, and a button on it
+- `AUCTION_HOUSE_SHOW` → Blizzard's `GameEvent.HandleAuctionHouseShow` → `ShowAuctionHouseFrame()`, which loads
+  `Blizzard_AuctionHouseUI` (its `ADDON_LOADED` fires) and shows `AuctionHouseFrame`. The frame's `OnHide` calls
+  `C_AuctionHouse.CloseAuctionHouse()`, so closing the window ends the session (`AUCTION_HOUSE_CLOSED`); ignore a
+  repeated CLOSED. (`Blizzard_Game\Mainline\EventImplementation.lua`, `Blizzard_AuctionHouseFrame.lua`)
+- **A scan button on it** (works on 70425, BuffettForever `UI\AHButton.lua`):
+  - Use your own `UIPanelButtonTemplate` button parented to `AuctionHouseFrame`.
+  - Make it on `ADDON_LOADED("Blizzard_AuctionHouseUI")`, or at `AUCTION_HOUSE_SHOW` if that addon already loaded.
+    Keep `ADDON_LOADED` registered after your own load.
+  - Place it under the frame, right of the Buy/Sell/Auctions tabs (they hang below the frame on the left):
+    `SetPoint("TOPRIGHT", AuctionHouseFrame, "BOTTOMRIGHT", -6, -2)`.
+  - No secure attributes, no hooks, and nothing written into Blizzard's frame table.
 
 ## Targeted searches (one item, current prices)
 - `itemKey = C_AuctionHouse.MakeItemKey(itemID)` → `{itemID, itemLevel = 0, itemSuffix = 0, battlePetSpeciesID = 0}`.
@@ -96,8 +113,12 @@ end
 - **Store aggregates, not listings.** Per item and day: market value, min buyout, quantity, auction count. Keep the
   latest price ladder (up to ~8 price levels with quantities) for depth-aware costs. Prune at login (14–30 days).
   The estimators are in the `wowf-economics` skill.
-- **Pack it.** A day number (`math.floor(GetServerTime() / 86400)`) and one string per item-day (`"mv:min:qty:n"`)
-  keep the file small. SavedVariables load at login and save at logout or `/reload`; huge files slow both.
+- **Pack it.** A day number (`math.floor(GetServerTime() / 86400)`) and one string per item-day (`"mv:min:qty:n:k"`,
+  k = scans that day) keep the file small. SavedVariables load at login and save at logout or `/reload`; huge files
+  slow both.
+- Measured on 70425: about 185 bytes per item row, plus about 33 bytes per extra day. 3,000 items × 14 days is
+  about 2 MB per market [F-127].
+- Format numbers with `%.0f`, not `%d`: troll listings reach 10^11 copper, past `%d`'s 32-bit range.
 - `SAVED_VARIABLES_TOO_LARGE(addOnName)` exists and Blizzard shows a popup for it [F-127]. Whether data is
   dropped at load or at save isn't verified on Forever: stay small, and if it fires for your addon, stop
   writing and tell the player.
@@ -110,14 +131,22 @@ end
   and `GetMouseButtonClicked() == "RightButton"`. Mixin hooks miss buttons that already exist.
 
 ## Probes (paste in game; record results in forever-facts.md with the build)
+Better than `/run` lines: let the addon answer its own probes. Keep a `diag` table in SavedVariables and read it
+with `savedvars.py <Addon> --path <DB>.diag` after a `/reload`. BuffettForever's `Pricing\Scanner.lua` records the
+index base, every request (cooldown), timings, rows missing info, the realm keys and commodity status.
 - Presence: `/run print(type(C_AuctionHouse and C_AuctionHouse.ReplicateItems), type(QueryAuctionItems))` → `function nil`.
 - Replicate index base (at the AH, after `/run C_AuctionHouse.ReplicateItems()` and the update event):
   `/run local n=C_AuctionHouse.GetNumReplicateItems() print(n,C_AuctionHouse.GetReplicateItemLink(0),C_AuctionHouse.GetReplicateItemLink(n))`
+  → 70425: index 0 is a real row and index n returns `itemID 0`, so the index is 0-based.
 - Are reagents commodities? (Linen Cloth; run twice if it prints nil):
   `/run local i=C_AuctionHouse.GetItemKeyInfo(C_AuctionHouse.MakeItemKey(2589)) print(i and i.itemName,i and i.isCommodity)`
+  → 70425: true for 2589, 2770, 2840, 2447 and 2318.
 - Cut rate (after a sale, mailbox open):
   `/run for i=1,GetInboxNumItems() do local t,n,_,bid,_,dep,cut=GetInboxInvoiceInfo(i) if t=="seller" and bid and bid>0 then print(n,bid,dep,cut,format("%.2f%%",cut*100/bid)) end end`
 - Pricing rules: `/run print(C_AuctionHouse.SupportsCopperValues(),C_AuctionHouse.IsThrottledMessageSystemReady())`
+  → 70425: copper values true.
 - Market keys: `/run print(GetRealmName(),GetNormalizedRealmName(),UnitFactionGroup("player"))`; compare listings
-  seen by an Alliance and a Horde character, and across realms of one ruleset.
+  seen by an Alliance and a Horde character, and across realms of one ruleset. 70425 values: [F-083]; sharing is
+  still open.
 - Full-scan cooldown: call `ReplicateItems` twice a few minutes apart and note whether the second returns data.
+  → 70425: nothing 121 s after a success; the exact length is still open.

@@ -97,7 +97,8 @@ A half-life `h` matches an EMA with α = 1 − 0.5^(1/h): h = 3 days ≈ α 0.21
 
 ## Cost to buy Q units: the price ladder
 Keep the latest scan's ladder per item: unit price levels, cheapest first, with quantities (merge equal prices;
-~8 levels or enough to cover a few stacks is plenty). Buying Q walks it:
+~8 levels or enough to cover a few stacks is plenty). BuffettForever keeps 8 levels, adds more until 100 units are
+covered, and stops at 16. On the beta that's median 2 levels, p90 8. Buying Q walks it:
 
 ```lua
 -- ladder: flat { price1, qty1, price2, qty2, ... } sorted by price ascending.
@@ -129,10 +130,13 @@ When the ladder can't fill Q, say so ("only 160 listed"); don't extrapolate sile
 -- BuffettForeverDB.markets[marketKey].items[itemID] =
 -- { t = lastScanTime, mv = 106.25, min = 100, q = 100, n = 5,
 --   ladder = "100:5,105:5,110:10,300:20",            -- top levels of the latest scan
---   h = { [20376] = "106.25:100:100:5", ... } }      -- day -> "mv:min:qty:n", pruned to 14-30 days
+--   h = { [20376] = "106.25:100:100:5:2", ... } }    -- day -> "mv:min:qty:n:k", pruned to 14-30 days
 ```
-Pack days into strings, prune at login, and keep the file small (auction-house.md has the
-`SAVED_VARIABLES_TOO_LARGE` note). Store aggregates only, never every listing.
+A day can hold several scans. `k` counts them, so the day's `mv` stays the mean of its scans
+(`(mv * k + new) / (k + 1)`); `min` is the day's lowest, and `qty` and `n` the latest. Keep prices to 0.01 copper.
+Pack days into strings, prune at login, and keep the file small: about 185 bytes per item plus 33 per day on
+70425 (auction-house.md has the measurements and the `SAVED_VARIABLES_TOO_LARGE` note). Store aggregates only,
+never every listing.
 
 ## Test vectors (computed with an independent Python implementation)
 | Case | Input | Expected |
