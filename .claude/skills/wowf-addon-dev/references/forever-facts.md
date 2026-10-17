@@ -222,9 +222,10 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     data for uncached rows arrived. Act on the first one only.
   - 5,390 of the 61,933 rows (8.7%) had `hasAllInfo` false when read, but `itemID`, `count` and `buyoutPrice` were
     always valid. Pricing by itemID doesn't need to wait for the item data.
-  - **Cooldown:** a second `ReplicateItems()` 121 s after a successful one got **no event at all** within 60 s. One
-    2,300 s (38 min) after the last data got data in 4.2 s. So the cooldown is **between 2 and 38 min** (retail:
-    15 min). A request inside the cooldown is ignored, not queued, so use a timeout.
+  - **Cooldown:** a request inside it gets **no event at all**: it's ignored, not queued, so use a timeout.
+    - Within a minute after a successful scan the request is silent; 2,300 s after it, data came in 4.2 s.
+    - BuffettForever's request log (`diag.cooldown`, 2026-10-17): no data 877 s after the last data, data
+      1,120 s after it. So the cooldown is **between 14.6 and 18.7 min**, consistent with retail's 15 min.
   - **Targeted searches** at one query in flight:
     - Commodity results are **grouped by unit price**: Light Leather returned 41 result rows while the full scan
       showed 295 auctions. A commodity search gives quantity per price, not an auction count.
@@ -238,7 +239,7 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
 - **[F-122]** There is **no AH cut API or constant**. Measure it from seller invoices: `GetInboxInvoiceInfo`
   (undocumented, present) → `consignment / bid`. Deposits: `CalculateCommodityDeposit` /
   `CalculateItemDeposit`; the formula is in [F-129]. `Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5`.
-  The cut rate on Forever: **unmeasured**. The ReplicateItems cooldown is between 2 and 38 min ([F-121]). [Source; Probe 70374, 70425]
+  The cut rate on Forever: **unmeasured**. The ReplicateItems cooldown is between 14.6 and 18.7 min ([F-121]). [Source; Probe 70374, 70425]
 - **[F-123]** Professions use the modern `Blizzard_Professions` (LoadOnDemand) with Camelot overrides; Forever
   forces "show unlearned" off. `Blizzard_TradeSkillUI` and `Blizzard_CraftUI` don't exist; Enchanting uses the
   normal window. `C_TradeSkillUI`: 89 documented + 57 runtime-only functions (`GetAllRecipeIDs`,

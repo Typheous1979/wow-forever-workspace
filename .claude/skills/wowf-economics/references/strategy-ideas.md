@@ -17,6 +17,14 @@ Features that use the same data. Each lists its inputs and which are available o
   - z < −1: inputs are cheap; stock up for planned crafts.
   - z > +1: outputs are dear; sell what you hold.
 - Show signals as hints, never as orders; a thin market can produce any z.
+- As built (BuffettForever 0.6.0, `Econ.MrMarket`, `Econ.Mood`; Python `mr_market`, `mood`):
+  - σ is the standard deviation of the daily market values in the window, and fair is the decay-weighted fair
+    value (price-estimation.md). Only with 5 or more days.
+  - The mood is "cheap" or "dear" only when |z| ≥ 1 **and** the price is at least 10% from fair value, so a very
+    steady item can't flag on a few copper.
+  - MOOD-1: days 1000, 1100, 900, 1000, today 700 → fair 905.7, z −1.517, −22.7%: cheap.
+  - MOOD-2: 1000, 1000, 1010, 990, today 1300 → z +1.75, +19.3%: dear.
+  - MOOD-3: 2 days → no mood.
 
 ## Profession planning
 - **Cheapest skill-up path.** SkillLineAbility gives each recipe's `MinSkillLineRank` and the yellow and grey

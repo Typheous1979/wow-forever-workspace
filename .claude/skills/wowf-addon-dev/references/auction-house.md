@@ -113,6 +113,10 @@ Working code: BuffettForever `Pricing\Search.lua` (tested on 70425).
   `AUCTION_HOUSE_THROTTLED_SYSTEM_READY`. Keep your own queue with one query in flight (Blizzard's sell frame
   checks the same function before posting).
 - Your searches also refresh Blizzard's AH frame if it shows the same item. That's expected.
+- **Your own auctions are in the results.** Commodity rows carry `numOwnerItems` (your units in that row), item
+  rows `containsOwnerItem`. Leave them out before pricing. A full scan has no owner flag you can use without names,
+  so subtract your own auctions (`GetOwnedAuctions`: quantity and unit price) from the listings at their price:
+  BuffettForever `Econ.ExcludeOwn`.
 
 ## Deposits and the house cut
 - `CalculateCommodityDeposit(itemID, duration, quantity)` and `CalculateItemDeposit(itemLocation, duration,
@@ -220,5 +224,6 @@ index base, every request (cooldown), timings, rows missing info, the realm keys
   seen by an Alliance and a Horde character, and across realms of one ruleset. 70425 values: [F-083]; sharing is
   still open.
 - Full-scan cooldown: call `ReplicateItems` twice a few minutes apart and note whether the second returns data.
-  → 70425: nothing 121 s after a success, data 2,300 s after one, so the cooldown is between 2 and 38 min. A
-  request log that narrows the bounds (BuffettForever `diag.cooldown`) settles it without extra effort.
+  → 70425: nothing 877 s after the last data, data 1,120 s after it, so the cooldown is between 14.6 and 18.7 min
+  (retail: 15 min) [F-121]. A request log that narrows the bounds (BuffettForever `diag.cooldown`) settles it
+  without extra effort.
