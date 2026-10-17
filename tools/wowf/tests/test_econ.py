@@ -71,6 +71,15 @@ class ReferenceVectors(unittest.TestCase):
         self.assertAlmostEqual(econ.item_sale_chance(18, 12, 40, 30), 0.595635, places=6)
         self.assertEqual(econ.item_sale_chance(0, 0, 0, 0), 0.5)
 
+    def test_deposit_formula(self):
+        """DEP-1..4 in crafting-economics.md: the game's own deposits on 70425 [F-129]."""
+        self.assertEqual([econ.deposit(142, 100, d) for d in (1, 2, 3)], [710, 2840, 8520])
+        self.assertEqual(econ.deposit(142, 1, 1), 100)                        # the 1s minimum per auction
+        self.assertEqual([econ.deposit(875, 1, d) for d in (1, 2, 3)], [100, 172, 516])   # floor, then x4/x12
+        self.assertEqual(econ.deposit_per_unit(2, 2, 2), 50)                  # 2 Coarse Thread for 8 hours
+        self.assertEqual(econ.deposit_per_unit(875, 5, 2, commodity=False), 172)          # gear: per auction
+        self.assertEqual(econ.deposit(None, 3, 3), 100)                       # no vendor price: the minimum
+
     def test_measured_cut(self):
         """CUT-1..3 in crafting-economics.md."""
         self.assertAlmostEqual(econ.measured_cut(1500, 30000, 3), 0.05)
@@ -146,6 +155,15 @@ class Branches(unittest.TestCase):
         r = scenario("BOLT-CUT-15")
         self.assertAlmostEqual(r["ahExit"], 24650)
         self.assertAlmostEqual(r["cogs"], 18145)
+
+    def test_deposit_rule_in_the_evaluator(self):
+        r = scenario("BOLT-DEPOSIT-RULE")      # 10 bolts pay 1s (10c each); 20 Linen pay 1s (5c each)
+        self.assertAlmostEqual(r["ahExit"], 27450)
+        self.assertAlmostEqual(r["cogs"], 18685)
+        r = scenario("BELT-GEAR")              # gear: 1s per auction, one auction per belt
+        self.assertAlmostEqual(r["ahExit"], 16900)
+        r = scenario("CHEAP-SMALL-POST")       # the minimum outweighs a 19c price: vendor
+        self.assertEqual((r["ahExit"], r["bestSource"]), (0, "vendor"))
 
     def test_ah_net_floor(self):
         r = scenario("BOLT-UNSOLD")

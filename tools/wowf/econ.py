@@ -31,6 +31,9 @@ SALE_MIN = 0.05            # a sale chance never drops below this (deposit loss 
 MARKET_WEIGHT = 2          # pseudo-units of the default behind your rate over all items
 ITEM_WEIGHT = 5            # pseudo-units of that rate behind one item's own record
 CUT_MIN_SALES, CUT_MIN_COPPER = 3, 10000   # invoices, and their total, before the measured cut counts
+# Forever's deposit per auction [F-129]: 5% of the vendor price per 2 hours, floored to whole copper, times 1, 4
+# or 12 for 2, 8 or 24 hours, at least 1s.
+DEPOSIT_DIVISOR, DEPOSIT_MULT, DEPOSIT_MIN = 20, (1, 4, 12), 100
 
 
 # ---------------------------------------------------------------- price math
@@ -84,6 +87,21 @@ def item_sale_chance(sold, expired, market_sold, market_expired, default=0.5):
     (which is pulled toward the default). Cancelled auctions count neither way."""
     market = sale_chance(market_sold, market_expired, default, MARKET_WEIGHT)
     return sale_chance(sold, expired, market, ITEM_WEIGHT)
+
+
+def deposit(vendor_sell, qty, duration):
+    """The deposit for one auction of qty units at duration 1-3 (2, 8, 24 h): max(1s, floor(vendor x qty / 20) x
+    1, 4 or 12). Dividing by 20 keeps the floor exact for whole-copper prices."""
+    return max(DEPOSIT_MIN, math.floor((vendor_sell or 0) * qty / DEPOSIT_DIVISOR) * DEPOSIT_MULT[duration - 1])
+
+
+def deposit_per_unit(vendor_sell, qty, duration, commodity=True):
+    """Selling qty units: a commodity goes up as one auction of qty, anything else one auction per unit."""
+    if qty <= 0:
+        return 0.0
+    if commodity:
+        return deposit(vendor_sell, qty, duration) / qty
+    return float(deposit(vendor_sell, 1, duration))
 
 
 def measured_cut(cut_total, bid_total, sales):
@@ -187,19 +205,32 @@ def _grade_for(ctx, item, need):
     return grade(info.get("age"), info.get("days"), info.get("observations"), info.get("cv"), info.get("listed"), need)
 
 
-def _ah_unit(ctx, item):
-    """What one unit nets on the AH with the item's deposit and sale chance, floored at 0: a listing that
-    loses more in deposits than it earns is worth nothing there. None when there's no AH price."""
+def _deposit_unit(ctx, item, qty):
+    """The deposit per unit when selling qty: the context's own figure if it has one, else Forever's formula
+    for the settings' auction duration (commodity unless ctx commodity says False), else 0."""
+    d = ctx["deposit"].get(item)
+    if d is not None:
+        return d
+    duration = ctx["settings"].get("duration")
+    if duration is None:
+        return 0
+    commodity = ctx.get("commodity", {}).get(item) is not False
+    return deposit_per_unit(ctx["vendorSell"].get(item) or 0, qty, duration, commodity)
+
+
+def _ah_unit(ctx, item, qty):
+    """What one unit nets on the AH when selling qty, with the item's deposit and sale chance, floored at 0: a
+    listing that loses more in deposits than it earns is worth nothing there. None when there's no AH price."""
     s = ctx["settings"]
     p = ctx.get("saleChance", {}).get(item)
-    net = ah_net(ctx["sellPrice"].get(item), s["cut"], ctx["deposit"].get(item) or 0,
+    net = ah_net(ctx["sellPrice"].get(item), s["cut"], _deposit_unit(ctx, item, qty),
                  p if p is not None else s["saleChance"])
     return None if net is None else max(0.0, net)
 
 
-def _liquidation(ctx, item):
+def _liquidation(ctx, item, qty):
     vendor = ctx["vendorSell"].get(item)
-    net = _ah_unit(ctx, item)
+    net = _ah_unit(ctx, item, qty)
     return liquidation(vendor, net), net is not None and (vendor is None or net > vendor)
 
 
@@ -217,7 +248,7 @@ def evaluate(recipe, crafts, ctx):
     for item, count in recipe["reagents"]:
         need = count * crafts
         line = {"itemID": item, "need": need, "owned": 0, "ownedCost": 0.0, "buyCost": 0.0, "source": None}
-        unit_liq, from_ah = _liquidation(ctx, item)
+        unit_liq, from_ah = _liquidation(ctx, item, need)
         owned = min(need, ctx["owned"].get(item) or 0)
         if owned > 0:
             owned_any = True
@@ -262,7 +293,7 @@ def evaluate(recipe, crafts, ctx):
     r["vendorExit"] = vendor_unit * r["units"] if vendor_unit is not None else None
     r["ahExit"] = r["ahUnit"] = None
     if not recipe["bop"]:
-        unit = _ah_unit(ctx, out)
+        unit = _ah_unit(ctx, out, r["units"])
         if unit is not None:
             r["ahUnit"], r["ahExit"] = unit, unit * r["units"]
     ah, vend = r["ahExit"], r["vendorExit"]
@@ -325,7 +356,7 @@ def _info(age=3600, days=5, observations=6, cv=0.10, listed=1000):
 
 def _ctx(settings=None, **tables):
     ctx = {k: {} for k in ("vendorBuy", "vendorSell", "sellPrice", "ladder", "recipeFor", "owned", "deposit",
-                           "saleChance", "priceInfo")}
+                           "commodity", "saleChance", "priceInfo")}
     ctx.update(tables)
     ctx["settings"] = dict(DEFAULT_SETTINGS, **(settings or {}))
     return ctx
@@ -336,6 +367,7 @@ def _recipe(rid, output, count, reagents, bop=False):
 
 
 LINEN, BOLT, COPPER, TIN, BRONZE, BRACERS = 2589, 2996, 2840, 3576, 2841, 2671
+BELT, LLEATHER, THREAD = 4237, 2318, 2320
 
 
 def scenarios():
@@ -401,6 +433,18 @@ def scenarios():
         ("OWNED-WORTHLESS", _recipe(3, 30, 1, [(31, 1)]), 1,
          _ctx({"minProfit": 0}, vendorSell={30: 500}, sellPrice={31: 100}, owned={31: 1}, deposit={31: 100},
               saleChance={31: 0.1}, priceInfo={31: _info()})),
+        # Forever's deposit per auction [F-129] (settings carry the duration): 10 bolts as one 8-hour auction
+        # pay the 1s minimum (10c each), and the 20 Linen valued for sale pay it too (5c each).
+        ("BOLT-DEPOSIT-RULE", bolt, 10, bolt_ctx({"minProfit": 500, "duration": 2})),
+        # Gear goes up one auction each: 2 belts for 24 hours pay 1s apiece.
+        ("BELT-GEAR", _recipe(3753, BELT, 1, [(LLEATHER, 6), (THREAD, 1)]), 2,
+         _ctx({"minProfit": 500, "duration": 3}, vendorSell={BELT: 30, LLEATHER: 15, THREAD: 2},
+              sellPrice={BELT: 9000, LLEATHER: 120}, ladder={LLEATHER: [120, 100]}, vendorBuy={THREAD: 10},
+              commodity={BELT: False}, priceInfo={BELT: _info(), LLEATHER: _info()})),
+        # 2 cheap units for 8 hours carry the 1s minimum: 50c each against a 19c price, so the vendor wins.
+        ("CHEAP-SMALL-POST", _recipe(4, 40, 1, [(41, 1)]), 2,
+         _ctx({"minProfit": 0, "duration": 2}, vendorSell={40: 2}, sellPrice={40: 19}, vendorBuy={41: 1},
+              priceInfo={40: _info()})),
     ]
     return out
 
@@ -494,6 +538,8 @@ def context_from_snapshot(snap):
     ctx = {}
     for name in ("vendorBuy", "vendorSell", "sellPrice", "owned", "deposit", "saleChance"):
         ctx[name] = {_key(k): _unfalse(v) for k, v in (c.get(name) or {}).items() if _unfalse(v) is not None}
+    # here false is a value: not a commodity (one auction per unit)
+    ctx["commodity"] = {_key(k): bool(v) for k, v in (c.get("commodity") or {}).items()}
     ctx["ladder"] = {_key(k): list(v) for k, v in (c.get("ladder") or {}).items() if _unfalse(v) is not None}
     ctx["priceInfo"] = {_key(k): dict(v) for k, v in (c.get("priceInfo") or {}).items() if _unfalse(v) is not None}
     ctx["recipeFor"] = {}
