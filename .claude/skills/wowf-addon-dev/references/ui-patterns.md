@@ -87,6 +87,9 @@ Addon frames that you create aren't protected. You only need combat-lockdown car
     - Play `SOUNDKIT.IG_CHARACTER_INFO_TAB` on click, as the Auction House does.
     - The tabs hang 30 px below the window: `window:SetClampRectInsets(0, 0, 0, -30)` keeps them on screen.
     - Example: BuffettForever `UI/ResultsList.lua` 0.7.0, tested on 70425.
+    - An action tab can follow the views, such as Options opening Blizzard's settings window. Give it the next ID
+      and never select it. Blizzard's settings window uses the HIGH strata, like most addon windows, so call
+      `window:Lower()` after opening it, or it can open behind yours. BuffettForever 0.8.0, tested on 70425.
   - **Icon side tabs**, `LargeSideTabButtonTemplate`, on the windows Forever redesigned: Character, Professions,
     Collections, Bank, Inspect. An icon needs a hover to explain itself.
 - **Items the way the profession window shows them** [Source 70450]. Forever's recipe form puts the result in a
