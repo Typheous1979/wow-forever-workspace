@@ -11,6 +11,20 @@ Features that use the same data. Each lists its inputs and which are available o
   ItemSparse sell prices, merchant prices.
 - **Under-priced intermediates.** An intermediate (bars, bolts, leathers) listed below the cost of its inputs:
   buy it instead of making it, or buy the inputs and sell the intermediate when the gap reverses.
+- As built (BuffettForever 0.7.0, the Vendor crafts and AH flips views):
+  - **Vendor crafts** evaluate each known recipe on the context with the AH taken out (Python `vendor_context`),
+    so owned reagents count at what a vendor pays. That is the certain comparison.
+    - The batch is what your bags allow: every reagent a vendor (or a recipe from vendor goods) can't supply
+      must be owned.
+    - Flag a craft whose owned reagents would fetch more raw on the AH than crafting pays at a vendor
+      (opportunity cost, less certain).
+  - **AH flips** come from every listing in the full scan, with your own left out. `flip(listings, vendor_sell)`
+    returns the units below the vendor price, their cost, their value at the vendor, and the cheapest and dearest.
+    - The confidence follows the scan's age, because listings vanish fast: A under 15 min, B under 1 h, C under
+      6 h.
+    - For a commodity, buying the flip's quantity takes the cheapest units first, which are exactly these.
+  - FLIP-1: listings 40c × 5, 45c × 10, 60c × 20, vendor 50c → 15 units, cost 6s 50c, worth 7s 50c, 40c to
+    45c. FLIP-2: vendor price 0 → none. FLIP-3: all above → none. FLIP-4: 49.5c × 3 → 3 (half a copper counts).
 
 ## Mr. Market signals
 - z-score of today's market value against fair value: `z = (now − fair) / σ` over the window.
