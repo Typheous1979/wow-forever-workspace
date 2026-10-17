@@ -1,7 +1,8 @@
 # Changelog
 
 ## 0.7.0 (not released)
-- **Three views** in the middle pane: Tray, Vendor crafts and AH flips (tabs where its heading was).
+- **Three views** in the middle pane: Tray, Vendor crafts and AH flips, picked with Blizzard's tabs under the
+  window (as on the Auction House); the pane's heading names the view.
 - **Vendor crafts:** every recipe you know that profits on vendor prices alone.
   - Its reagents come from a vendor, or from your bags counted at what a vendor pays for them; the result goes to
     a vendor. Certain profit, no Auction House risk.
@@ -16,7 +17,8 @@
 - `/bf selftest`: 107 checks (flips, the vendor-only context, the vendor batch, raw materials on the AH; 35
   scenarios from the Python reference).
 - Tested on client 1.60.1.70425, 2026-10-17: selftest 107/107; the three views, the vendor-craft details and a full
-  scan's flips work.
+  scan's flips work. The tabs then moved from the top of the pane to under the window, where WoW players look
+  for them.
 
 ## 0.6.0 (not released)
 - **Your own auctions aren't the market:** full scans leave out the auctions you have listed (from your auctions

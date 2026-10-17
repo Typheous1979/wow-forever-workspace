@@ -1,6 +1,7 @@
 local addonName, ns = ...
 
--- The middle pane, in three views (tabs where its heading was):
+-- The middle pane, in three views (Blizzard's tabs under the window, like the Auction House's;
+-- the pane's heading names the view):
 -- - Tray: every recipe that uses the tray's reagents (Evaluator.ForTray);
 -- - Vendor crafts: recipes you know that profit on vendor prices alone (Evaluator.VendorCrafts);
 -- - AH flips: listings in the last full scan below what a vendor pays (Pricing/Flips.lua).
@@ -32,16 +33,18 @@ local BAR_SPACE = 24          -- the scroll bar and the box inset, right of the 
 local QUESTION_MARK = 134400
 local GRADE_COLOR = { A = "|cff33ff33", B = "|cffb4ff33", C = "|cffffd100", D = "|cffff5533" }
 local DEBOUNCE = 0.15
+local TAB_HANG = 30   -- how far the tabs reach below the window (32 tall, 2 tucked under its edge)
 
-local VIEWS = {
-    { key = "tray", label = "Tray", tip = "Every recipe that uses the reagents in your tray." },
-    { key = "vendor", label = "Vendor crafts",
+local VIEWS = {   -- label: the tab; title: the pane's heading
+    { key = "tray", label = "Tray", title = "Craftable items",
+      tip = "Every recipe that uses the reagents in your tray." },
+    { key = "vendor", label = "Vendor crafts", title = "Vendor crafts",
       tip = "Recipes you know that profit on vendor prices alone: reagents from a vendor or your bags (counted at what a vendor pays for them), the result sold to a vendor. Certain profit, no Auction House risk." },
-    { key = "flips", label = "AH flips",
+    { key = "flips", label = "AH flips", title = "AH flips",
       tip = "Listings in your last full scan priced below what a vendor pays: buy them on the Auction House and sell them to a vendor. Listings vanish fast, so the confidence follows the scan's age." },
 }
 
-local panel, pick, box, countText, knownCheck, unconfirmedCheck
+local window, panel, pick, box, countText, knownCheck, unconfirmedCheck
 local tabs = {}
 local results, ranked = {}, {}
 local selected
@@ -325,18 +328,18 @@ end
 
 -- ---------------------------------------------------------------- build
 
--- The tabs show the view; the filters apply to the Tray view only.
+-- The tabs show the view and the heading names it; the filters apply to the Tray view only.
 local function ShowView()
+    if not knownCheck then return end   -- not built yet
     local view = View()
-    for _, tab in ipairs(tabs) do
-        local on = tab.key == view
-        tab:SetNormalFontObject(on and "GameFontNormal" or "GameFontDisable")
-        tab.line:SetShown(on)
+    for i, v in ipairs(VIEWS) do
+        if v.key == view then
+            PanelTemplates_SetTab(window, i)
+            panel.Title:SetText(L[v.title])
+        end
     end
-    if knownCheck then
-        knownCheck:SetShown(view == "tray")
-        unconfirmedCheck:SetShown(view == "tray")
-    end
+    knownCheck:SetShown(view == "tray")
+    unconfirmedCheck:SetShown(view == "tray")
 end
 
 function ResultsList.SetView(view)
@@ -347,27 +350,26 @@ function ResultsList.SetView(view)
     ResultsList.Update()
 end
 
-local function Tabs()
-    panel.Title:Hide()
-    local prev
-    for _, v in ipairs(VIEWS) do
-        local tab = CreateFrame("Button", nil, panel)
-        tab:SetNormalFontObject("GameFontDisable")
-        tab:SetHighlightFontObject("GameFontHighlight")
+-- Blizzard's own tabs (PanelTabButtonTemplate) under the window's bottom edge, where the Auction House keeps
+-- Buy, Sell and Auctions; the first sits where the Character frame's does on this frame template.
+local function Tabs(frame)
+    window = frame
+    for i, v in ipairs(VIEWS) do
+        local tab = CreateFrame("Button", nil, frame, "PanelTabButtonTemplate")
+        tab:SetID(i)
         tab:SetText(L[v.label])
-        tab:SetSize(tab:GetTextWidth() + 12, 18)
-        if prev then tab:SetPoint("LEFT", prev, "RIGHT", 4, 0) else tab:SetPoint("TOPLEFT", 2, -3) end
-        tab.line = tab:CreateTexture(nil, "ARTWORK")
-        tab.line:SetColorTexture(1, 0.82, 0, 0.8)
-        tab.line:SetHeight(1)
-        tab.line:SetPoint("BOTTOMLEFT", 6, 0)
-        tab.line:SetPoint("BOTTOMRIGHT", -6, 0)
-        tab.key = v.key
-        tab:SetScript("OnClick", function() ResultsList.SetView(v.key) end)
-        UI.Tooltip(tab, L[v.label], L[v.tip])
-        tabs[#tabs + 1] = tab
-        prev = tab
+        tab:SetScript("OnClick", function()
+            PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB)
+            ResultsList.SetView(v.key)
+        end)
+        UI.Tooltip(tab, L[v.label], L[v.tip], "ANCHOR_RIGHT")
+        tabs[i] = tab
     end
+    frame.Tabs = tabs   -- PanelTemplates_* find the tabs here (the template's parentArray may fill it too)
+    tabs[1]:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 11, 2)
+    PanelTemplates_SetNumTabs(frame, #tabs)   -- anchors the rest in a row
+    for _, tab in ipairs(tabs) do PanelTemplates_TabResize(tab, 0) end
+    frame:SetClampRectInsets(0, 0, 0, -TAB_HANG)   -- dragging the window keeps its tabs on screen
 end
 
 local function Header(parent, text, key, anchorPoint, x, width, justify)
@@ -398,7 +400,7 @@ end
 
 local function Build(frame)
     panel, pick = frame.Results, frame.Pick
-    Tabs()
+    Tabs(frame)
     local x = -BAR_SPACE - 4
     for i = #COLUMNS, 1, -1 do
         local c = COLUMNS[i]

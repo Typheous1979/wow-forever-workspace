@@ -69,11 +69,14 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   vendor_context, VENDOR-CRAFT (35 scenarios). Tested on 70425 (2026-10-17): selftest 107/107, the three views,
   the vendor-craft details and a scan's flips work. **M4 complete** (profit per hour and the value-added column
   wait for M5, as decided).
-- **Tests logged for later** (Justin, 2026-10-17; run them when the mail exists):
-  - the 2 Light Leather posted for 2 hours at 5g each: once expired, open a mailbox, and `/bf ledger` shows
-    2 expired;
-  - open a mailbox, close it, wait 5 minutes, open it again: `/bf ledger` doesn't change (the cached-list fix);
-  - a real sale: `/bf ledger` shows it, and 3 sales worth 1g in all measure the house cut.
+- 0.7.0 follow-up (2026-10-17): the view tabs moved from the top of the middle pane to Blizzard's
+  bottom tabs under the window (PanelTabButtonTemplate, as on the Auction House); the heading names the view again.
+  Tested on 70425: the tabs work and stay on screen. The logged mail tests passed: 2 Light Leather expired and were
+  filed once, a mailbox reopened about 4 minutes later filed nothing twice, and a 19c Coarse Thread sale was filed
+  with no cut. The first flips scan found 6, but 1,309 of 2,927 items' vendor prices weren't cached yet.
+- **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
+  all have come by mail (`/bf ledger` shows the measured cut). The expiry and mailbox-reopen tests passed on
+  70425 (2026-10-17).
 
 ## Decisions (2026-10-16, M4; Justin approved the plan's recommendations)
 - **Order:** pass 1 an honest AH exit (sales ledger, measured cut, deposits, your auctions); pass 2 market reality
@@ -93,6 +96,10 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   Returns are keyed without their count.
 - **Walls that never shrink get grade D** (pass 2), unless your own sales show the item sells.
 - **Scanners are views in the existing list,** not new windows (pass 3).
+- **The view tabs sit under the window** (Justin, 2026-10-17: players would miss them at the top of the pane).
+  They are Blizzard's bottom text tabs, as on the Auction House, Friends and Merchant windows. Forever's redesigned
+  windows (Character, Professions, Collections) use icon side tabs, but an icon hides what "Vendor crafts" and
+  "AH flips" mean until you hover it.
 - **The details pane is data** (Justin, 2026-10-17): label/value rows, one number each, with the explanation in
   the row's tooltip. No sentences in the pane except the verdict and the warnings.
 

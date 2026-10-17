@@ -22,9 +22,10 @@ function UI.Button(parent, text, width, onClick, height)
     return b
 end
 
-function UI.Tooltip(frame, title, text)
+-- anchor: "ANCHOR_TOP" unless given (Blizzard's bottom tabs use "ANCHOR_RIGHT").
+function UI.Tooltip(frame, title, text, anchor)
     frame:HookScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetOwner(self, anchor or "ANCHOR_TOP")
         GameTooltip:SetText(title, 1, 1, 1)
         if text then GameTooltip:AddLine(text, nil, nil, nil, true) end
         GameTooltip:Show()
