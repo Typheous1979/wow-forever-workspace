@@ -432,18 +432,23 @@ def _unfalse(v):
     return None if v is False else v
 
 
+def _key(k):
+    """An item ID key: an int from savedvars.load_sv, or "[2589]" from its JSON export."""
+    return int(str(k).strip("[]"))
+
+
 def context_from_snapshot(snap):
     """The Lua context saved by /bf eval (diag.eval.ctx) as a Python context."""
     c = snap.get("ctx") or {}
     ctx = {}
     for name in ("vendorBuy", "vendorSell", "sellPrice", "owned", "deposit"):
-        ctx[name] = {int(k): _unfalse(v) for k, v in (c.get(name) or {}).items() if _unfalse(v) is not None}
-    ctx["ladder"] = {int(k): list(v) for k, v in (c.get("ladder") or {}).items() if _unfalse(v) is not None}
-    ctx["priceInfo"] = {int(k): dict(v) for k, v in (c.get("priceInfo") or {}).items() if _unfalse(v) is not None}
+        ctx[name] = {_key(k): _unfalse(v) for k, v in (c.get(name) or {}).items() if _unfalse(v) is not None}
+    ctx["ladder"] = {_key(k): list(v) for k, v in (c.get("ladder") or {}).items() if _unfalse(v) is not None}
+    ctx["priceInfo"] = {_key(k): dict(v) for k, v in (c.get("priceInfo") or {}).items() if _unfalse(v) is not None}
     ctx["recipeFor"] = {}
     for k, v in (c.get("recipeFor") or {}).items():
         if _unfalse(v) is not None:
-            ctx["recipeFor"][int(k)] = {"yield": v["yield"], "reagents": list(v["reagents"])}
+            ctx["recipeFor"][_key(k)] = {"yield": v["yield"], "reagents": list(v["reagents"])}
     ctx["settings"] = dict(DEFAULT_SETTINGS, **(snap.get("settings") or {}))
     return ctx
 
@@ -496,6 +501,40 @@ def check_snapshot(snap, names=None):
     return len(results), mismatches, order_lua == order_py
 
 
+def _money(c):
+    if c is None:
+        return "?"
+    sign = "-" if c < 0 else ""
+    c = int(round(abs(c)))
+    g, s, cp = c // 10000, (c // 100) % 100, c % 100
+    return sign + (f"{g}g {s:02d}s {cp:02d}c" if g else f"{s}s {cp:02d}c" if s else f"{cp}c")
+
+
+def report(snap, items, spells, top=15):
+    """A readable table of a snapshot's ranked results, with the reasons and grades tallied."""
+    results = snap.get("results") or []
+    lines = []
+    recommended = sum(1 for r in results if r.get("recommended"))
+    lines.append(f"{len(results)} recipes, {recommended} recommended")
+    tally, grades = {}, {}
+    for r in results:
+        for key in _unfalse(r.get("reasons")) or []:
+            tally[key] = tally.get(key, 0) + 1
+        grades[r.get("grade")] = grades.get(r.get("grade"), 0) + 1
+    lines.append("  reasons: " + ", ".join(f"{k} {v}" for k, v in sorted(tally.items(), key=lambda kv: -kv[1])))
+    lines.append("  grades: " + ", ".join(f"{k} {grades[k]}" for k in sorted(grades)))
+    for i, r in enumerate(results[:top], 1):
+        roi_v = _unfalse(r.get("roi"))
+        roi_text = f"{roi_v * 100:.0f}%" if roi_v is not None else "n/a"
+        exit_text = f"{r.get('bestSource') or '-'} {_money(_unfalse(r.get('best')))}"
+        why = "" if r.get("recommended") else "  [" + ",".join(_unfalse(r.get("reasons")) or []) + "]"
+        units = r.get("count", 1) * r.get("crafts", 1)
+        name = items.get(r.get("output"), spells.get(r.get("recipeID"), "?"))
+        lines.append(f"  {i:2}. {name} x{units}: cost {_money(r.get('cogs'))}, {exit_text}, "
+                     f"profit {_money(_unfalse(r.get('profit')))}, ROI {roi_text}, grade {r.get('grade')}{why}")
+    return "\n".join(lines)
+
+
 def _snapshots(cfg, client=None):
     import savedvars
     out = []
@@ -526,6 +565,7 @@ def main(argv):
     p.add_argument("action", choices=["vectors", "check"])
     p.add_argument("--out", help="vectors: output path (default BuffettForever/Economics/EvaluatorVectors.lua)")
     p.add_argument("--client", help="check: only this client (e.g. beta)")
+    p.add_argument("--top", type=int, default=0, help="check: also print the N best-ranked recipes with names")
     a = p.parse_args(argv)
     cfg = config.load()
     if a.action == "vectors":
@@ -559,6 +599,8 @@ def main(argv):
         for entry in snap.get("tray") or []:
             iid = entry.get("itemID")
             print(f"  tray: {iid} {items.get(iid, '?')} x{entry.get('qty')}: used by {recipes.get(iid, 0)} of these recipes")
+        if a.top:
+            print(report(snap, items, spells, a.top))
     return status
 
 

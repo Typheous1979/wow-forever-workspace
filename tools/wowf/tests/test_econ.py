@@ -167,6 +167,14 @@ class Outputs(unittest.TestCase):
         self.assertEqual(len(mismatches), 1)
         self.assertIn("cogs", mismatches[0][1][0])
 
+    def test_report_and_money(self):
+        self.assertEqual(econ._money(18715), "1g 87s 15c")
+        self.assertEqual(econ._money(-475), "-4s 75c")
+        self.assertEqual(econ._money(7), "7c")
+        text = econ.report(self._snapshot(), {BOLT: "Bolt of Linen Cloth"}, {}, top=5)
+        self.assertIn("2 recipes, ", text)
+        self.assertIn("Bolt of Linen Cloth x10: cost 1g 87s 15c", text)
+
 
 if __name__ == "__main__":
     unittest.main()
