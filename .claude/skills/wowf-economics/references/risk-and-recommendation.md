@@ -58,3 +58,6 @@ margin of safety, ranks the candidates and words the advice.
 - BoP outputs: vendor exit only. Enchants: no item, no exit.
 - Daily-cooldown recipes: value per cooldown, not per craft (strategy-ideas.md).
 - Long auction durations raise the deposit; the expected deposit loss grows as `p` falls.
+- **Small posts of cheap items lose money on Forever.** Every auction pays at least a 1s deposit [F-129], so 2
+  Coarse Thread at 19c each risk 1s to earn 36c. Advise posting a batch in one auction, or selling cheap goods to
+  a vendor.

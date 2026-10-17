@@ -32,10 +32,11 @@ money formatting). All amounts are **copper**; keep full precision and round onl
 | Known recipes | profession-window harvest (or `IsPlayerSpell` if the probe passes) | per character |
 | Owned quantities | `C_Item.GetItemCount(id, includeBank)` | live |
 | Bind type | `C_Item.GetItemInfo` 14th return (1 = BoP) | BoP has no AH exit |
-| Deposit | `CalculateCommodityDeposit` / `CalculateItemDeposit` at the AH | cache per unit and duration |
+| Deposit | Forever's formula, per auction: max(1s, floor(vendor sell × qty ÷ 20) × {1, 4, 12}) [F-129] | check it with `Calculate*Deposit` at the AH after a new build |
+| Auction duration | CVar `auctionHouseDurationDropdown` (1 to 3: 2, 8 or 24 hours on Forever) | the sell frame's choice |
 | AH cut | seller invoices: consignment / bid | measure once, keep as a setting |
 | Budget | `GetMoney()` | live |
-| Realized sales | AH mail invoices (`GetInboxInvoiceInfo`) | ground truth for sell-through |
+| Realized sales | AH mail invoices (`GetInboxInvoiceInfo`), expired and cancelled mail | ground truth for sell-through |
 
 ## Default parameters (make each a setting)
 | Parameter | Default | Why |

@@ -32,10 +32,23 @@ The owned-materials policy is a setting: **opportunity cost** (default), **free*
 - **AH net per unit** = `price × (1 − cut) − deposit × (1 − p) / p`
   - `price`: the conservative sell price, the lower of the latest market value and min buyout (price-estimation.md).
   - `cut`: the house cut (measured from invoices; default 0.05).
-  - `deposit`: per unit, from `Calculate*Deposit` (cached).
+  - `deposit`: per unit. On Forever a deposit is charged **per auction**: `max(1s, floor(vendor sell × quantity ÷
+    20) × {1, 4, 12})` for 2, 8 and 24 hours (wowf-addon-dev forever-facts [F-129]). So the deposit per unit is that
+    divided by the units posted together: the whole batch for a commodity, 1 for gear (one auction each). Small
+    posts of cheap items pay the 1s minimum: 2 Coarse Thread at 19c each carry a 1s deposit.
   - `p`: chance a listing sells before it expires. Each failed listing loses its deposit, so the expected
     deposits lost before a sale are `deposit × (1 − p) / p` (a geometric series). Default 0.5.
   - Unavailable for BoP outputs (`bindType == 1`) and when there's no price data (unknown, not 0).
+  - **Floored at 0.** When the expected deposit loss exceeds the price after the cut, a listing loses money on
+    average. The AH exit, and an owned unit's AH value, is then 0, not negative: you'd keep it or vendor it.
+- **Sale chance `p` from your own sales** (a sales ledger read from AH mail, strategy-ideas.md), per item, in
+  units: `p = (sold + w × prior) / (sold + expired + w)`, kept within [0.05, 1].
+  - An item's prior is your rate over all items (w = 5 units); that rate's prior is the default 0.5 (w = 2).
+    Two sales don't read as 100%, and one expired stack of 20 drags the item down hard, as it should.
+  - Cancelled auctions are censored: they count neither way.
+  - The 0.05 floor caps the expected loss at 19 deposits per sale.
+- **The cut, measured:** Σ cut ÷ Σ sale totals over seller invoices, once there are 3 of them worth 1g together
+  (copper rounding is negligible by then). Use the setting until then.
 - **Disenchant** (later): the expected value of the materials, an exit only enchanters have.
 - **Best exit** = the highest available, subject to the margin-of-safety rule (risk-and-recommendation.md): the AH
   must beat the vendor by the margin, otherwise take the certain vendor exit.
@@ -56,7 +69,17 @@ function Econ.Liquidation(vendorSell, ahNet)
     if ahNet and vendorSell then return math.max(vendorSell, ahNet) end
     return ahNet or vendorSell
 end
+
+-- Sale chance: sold / (sold + expired), pulled toward prior by weight pseudo-units, within [0.05, 1].
+function Econ.SaleChance(sold, expired, prior, weight)
+    local n = sold + expired + weight
+    if n <= 0 then return prior end
+    return math.max(0.05, math.min(1, (sold + weight * prior) / n))
+end
 ```
+In the evaluator, take `math.max(0, Econ.AHNet(...))` with the item's own deposit and `p`. BuffettForever:
+`Economics/Econ.lua` (`SaleChance`, `ItemSaleChance`, `MeasuredCut`), `Pricing/Ledger.lua`; Python reference:
+`tools/wowf/econ.py` (`sale_chance`, `item_sale_chance`, `measured_cut`).
 
 ## 3. Profit, ROI and value added
 - **Cost of goods (COGS)** = Σ over reagents of the cost of `qty × N` units from section 1.
@@ -124,3 +147,19 @@ Bolt 40c (ItemSparse 70245). AH: Linen ladder 9.50s × 20, 10s × 40, 11s × 100
 | MOB-1 | need 4 Bronze Bars; AH 80c × 10; craft = Copper Bar 60c + Tin Bar 90c per 2 bars | buy 320 vs craft 300 → "craft" |
 | NET-1 | `AHNet(2900, 0.05, 60, 0.5)` | 2695 |
 | ROI-0 | COGS 0, exit 500 | ROI nil, rank by profit 500 |
+| SALE-0 | no sales, no expiries, prior 0.5, weight 2 | 0.5 |
+| SALE-1 | 18 sold, 12 expired, prior 0.5, weight 5 | 0.585714 (20.5 / 35) |
+| SALE-2 | 0 sold, 30 expired, prior 0.5, weight 2 | 0.05 (1 / 32 = 0.03125, floored) |
+| SALE-3 | item 18 sold / 12 expired; all items 40 / 30; default 0.5 | 0.595635 (your rate 0.569444) |
+| CUT-1 | cut 1,500 over sales of 30,000 in 3 invoices | 0.05 |
+| CUT-2 | 2 invoices, or 4 worth 5,000 in total | not measured: use the setting |
+| CUT-3 | cut 0 over 30,000 in 3 invoices | 0 (no cut is a measurement too) |
+| FLOOR-1 | Bolt AH 2900, deposit 400, p 0.1 (AH net −845) | AH exit 0; the vendor's 40c wins |
+| DEP-1 | vendor 142c × 100 units, 2 / 8 / 24 h | 710 / 2840 / 8520 (the game's own figures, [F-129]) |
+| DEP-2 | vendor 142c × 1 unit, 2 h | 100 (the minimum; 142 ÷ 20 = 7.1 → 7) |
+| DEP-3 | vendor 875c × 1 (gear), 2 / 8 / 24 h | 100 / 172 / 516 (43 × 4, 43 × 12) |
+| DEP-4 | vendor 2c × 2 units, 8 h (2 Coarse Thread) | 100: 50c per unit |
+
+The Python reference also generates 26 evaluator scenarios (`cli.py econ vectors`), replayed by `/bf selftest`.
+Six of them cover the ledger: BOLT-SALE-CHANCE (p 0.8: AH exit 27,400), BOLT-OWNED-LOW-P, BOLT-CUT-15,
+BOLT-UNSOLD, BOLT-UNSOLD-NO-VENDOR and OWNED-WORTHLESS.

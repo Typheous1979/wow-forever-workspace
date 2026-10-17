@@ -237,7 +237,7 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   - `C_AuctionHouse.SupportsCopperValues()` = **true**: prices can carry copper.
 - **[F-122]** There is **no AH cut API or constant**. Measure it from seller invoices: `GetInboxInvoiceInfo`
   (undocumented, present) → `consignment / bid`. Deposits: `CalculateCommodityDeposit` /
-  `CalculateItemDeposit`. `Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5`.
+  `CalculateItemDeposit`; the formula is in [F-129]. `Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5`.
   The cut rate on Forever: **unmeasured**. The ReplicateItems cooldown is between 2 and 38 min ([F-121]). [Source; Probe 70374, 70425]
 - **[F-123]** Professions use the modern `Blizzard_Professions` (LoadOnDemand) with Camelot overrides; Forever
   forces "show unlearned" off. `Blizzard_TradeSkillUI` and `Blizzard_CraftUI` don't exist; Enchanting uses the
@@ -341,6 +341,37 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     demand; see wowf-economics risk-and-recommendation.md.
 
   [Probe 70425]
+- **[F-129]** **AH deposits are Classic's, with a 1s minimum per auction.**
+  - The sell frame offers **2 Hours, 8 Hours and 24 Hours** (`AUCTION_DURATION_ONE/TWO/THREE`). Its default, the CVar
+    `auctionHouseDurationDropdown`, was 2 (8 hours).
+  - **deposit = max(1s, floor(vendor sell price × quantity ÷ 20) × {1, 4, 12})** for 2, 8 and 24 hours. That's 5%
+    of the vendor price per 2 hours, floored to whole copper before the duration multiplier.
+  - Verified with `CalculateCommodityDeposit` / `CalculateItemDeposit` on 20 items × 3 durations (commodities at
+    100 units, items at 1), on single units, and against the sell frame: 2 Coarse Thread for 8 hours, 1s.
+  - **The minimum applies per post.** Posting 2 Coarse Thread at 19c each costs a 1s deposit, lost if they don't
+    sell. Items no vendor buys pay the 1s minimum.
+  - Item 2657 (vendor 875c): 100c, 172c and 516c, so the floor comes before the multiplier (875 ÷ 20 = 43.75 → 43).
+  - `CalculateCommodityDeposit` answers away from the AH too (1 Linen Cloth: 100).
+
+  [Probe 70425]
+- **[F-130]** **Auction House mail.**
+  - The subject strings exist:
+    - `AUCTION_EXPIRED_MAIL_SUBJECT` = "Auction expired: %s"
+    - `AUCTION_REMOVED_MAIL_SUBJECT` = "Auction canceled: %s" (one L)
+    - `AUCTION_OUTBID_MAIL_SUBJECT` = "Outbid on %s"
+    - `AUCTION_SOLD_MAIL_SUBJECT` = "Auction successful: %s"
+    - `AUCTION_WON_MAIL_SUBJECT` = "Auction won: %s"
+  - The sender is "Horde Auction House" for a Horde character.
+  - A cancelled auction's items come back as plain mail (no invoice), money 0. The mail lasts 30 days: `daysLeft`
+    read 29.9995 just after it arrived.
+  - Reading the header, invoice and attachments of 3 unread mails left them unread.
+  - **`daysLeft` is a snapshot.** `GetServerTime() + daysLeft × 86400` moved by up to 142 s between reads.
+    Blizzard's mail frame refreshes the list with `CheckInbox`, rate-limited by `C_Mail.CanCheckInbox` [Source
+    70450], so reopening the mailbox can show the cached list. Within one snapshot a mail's `daysLeft` float is
+    identical, so match on it before matching on time.
+  - The house cut is still unmeasured ([F-122]): no sale yet.
+
+  [Probe 70425]
 
 ## 14. Retest checklist (run on every new build)
 
@@ -359,6 +390,7 @@ Use `/wowfprobe full`, then `cli.py probe-report`.
    realm/faction keys and which characters share an AH ([F-081]); `GetRecipeSchematic` with the window closed
    and for an unknown recipe; `GetAllRecipeIDs` signature; `C_SpellBook.IsSpellKnown(recipeID)` for learned recipes
    ([F-123]); merchant `numAvailable` for unlimited stock ([F-124]). BuffettForever's `diag.harvest` answers the
-   profession ones.
+   profession ones. Its `diag.deposits` checks the deposit formula against the game ([F-129]), and `diag.mail`
+   the AH mail subjects and `daysLeft` ([F-130]).
 10. Regenerate recipe data from the new build's tables and diff the counts against [F-126]:
     `python tools/wowf/cli.py recipe-catalog build --build <build>` (then `git diff --stat BuffettForever/Data`).

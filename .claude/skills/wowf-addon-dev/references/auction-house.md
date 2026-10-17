@@ -117,11 +117,62 @@ Working code: BuffettForever `Pricing\Search.lua` (tested on 70425).
 ## Deposits and the house cut
 - `CalculateCommodityDeposit(itemID, duration, quantity)` and `CalculateItemDeposit(itemLocation, duration,
   quantity)`: `duration` is a `luaIndex` (1..3, the sell frame's durations). Cache the per-unit result.
+  - Blizzard's sell frames call exactly these for the deposit they display. The duration index (named
+    `AUCTION_DURATION_ONE/TWO/THREE`) is remembered in the CVar `auctionHouseDurationDropdown`, so
+    `C_CVar.GetCVar("auctionHouseDurationDropdown")` is the duration the player will post with [Source 70450].
+  - Commodities need only the itemID. Items need a bag slot (`ItemLocation:CreateFromBagAndSlot`; check
+    `C_AuctionHouse.IsSellItemValid(location, false)` and `GetItemCommodityStatus(location)` first).
+  - **On Forever the formula is known** [F-129]: durations 2, 8 and 24 hours, and
+    `deposit = max(100, floor(vendorSell × quantity / 20) × ({1, 4, 12})[duration])` copper **per auction**.
+    Compute it for any item and quantity, and keep the calls to check it after a new build. Divide by 20 rather
+    than multiply by 0.05, so the floor is exact for integer prices.
+  - **The 1s minimum is per auction**, so the deposit per unit depends on how many you post at once: 2 Coarse
+    Thread cost 50c each, 200 cost 0.5c each. One auction per item for gear (non-commodities).
 - There is **no API or constant for the cut** [F-122]. Measure it from seller invoices at the mailbox:
   `GetInboxInvoiceInfo(i)` (undocumented, present) → `invoiceType, itemName, playerName, bid, buyout, deposit,
   consignment`; for `"seller"`, `bid` is the sale total and `consignment` the cut, so rate = consignment / bid.
   Retail's cut is 5%; keep it a setting until measured.
 - `C_AuctionHouse.SupportsCopperValues()`: when false, Blizzard's sell frame rounds prices to whole silver.
+
+## Sales mail and your auctions (a sales ledger)
+The calls below are runtime-only (undocumented, present on 70374). Their returns are as Blizzard's
+`Blizzard_MailFrame\MailFrame.lua` reads them [Source 70450]:
+- `GetInboxNumItems()` → numItems, totalItems.
+- `GetInboxHeaderInfo(i)` → packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, itemCount,
+  wasRead, wasReturned, textCreated, canReply, isGM, firstItemQuantity, firstItemLink.
+- `GetInboxInvoiceInfo(i)` → invoiceType (`"seller"`, `"seller_temp_invoice"`, `"buyer"`, nil for other mail),
+  itemName, playerName (nil means several), bid (the sale total for `count` units), buyout, deposit, consignment
+  (the house cut), moneyDelay, etaHour, etaMin, count, commerceAuction. A seller receives bid + deposit − consignment.
+- `GetInboxItem(i, slot)` → name, itemID, texture, count, quality, canUse, isCurrency (slots 1 to
+  `ATTACHMENTS_MAX_RECEIVE` = 16, defined in MailFrame.lua).
+
+What to know when building on them:
+- Blizzard calls `GetInboxText` only when the player opens a mail [Source 70450], and it's believed to mark the
+  mail read [Unverified]. Read mail without it: header, invoice and attachment reads leave unread mail unread
+  [F-130].
+- Expired and cancelled auctions come back as plain mail (not invoices) with the items attached. Their subjects
+  are `AUCTION_EXPIRED_MAIL_SUBJECT` ("Auction expired: %s") and `AUCTION_REMOVED_MAIL_SUBJECT` ("Auction
+  canceled: %s"); both exist on Forever, from "Horde Auction House" for a Horde character [F-130]. These global
+  strings aren't in the index, so access them as `_G[name]`. Also require `canReply` false and not `isGM`, or a
+  player's mail with that subject would count.
+- **Mail has no ID.** Count each mail once by a key (kind, item, amount) plus its expiry time,
+  `GetServerTime() + daysLeft × 86400`. Give identical mails one stored time each. Key returned items without
+  their count: taking some of the items changes the count.
+  - **`daysLeft` is a snapshot** of the last inbox refresh, and `CheckInbox` is rate-limited
+    (`C_Mail.CanCheckInbox`), so a reopened mailbox can show the old list. The computed time then moves: by up to
+    142 s on 70425 [F-130].
+  - Match a mail first on its exact `daysLeft` float (the same snapshot), then on the nearest time within a
+    tolerance. Store both, and persist them.
+- Read on `MAIL_SHOW` and every `MAIL_INBOX_UPDATE` while the mailbox is open, not debounced, so "Open All" can't
+  take a mail before it's read.
+- Your auctions: `C_AuctionHouse.QueryOwnedAuctions(sorts)` → `OWNED_AUCTIONS_UPDATED` → `GetOwnedAuctions()` →
+  `{ auctionID, itemKey, itemLink, status (Enum.AuctionStatus Active 0, Sold 1), quantity, timeLeftSeconds,
+  bidAmount, buyoutAmount }`. Blizzard sends that query when its Auctions tab opens. The item link's name is how
+  a sales invoice (name only) finds its itemID.
+  - Re-query after `AUCTION_HOUSE_AUCTION_CREATED` and `AUCTION_CANCELED`.
+  - Send every AH message through one throttle queue (BuffettForever `Search.WhenReady`).
+- BuffettForever: `Pricing/Mail.lua` (reading, `Mail.Reconcile`), `Pricing/Ledger.lua` (filing, sale chance,
+  measured cut), `Pricing/Owned.lua`.
 - `Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5` is Blizzard's default price (vendor x 1.5).
 
 ## Storing prices in SavedVariables
@@ -161,6 +212,8 @@ index base, every request (cooldown), timings, rows missing info, the realm keys
   → 70425: true for 2589, 2770, 2840, 2447 and 2318.
 - Cut rate (after a sale, mailbox open):
   `/run for i=1,GetInboxNumItems() do local t,n,_,bid,_,dep,cut=GetInboxInvoiceInfo(i) if t=="seller" and bid and bid>0 then print(n,bid,dep,cut,format("%.2f%%",cut*100/bid)) end end`
+- AH mail subjects: `/run print(AUCTION_EXPIRED_MAIL_SUBJECT, AUCTION_REMOVED_MAIL_SUBJECT, AUCTION_SOLD_MAIL_SUBJECT)`
+- Deposit duration: `/run print(C_CVar.GetCVar("auctionHouseDurationDropdown"), AUCTION_DURATION_ONE, AUCTION_DURATION_TWO, AUCTION_DURATION_THREE)`
 - Pricing rules: `/run print(C_AuctionHouse.SupportsCopperValues(),C_AuctionHouse.IsThrottledMessageSystemReady())`
   → 70425: copper values true.
 - Market keys: `/run print(GetRealmName(),GetNormalizedRealmName(),UnitFactionGroup("player"))`; compare listings

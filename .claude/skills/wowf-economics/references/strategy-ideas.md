@@ -33,6 +33,8 @@ Features that use the same data. Each lists its inputs and which are available o
   side by side; the gap is the market risk you hold.
 - **Sales ledger.** Read AH invoices at the mailbox (`GetInboxInvoiceInfo`): realized revenue, the cut, deposits,
   and sell-through by item. It replaces the default `p` with measured sell-through and calibrates the cut.
+  The estimator is in crafting-economics.md ("Sale chance"), and the mail flow in wowf-addon-dev auction-house.md
+  ("Sales mail and your auctions"). Built in BuffettForever 0.5.0.
 - **Budget allocation.** With gold G (`GetMoney()`), pick crafts greedily by ROI, each capped by its batch limit
   (risk-and-recommendation.md) until G runs out. It's a fractional knapsack; good enough and explainable.
 - **Diversify.** Don't put the whole budget into one market; saturation risk dominates small AHs.
