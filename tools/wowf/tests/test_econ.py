@@ -63,6 +63,21 @@ class ReferenceVectors(unittest.TestCase):
         self.assertEqual(econ.grade(3600, 5, 6, 0.10, 40, 50), "D")
         self.assertEqual(econ.grade(None, 5, 6, 0.1, 100, None), "D")
 
+    def test_sale_chance(self):
+        """SALE-0..3 in crafting-economics.md."""
+        self.assertEqual(econ.sale_chance(0, 0, 0.5, 2), 0.5)                          # no record: the prior
+        self.assertAlmostEqual(econ.sale_chance(18, 12, 0.5, 5), 0.585714, places=6)   # 20.5 / 35
+        self.assertEqual(econ.sale_chance(0, 30, 0.5, 2), econ.SALE_MIN)              # 1 / 32, floored
+        self.assertAlmostEqual(econ.item_sale_chance(18, 12, 40, 30), 0.595635, places=6)
+        self.assertEqual(econ.item_sale_chance(0, 0, 0, 0), 0.5)
+
+    def test_measured_cut(self):
+        """CUT-1..3 in crafting-economics.md."""
+        self.assertAlmostEqual(econ.measured_cut(1500, 30000, 3), 0.05)
+        self.assertIsNone(econ.measured_cut(1000, 20000, 2))    # too few invoices
+        self.assertIsNone(econ.measured_cut(250, 5000, 4))      # under 1g in total
+        self.assertEqual(econ.measured_cut(0, 30000, 3), 0.0)   # no cut at all is a measurement too
+
 
 class Branches(unittest.TestCase):
     """Each scenario lands on the branch its name promises (the Lua is then held to these results)."""
@@ -122,6 +137,24 @@ class Branches(unittest.TestCase):
         self.assertEqual((r["lines"][0]["source"], r["lines"][0]["buyCost"]), ("vendor", 100))
         r = scenario("DEPTH-LIMIT")
         self.assertEqual((r["lines"][0]["source"], r["lines"][0]["buyCost"]), ("vendor", 900))
+
+    def test_ledger_inputs(self):
+        # 2900 x 0.95 - 60 x 0.2 / 0.8 = 2740 per bolt
+        self.assertAlmostEqual(scenario("BOLT-SALE-CHANCE")["ahExit"], 27400)
+        # owned Linen at 950 x 0.95 - 100 x 3 = 602.5: 6 x 602.5 + 14 x 950
+        self.assertAlmostEqual(scenario("BOLT-OWNED-LOW-P")["cogs"], 16915)
+        r = scenario("BOLT-CUT-15")
+        self.assertAlmostEqual(r["ahExit"], 24650)
+        self.assertAlmostEqual(r["cogs"], 18145)
+
+    def test_ah_net_floor(self):
+        r = scenario("BOLT-UNSOLD")
+        self.assertEqual((r["ahExit"], r["bestSource"], r["reasons"]), (0, "vendor", ["loss"]))
+        self.assertFalse(r["underMargin"])
+        r = scenario("BOLT-UNSOLD-NO-VENDOR")
+        self.assertEqual((r["best"], r["bestSource"], r["profit"]), (0, "ah", -18715))
+        r = scenario("OWNED-WORTHLESS")
+        self.assertEqual((r["cogs"], r["roi"], r["recommended"]), (0, None, True))
 
 
 class Outputs(unittest.TestCase):

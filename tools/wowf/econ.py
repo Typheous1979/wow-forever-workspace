@@ -9,8 +9,8 @@ addon's Lua, so the two can check each other.
                                                        in SavedVariables) here and report every difference
 
 Contexts mirror the Lua ones: dicts keyed by item ID (vendorBuy, vendorSell, sellPrice, ladder, recipeFor,
-owned, deposit, priceInfo) plus settings. A missing key, None and Lua's false all mean "unknown"; 0 is a
-real value (it is truthy in Lua), so every test here is "is not None", never truthiness.
+owned, deposit, saleChance, priceInfo) plus settings. A missing key, None and Lua's false all mean "unknown";
+0 is a real value (it is truthy in Lua), so every test here is "is not None", never truthiness.
 """
 import argparse
 import math
@@ -27,6 +27,10 @@ GRADE_RANK = {"A": 1, "B": 2, "C": 3, "D": 4}
 MAX_DEPTH = 3
 DEFAULT_SETTINGS = {"cut": 0.05, "saleChance": 0.5, "margin": 0.20, "minProfit": 1000, "minGrade": "C",
                     "ownedPolicy": "opportunity"}
+SALE_MIN = 0.05            # a sale chance never drops below this (deposit loss = deposit x 19 at most)
+MARKET_WEIGHT = 2          # pseudo-units of the default behind your rate over all items
+ITEM_WEIGHT = 5            # pseudo-units of that rate behind one item's own record
+CUT_MIN_SALES, CUT_MIN_COPPER = 3, 10000   # invoices, and their total, before the measured cut counts
 
 
 # ---------------------------------------------------------------- price math
@@ -64,6 +68,30 @@ def liquidation(vendor, net):
     if vendor is not None and net is not None:
         return max(vendor, net)
     return net if net is not None else vendor
+
+
+def sale_chance(sold, expired, prior=0.5, weight=0):
+    """Units sold / (sold + expired), pulled toward prior by weight pseudo-units, kept in [SALE_MIN, 1]."""
+    sold, expired = sold or 0, expired or 0
+    n = sold + expired + weight
+    if n <= 0:
+        return prior
+    return max(SALE_MIN, min(1.0, (sold + weight * prior) / n))
+
+
+def item_sale_chance(sold, expired, market_sold, market_expired, default=0.5):
+    """One item's sale chance from your sales ledger: its own record, pulled toward your rate over all items
+    (which is pulled toward the default). Cancelled auctions count neither way."""
+    market = sale_chance(market_sold, market_expired, default, MARKET_WEIGHT)
+    return sale_chance(sold, expired, market, ITEM_WEIGHT)
+
+
+def measured_cut(cut_total, bid_total, sales):
+    """The house cut from seller invoices (total cut / total sales), or None until there are enough of them."""
+    if (sales or 0) < CUT_MIN_SALES or (bid_total or 0) < CUT_MIN_COPPER:
+        return None
+    rate = cut_total / bid_total
+    return rate if 0 <= rate < 0.5 else None
 
 
 def roi(profit, cogs):
@@ -159,10 +187,19 @@ def _grade_for(ctx, item, need):
     return grade(info.get("age"), info.get("days"), info.get("observations"), info.get("cv"), info.get("listed"), need)
 
 
-def _liquidation(ctx, item):
+def _ah_unit(ctx, item):
+    """What one unit nets on the AH with the item's deposit and sale chance, floored at 0: a listing that
+    loses more in deposits than it earns is worth nothing there. None when there's no AH price."""
     s = ctx["settings"]
+    p = ctx.get("saleChance", {}).get(item)
+    net = ah_net(ctx["sellPrice"].get(item), s["cut"], ctx["deposit"].get(item) or 0,
+                 p if p is not None else s["saleChance"])
+    return None if net is None else max(0.0, net)
+
+
+def _liquidation(ctx, item):
     vendor = ctx["vendorSell"].get(item)
-    net = ah_net(ctx["sellPrice"].get(item), s["cut"], ctx["deposit"].get(item) or 0, s["saleChance"])
+    net = _ah_unit(ctx, item)
     return liquidation(vendor, net), net is not None and (vendor is None or net > vendor)
 
 
@@ -225,7 +262,7 @@ def evaluate(recipe, crafts, ctx):
     r["vendorExit"] = vendor_unit * r["units"] if vendor_unit is not None else None
     r["ahExit"] = r["ahUnit"] = None
     if not recipe["bop"]:
-        unit = ah_net(ctx["sellPrice"].get(out), s["cut"], ctx["deposit"].get(out) or 0, s["saleChance"])
+        unit = _ah_unit(ctx, out)
         if unit is not None:
             r["ahUnit"], r["ahExit"] = unit, unit * r["units"]
     ah, vend = r["ahExit"], r["vendorExit"]
@@ -287,7 +324,8 @@ def _info(age=3600, days=5, observations=6, cv=0.10, listed=1000):
 
 
 def _ctx(settings=None, **tables):
-    ctx = {k: {} for k in ("vendorBuy", "vendorSell", "sellPrice", "ladder", "recipeFor", "owned", "deposit", "priceInfo")}
+    ctx = {k: {} for k in ("vendorBuy", "vendorSell", "sellPrice", "ladder", "recipeFor", "owned", "deposit",
+                           "saleChance", "priceInfo")}
     ctx.update(tables)
     ctx["settings"] = dict(DEFAULT_SETTINGS, **(settings or {}))
     return ctx
@@ -350,6 +388,19 @@ def scenarios():
          _ctx(vendorSell={20: 1000}, vendorBuy={21: 900, 25: 1},
               recipeFor={21: {"yield": 1, "reagents": [22, 1]}, 22: {"yield": 1, "reagents": [23, 1]},
                          23: {"yield": 1, "reagents": [24, 1]}, 24: {"yield": 1, "reagents": [25, 1]}})),
+        # The sales ledger (M4): the item's own sale chance and deposit, the measured cut.
+        ("BOLT-SALE-CHANCE", bolt, 10, bolt_ctx({"minProfit": 500}, deposit={BOLT: 60}, saleChance={BOLT: 0.8})),
+        ("BOLT-OWNED-LOW-P", bolt, 10, bolt_ctx({"minProfit": 500}, deposit={LINEN: 100}, saleChance={LINEN: 0.25})),
+        ("BOLT-CUT-15", bolt, 10, bolt_ctx({"minProfit": 500, "cut": 0.15})),
+        # Deposits lost on unsold listings outweigh the price: the AH nets 0, so the vendor wins (or, with
+        # no vendor, the AH's 0 is the best there is and the batch loses its cost).
+        ("BOLT-UNSOLD", bolt, 10, bolt_ctx(deposit={BOLT: 400}, saleChance={BOLT: 0.1})),
+        ("BOLT-UNSOLD-NO-VENDOR", bolt, 10, bolt_ctx(vendorSell={LINEN: 13}, deposit={BOLT: 400},
+                                                     saleChance={BOLT: 0.1})),
+        # An owned reagent no vendor buys whose AH listing would lose money is worth 0, not less.
+        ("OWNED-WORTHLESS", _recipe(3, 30, 1, [(31, 1)]), 1,
+         _ctx({"minProfit": 0}, vendorSell={30: 500}, sellPrice={31: 100}, owned={31: 1}, deposit={31: 100},
+              saleChance={31: 0.1}, priceInfo={31: _info()})),
     ]
     return out
 
@@ -441,7 +492,7 @@ def context_from_snapshot(snap):
     """The Lua context saved by /bf eval (diag.eval.ctx) as a Python context."""
     c = snap.get("ctx") or {}
     ctx = {}
-    for name in ("vendorBuy", "vendorSell", "sellPrice", "owned", "deposit"):
+    for name in ("vendorBuy", "vendorSell", "sellPrice", "owned", "deposit", "saleChance"):
         ctx[name] = {_key(k): _unfalse(v) for k, v in (c.get(name) or {}).items() if _unfalse(v) is not None}
     ctx["ladder"] = {_key(k): list(v) for k, v in (c.get("ladder") or {}).items() if _unfalse(v) is not None}
     ctx["priceInfo"] = {_key(k): dict(v) for k, v in (c.get("priceInfo") or {}).items() if _unfalse(v) is not None}
