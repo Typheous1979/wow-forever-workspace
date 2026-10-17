@@ -36,6 +36,11 @@ entire auction house."
      on the beta). Pricing by `itemID` doesn't need them; load names later only for items you display.
 5. Process in time slices so the client never freezes, and abort if the AH closes. At 8 ms per frame, 62k rows took
    0.7 s to read [F-128].
+6. **Item data is still loading when the read ends.** Anything you need from `C_Item.GetItemInfo` (a vendor sell
+   price, a class) is nil for many items until they're cached: 1,309 of 2,927 items right after a 54k-row scan on
+   70425. Keep those items' listings, load them (`ContinuableContainer` with `Item:CreateFromItemID`, plus a
+   timeout), then decide. BuffettForever `Flips.Recheck` 0.7.0: on 70425 the next scan left 1,305 items unpriced;
+   all of them loaded inside its 20 s timeout, and 5 more flips turned up.
 
 ```lua
 local addonName, ns = ...

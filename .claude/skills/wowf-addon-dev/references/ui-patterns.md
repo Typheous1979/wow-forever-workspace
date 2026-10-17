@@ -89,6 +89,19 @@ Addon frames that you create aren't protected. You only need combat-lockdown car
     - Example: BuffettForever `UI/ResultsList.lua` 0.7.0, tested on 70425.
   - **Icon side tabs**, `LargeSideTabButtonTemplate`, on the windows Forever redesigned: Character, Professions,
     Collections, Bank, Inspect. An icon needs a hover to explain itself.
+- **Items the way the profession window shows them** [Source 70450]. Forever's recipe form puts the result in a
+  47 px round icon with the name beside it in its quality colour. Each reagent sits in a 39 px square slot with
+  "have/need Name" beside it, white when you have enough and `DISABLED_REAGENT_COLOR` when not.
+  - The round icon: `CreateFrame("Button", nil, parent, "CircularGiantItemButtonTemplate")` (Blizzard_ItemButton,
+    always loaded). Set `.Icon:SetTexture(...)`, `:SetItemButtonQuality(quality)` (the Auction House's quality
+    ring, which reaches about 10 px past the button, so leave a margin inside a scroll frame), and `.Count`.
+  - The slot: the reagent button template lives in the load-on-demand `Blizzard_ProfessionsTemplates`, so build
+    it yourself from Blizzard's art. The background is the `Professions-Slot-bg` atlas and the icon fills the
+    slot. The quality frame is `PROFESSIONS_ITEM_QUALITY_ICON_BORDER_ATLASES[quality]` (Blizzard_Colors), anchored
+    to the icon with 1 px extra at the bottom right.
+  - Hover: `GameTooltip:SetItemByID`. Click: `HandleModifiedItemClick(link)`, so Shift-click links the item as
+    on any item button.
+  - Example: BuffettForever `UI/DetailPanel.lua` 0.7.0, tested on 70425.
 
 ## Combat lockdown queue
 ```lua
