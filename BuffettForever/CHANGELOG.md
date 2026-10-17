@@ -9,6 +9,12 @@
 - `/bf recipes <item link or ID>`: the recipes that use or make an item.
 - `/bf selftest` also checks the recipe data.
 - Pass 1 (recipe data and lookup) tested on client 1.60.1.70425 with the 70450 data, 2026-10-16: selftest 14/14.
+- Known recipes: opening one of your professions records every recipe the character knows (per character, by full
+  name), and every recipe the window lists counts as confirmed on Forever. `/bf recipes` marks known recipes.
+- `/bf diag` also reports what the profession window gave: how many recipes, known ones missing from the data,
+  whether yields and reagents match, and whether recipes can be checked without opening the window.
+- Pass 2 (known recipes) tested on client 1.60.1.70425, 2026-10-16: Leatherworking harvested (6 known of 592 listed),
+  yields and reagents match the data, and IsSpellKnown agrees with "learned" on all 592.
 
 ## 0.2.0 (not released)
 - Full Auction House scan (`ReplicateItems`), time-sliced so the game never freezes. Start it with the Scan

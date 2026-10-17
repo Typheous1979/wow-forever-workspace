@@ -50,6 +50,7 @@ SlashCmdList["BUFFETTFOREVER"] = function(msg)
         ns.Scanner.PrintDiag()
         ns.Search.PrintDiag()
         ns.Merchant.PrintDiag()
+        ns.Harvest.PrintDiag()
     elseif cmd == "selftest" then
         SelfTest()
     elseif cmd == "recipes" then

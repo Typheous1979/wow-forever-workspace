@@ -23,7 +23,9 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 - 0.3.0 M2 pass 1 (2026-10-16): `recipe-catalog` tool (committed), Data/Recipes.lua (1,976 recipes, 70450),
   Data/Vendor.lua (26), Util/Items.lua, Crafting/RecipeIndex.lua, `/bf recipes`, recipe selftests. Tested on client
   70425 with the 70450 data: selftest 14/14, `/bf recipes` lookups, vendor-seed tooltips, no load-time cost.
-  Pass 2 (Harvest) next.
+- 0.3.0 M2 pass 2 (2026-10-16): Crafting/Harvest.lua (recipesKnown per "First Surname", recipesSeen, probes in
+  diag.harvest). Tested on 70425 (Leatherworking 49/75). The probes showed GetAllRecipeIDs lists the whole skill line,
+  Season-of-Discovery recipes included, so "listed" can't confirm a recipe. Follow-up below.
 
 ## Decisions (2026-10-16, Justin)
 - **Bag clicks:** Alt+Right-click is context-aware. At the AH it price-checks the item (targeted search) and adds it
