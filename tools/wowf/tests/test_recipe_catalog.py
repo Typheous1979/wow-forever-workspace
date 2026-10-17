@@ -125,6 +125,21 @@ class Recipes(unittest.TestCase):
         self.assertEqual(re.findall(r"^R\[(\d+)\]", text, re.M), ["11479", "2659", "2963", "450000"])
         lua_lexer.tokenize(text.encode("utf-8"))               # raises LuaSyntaxError on bad Lua
         self.assertEqual(text.count("{"), text.count("}"))
+        self.assertNotIn("ns.ItemSellPrice", text)             # only when ItemSparse rows are given
+
+    def test_sell_prices_for_recipe_items(self):
+        t = tables()
+        rows = {int(r["ID"]): r for r in t["ItemSparse"]}
+        rows[2589] = dict(rows[2589], SellPrice="13")          # Linen Cloth, a reagent
+        rows[2996] = dict(rows[2996], SellPrice="40")          # Bolt of Linen Cloth, an output
+        rows[6947] = dict(rows[6947], SellPrice="5")           # Instant Poison: not in a kept recipe
+        text = rc.emit_recipes_lua(self.recipes, "1.60.1.70450", "2026-10-16", rows)
+        self.assertIn("ns.ItemSellPrice = S", text)
+        self.assertIn("S[2589] = 13", text)
+        self.assertIn("S[2996] = 40", text)
+        self.assertNotIn("S[6947]", text)
+        self.assertNotIn("S[3577]", text)                      # no SellPrice: left out
+        lua_lexer.tokenize(text.encode("utf-8"))
 
 
 class Vendors(unittest.TestCase):

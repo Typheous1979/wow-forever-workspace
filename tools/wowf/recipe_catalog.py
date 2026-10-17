@@ -255,9 +255,11 @@ def _num(x):
     return f"{x:.0f}" if float(x).is_integer() else f"{x:.4g}"
 
 
-def emit_recipes_lua(recipes, build, generated):
+def emit_recipes_lua(recipes, build, generated, items=None):
     """Data/Recipes.lua: ns.Recipes[recipeSpellID] = { profession, minRank, yellowAt, greyAt, flags,
-    outputItemID, outputCount, reagent1, count1, ... }, sorted by profession then recipe."""
+    outputItemID, outputCount, reagent1, count1, ... }, sorted by profession then recipe; and, when
+    items (ItemSparse rows by ID) are given, ns.ItemSellPrice[itemID] = what a vendor pays per unit for
+    every output and reagent (static per build, so no client item-cache round trip)."""
     lines = [
         "local addonName, ns = ...",
         "",
@@ -279,6 +281,18 @@ def emit_recipes_lua(recipes, build, generated):
         for item, count in r["reagents"]:
             fields += [item, count]
         lines.append(f"R[{sid}] = {{{','.join(str(x) for x in fields)}}}")
+    if items is not None:
+        used = sorted({r["output"] for r in recipes.values()} | reagent_ids(recipes))
+        lines += [
+            "",
+            "-- [itemID] = copper a vendor pays per unit (ItemSparse SellPrice) for every output and reagent; 0 left out.",
+            "local S = {}",
+            "ns.ItemSellPrice = S",
+        ]
+        for item in used:
+            sell = _int((items.get(item) or {}).get("SellPrice"))
+            if sell > 0:
+                lines.append(f"S[{item}] = {sell}")
     return "\n".join(lines) + "\n"
 
 
@@ -390,7 +404,7 @@ def main(argv):
     out = a.out or os.path.join(cfg["_root"], "BuffettForever", "Data")
     os.makedirs(out, exist_ok=True)
     generated = time.strftime("%Y-%m-%d")
-    text = emit_recipes_lua(recipes, a.build, generated)
+    text = emit_recipes_lua(recipes, a.build, generated, items)
     with open(os.path.join(out, "Recipes.lua"), "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     vtext, nv = emit_vendor_lua(vendor_list, items, a.build, generated)
