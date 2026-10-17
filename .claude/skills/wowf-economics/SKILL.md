@@ -58,7 +58,14 @@ money formatting). All amounts are **copper**; keep full precision and round onl
    ROI), risk-and-recommendation.md (confidence, ranking, wording).
 4. Rank, filter and explain: show the winner and the runner-up, with the numbers behind each.
 5. Test: there's no offline Lua runtime, so ship a `/<addon> selftest` that runs the test vectors in
-   crafting-economics.md and price-estimation.md and prints pass/fail.
+   crafting-economics.md and price-estimation.md and prints pass/fail. Then have **a second implementation
+   check the first**. BuffettForever's `tools/wowf/econ.py` reimplements the math in Python:
+   - `econ vectors` generates branch scenarios with Python's results (`Economics/EvaluatorVectors.lua`), and the
+     selftest replays them against the Lua.
+   - `econ check` replays a snapshot that `/bf eval` saves in SavedVariables (every input it looked up, plus its
+     ranked results), recipe by recipe, on the player's real data.
+
+   Keep "unknown" (nil/false) and 0 apart in both implementations: 0 is truthy in Lua.
 
 ## References
 | File | Read when |
