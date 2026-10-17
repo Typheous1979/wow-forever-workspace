@@ -167,6 +167,13 @@ class Outputs(unittest.TestCase):
         self.assertEqual(len(mismatches), 1)
         self.assertIn("cogs", mismatches[0][1][0])
 
+    def test_vendor_cap_invariant(self):
+        snap = self._snapshot()
+        self.assertEqual(econ.cap_violations(snap), [])
+        snap["ctx"]["vendorBuy"] = {2320: 10}
+        snap["ctx"]["sellPrice"] = {**snap["ctx"]["sellPrice"], 2320: 19}   # Coarse Thread on 70425
+        self.assertEqual(econ.cap_violations(snap), [(2320, 19, 10)])
+
     def test_report_and_money(self):
         self.assertEqual(econ._money(18715), "1g 87s 15c")
         self.assertEqual(econ._money(-475), "-4s 75c")

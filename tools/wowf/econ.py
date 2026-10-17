@@ -482,6 +482,18 @@ def compare(lua, py):
     return diffs
 
 
+def cap_violations(snap):
+    """Items a vendor sells whose saved AH sell price is above the vendor's price: the live context
+    caps it (nobody pays more on the AH than a vendor charges). Returns [(itemID, sellPrice, vendor)]."""
+    ctx = context_from_snapshot(snap)
+    out = []
+    for item, price in ctx["sellPrice"].items():
+        vendor = ctx["vendorBuy"].get(item)
+        if vendor is not None and price > vendor + 0.01:
+            out.append((item, price, vendor))
+    return out
+
+
 def check_snapshot(snap, names=None):
     """Replay every recipe of a /bf eval snapshot. Returns (checked, mismatches [(recipeID, diffs)], order_ok)."""
     ctx = context_from_snapshot(snap)
@@ -588,7 +600,13 @@ def main(argv):
               f"{checked - len(mismatches)} match, {len(mismatches)} differ; ranking {'matches' if order_ok else 'DIFFERS'}")
         for rid, diffs in mismatches[:20]:
             print(f"  {rid} {spells.get(rid, '')}: " + "; ".join(diffs))
-        if mismatches or not order_ok:
+        caps = cap_violations(snap)
+        if caps:
+            print(f"  vendor cap broken for {len(caps)} items: " + ", ".join(
+                f"{items.get(i, i)} AH {p:g} > vendor {v:g}" for i, p, v in caps[:10]))
+        else:
+            print("  vendor cap holds: no AH price above what a vendor charges")
+        if mismatches or not order_ok or caps:
             status = 1
         recipes = {}
         for res in snap.get("results") or []:
