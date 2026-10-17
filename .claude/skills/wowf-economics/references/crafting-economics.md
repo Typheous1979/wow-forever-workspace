@@ -14,6 +14,11 @@ walks up its price ladder, and owned stock covers the first units.
 
 Consume owned stock first, then buy the remainder from the cheapest acquisition source. Ties go to the simpler
 source (vendor, then AH, then craft). Record the source of every line; the detail panel shows it.
+
+**The vendor cap.** An item a vendor sells is worth at most the vendor's price, both when you value what you own and
+when you sell it, because nobody pays more on the AH. Cap the AH sell price at the vendor buy price. On the beta
+(70425), 12 vendor reagents were listed above it: Coarse Thread at 19c (vendor 10c), Blue Dye at 2s (50c), Wooden
+Stock at 50s (2s). Uncapped, owned thread and dyes looked like valuable inventory.
 The owned-materials policy is a setting: **opportunity cost** (default), **free** (sunk), or **replacement**
 (what it would cost to buy again).
 

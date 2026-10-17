@@ -336,6 +336,9 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     [F-126]).
   - At 8 ms per frame, 61,933 rows took 0.7 s to read and 2,998 items 0.15 s to price; the scan took 5.5 s in all,
     4.7 s of it waiting for the server.
+  - **Many listings are walls at one price.** 97 Azure Gustwoven Bracers were all at exactly 44s, and 12 vendor
+    reagents were listed above their vendor price (Wooden Stock 50s against 2s). Asks on the beta say little about
+    demand; see wowf-economics risk-and-recommendation.md.
 
   [Probe 70425]
 

@@ -51,6 +51,10 @@ margin of safety, ranks the candidates and words the advice.
 - ROI on tiny amounts: always pair it with absolute profit and a minimum.
 - Stale data looks precise: show the age, grade it, and refuse to rank D-grade results as the top pick.
 - "Expensive" items with one listing: one ask isn't a market (depth and persistence catch it).
+- **A wall of identical asks isn't a market either.** On the beta (70425), many crafted outputs were listed as walls
+  at one price: 97 Azure Gustwoven Bracers all at exactly 44s, 8 Handstitched Leather Belts at 90s–1g, so a
+  belt from 3s of materials showed 2,775% ROI. Depth alone passes them. Until persistence (do the walls shrink over
+  days?) and your own sales records can confirm demand, show the depth next to the price and flag one-price walls.
 - BoP outputs: vendor exit only. Enchants: no item, no exit.
 - Daily-cooldown recipes: value per cooldown, not per craft (strategy-ideas.md).
 - Long auction durations raise the deposit; the expected deposit loss grows as `p` falls.
