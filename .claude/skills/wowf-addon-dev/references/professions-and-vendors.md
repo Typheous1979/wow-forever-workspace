@@ -13,7 +13,7 @@ Blizzard's docs: lint accepts them, `api show` reports "not in the index". Verif
 | Need | Call |
 |---|---|
 | Is the open window's data ready? | `C_TradeSkillUI.IsTradeSkillReady()` (runtime-only). Skip when `IsTradeSkillLinked()` / `IsTradeSkillGuild()` (runtime-only) or `IsNPCCrafting()` is true |
-| Recipe IDs of the open profession | `C_TradeSkillUI.GetAllRecipeIDs()` (runtime-only, signature unverified) or `GetFilteredRecipeIDs()` |
+| Recipe IDs of the open profession | `C_TradeSkillUI.GetAllRecipeIDs()` (runtime-only, no arguments): **every** recipe of the skill line, learned or not, Season-of-Discovery ones included. `GetFilteredRecipeIDs()`: what the window shows, so with "show unlearned" forced off only learned ones, and it follows the filters [F-123] |
 | Name, learned, skill-ups | `C_TradeSkillUI.GetRecipeInfo(recipeID)` → `{recipeID, name, learned, numSkillUps, canSkillUp, relativeDifficulty?, categoryID, ...}` or nil |
 | Reagents and yield | `C_TradeSkillUI.GetRecipeSchematic(recipeID, false)` → `{quantityMin, quantityMax, outputItemID?, reagentSlotSchematics}`; each slot `{reagents = {{itemID?, currencyID?}}, quantityRequired, reagentType, required}` |
 | Output link | `C_TradeSkillUI.GetRecipeOutputItemData(recipeID)` → `{icon, hyperlink?, itemID?}` (prefer it to the unverified `GetRecipeItemLink`) |
@@ -23,36 +23,36 @@ Blizzard's docs: lint accepts them, `api show` reports "not in the index". Verif
 | Skill line info | `C_SkillInfo.GetSkillLineInfoByID(id)` (Forever-only) → `{rank, maxRank, ...}` or nil |
 | Events | `TRADE_SKILL_SHOW`, `TRADE_SKILL_LIST_UPDATE`, `TRADE_SKILL_DATA_SOURCE_CHANGED`, `TRADE_SKILL_CLOSE`, `NEW_RECIPE_LEARNED(recipeID, recipeLevel?, baseRecipeID?)`, `SKILL_LINES_CHANGED` |
 
-Blizzard's objective tracker calls `GetRecipeSchematic` on bag updates whether or not a profession window is
-open (`Blizzard_ObjectiveTracker\Blizzard_ProfessionsRecipeTracker.lua`), which suggests recipe data is
-client-side. Not yet proven on Forever: run the probes.
+Recipe data is client-side: `GetRecipeInfo` and `GetRecipeSchematic` work with no profession window open, for
+known and unknown recipes [F-123, Probe 70425]. Blizzard's objective tracker relies on the same thing
+(`Blizzard_ObjectiveTracker\Blizzard_ProfessionsRecipeTracker.lua`).
 
 ### Recording which recipes a character knows
+**Read them at login; no window needed.** Recipes are spells, and `C_SpellBook.IsSpellKnown(recipeID,
+Enum.SpellBookSpellBank.Player)` agreed with `GetRecipeInfo(id).learned` on all 592 Leatherworking recipes checked
+[F-123]. Check every recipe ID in your data and **replace** the character's set, so a dropped profession drops its
+recipes too:
 ```lua
 local addonName, ns = ...
-local pending
 
-local function Harvest()
-    pending = nil
-    if not C_TradeSkillUI.IsTradeSkillReady() then return end
-    if C_TradeSkillUI.IsTradeSkillLinked() or C_TradeSkillUI.IsTradeSkillGuild() or C_TradeSkillUI.IsNPCCrafting() then return end
-    local ids = C_TradeSkillUI.GetAllRecipeIDs()
-    if type(ids) ~= "table" then return end
-    local known = ns.charDB.knownRecipes                  -- [recipeID] = true
-    for _, recipeID in ipairs(ids) do
-        local info = C_TradeSkillUI.GetRecipeInfo(recipeID)
-        if info and info.learned then known[recipeID] = true end
+local function ReadKnownRecipes()
+    local known = {}
+    for recipeID in pairs(ns.Recipes) do                  -- your recipe data (Data/Recipes.lua)
+        if C_SpellBook.IsSpellKnown(recipeID, Enum.SpellBookSpellBank.Player) then known[recipeID] = true end
     end
+    ns.db.recipesKnown[ns.CharKey()] = known              -- account-wide, keyed "First Surname"
 end
-
--- TRADE_SKILL_LIST_UPDATE fires in bursts: debounce it.
-function ns.events:TRADE_SKILL_LIST_UPDATE()
-    if not pending then pending = C_Timer.NewTimer(0.5, Harvest) end
-end
+ns.On("LOGIN", function() C_Timer.After(5, ReadKnownRecipes) end)
 ```
-Recipes are spells, so `C_SpellBook.IsSpellKnown(recipeID, Enum.SpellBookSpellBank.Player)` may answer "known?"
-without opening the window. That's a probe; if it works, check known recipes at login instead. Don't use
-`IsPlayerSpell`: it's a deprecation fallback that exists only when `loadDeprecationFallbacks` is on [F-123].
+- Don't use `IsPlayerSpell`: it's a deprecation fallback that exists only when `loadDeprecationFallbacks` is on.
+- `NEW_RECIPE_LEARNED(recipeID)` covers recipes learned during the session.
+- The profession window still helps for diagnostics. On `TRADE_SKILL_LIST_UPDATE` (debounced), skip linked,
+  guild and NPC windows (`IsTradeSkillLinked()`, `IsTradeSkillGuild()`, `IsNPCCrafting()`). Then
+  `GetAllRecipeIDs()` + `GetRecipeInfo(id).learned` show learned recipes your data lacks.
+- **Don't count a recipe as "available on Forever" just because `GetAllRecipeIDs` lists it**: the list is the whole
+  skill line, Season-of-Discovery recipes included. Evidence that a recipe is real is a character knowing it, or its
+  output (or its recipe item) seen on the AH.
+- Working code: BuffettForever `Crafting/Harvest.lua`.
 
 ## Recipe data offline: the Forever game tables [F-126]
 `tools/wowf/music_catalog.py` fetches DB2 CSVs for a Forever build from
@@ -79,7 +79,8 @@ without opening the window. That's a probe; if it works, check known recipes at 
     grey thresholds.
   - IDs added after Classic: Season-of-Discovery spells (400k–1M) and **Forever-new recipes** (spells ≥ 1.2M). 117 of
     the Forever-new outputs were on the beta AH, so many are real. Mark a recipe confirmed only when a character
-    knows it, a profession window lists it, or its output is seen on the AH.
+    knows it or its output is seen on the AH. A profession window listing it proves nothing: `GetAllRecipeIDs`
+    lists Season-of-Discovery recipes too.
   - Enchants (Effect 53) create no item; only wands, oils and rods do.
   - `BuyPrice / VendorStackCount` is what a merchant charges (checked on 70425). But `BuyPrice` exists on every
     item, and **which** items a vendor sells is server-side, so keep an evidence list.
@@ -138,14 +139,20 @@ without opening the window. That's a probe; if it works, check known recipes at 
 - `GameTooltip:SetItemByID` / `:SetHyperlink` can return false silently [F-125].
 
 ## Probes (paste in game; record results in forever-facts.md with the build)
+BuffettForever's harvest answers the profession probes itself (`diag.harvest`, read with `savedvars.py`). Results on
+70425 are in [F-123].
 - Schematic with the window closed: open a profession, `/run WOWF_R=C_TradeSkillUI.GetFilteredRecipeIDs()[1] print(WOWF_R)`,
   close it, then `/run local ok,s=pcall(C_TradeSkillUI.GetRecipeSchematic,WOWF_R,false) print(ok,s and s.name,s and s.outputItemID,s and #s.reagentSlotSchematics)`
+  → 70425: works.
 - Schematic for a recipe the character doesn't know (2330 = Minor Healing Potion if Classic IDs carried over):
   `/run local ok,s=pcall(C_TradeSkillUI.GetRecipeSchematic,2330,false) if ok and s then for _,r in ipairs(s.reagentSlotSchematics) do local g=r.reagents[1] print(s.name,r.quantityRequired,g and g.itemID) end else print(ok,s) end`
+  → 70425: works, and matches the game tables.
 - Recipe info with the window closed: `/run local ok,i=pcall(C_TradeSkillUI.GetRecipeInfo,2330) print(ok,i and i.name,i and i.learned)`
+  → 70425: works.
 - `GetAllRecipeIDs`, once closed and once open: `/run local t=C_TradeSkillUI.GetAllRecipeIDs() print(type(t),type(t)=="table" and #t)`
+  → 70425, open: a table of every recipe of the skill line (592 for Leatherworking). Closed: untested.
 - Learned recipes without the window (a tailor who knows Bolt of Linen Cloth):
-  `/run print(C_SpellBook.IsSpellKnown(2963, Enum.SpellBookSpellBank.Player))`
+  `/run print(C_SpellBook.IsSpellKnown(2963, Enum.SpellBookSpellBank.Player))` → 70425: reliable (592 of 592 agreed).
 - Merchant data: `/run local i=C_MerchantFrame.GetItemInfo(1) print(i and i.name,i and i.price,i and i.stackCount,i and i.numAvailable,GetMerchantItemID(1))`
 - Bag hook: `/run hooksecurefunc("HandleModifiedItemClick",function(l) print("HMIC",l,IsAltKeyDown(),GetMouseButtonClicked()) end)`,
   then Alt+Right-click a bag item (stays until `/reload`).

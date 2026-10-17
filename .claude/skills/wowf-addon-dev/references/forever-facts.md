@@ -254,6 +254,20 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   - **`IsPlayerSpell` is only a deprecation fallback** (`Blizzard_DeprecatedSpellBook`, loaded only when the CVar
     `loadDeprecationFallbacks` is on). Use `C_SpellBook.IsSpellKnown(spellID, Enum.SpellBookSpellBank.Player)`.
     [Source 70450]
+  - Measured by BuffettForever's harvest (Leatherworking, skill 49/75) [Probe 70425]:
+    - **`C_TradeSkillUI.GetAllRecipeIDs()`** (no arguments) returns **every recipe of the open profession**,
+      learned or not, ignoring the filters.
+      - 592 for Leatherworking: its 616 SkillLineAbility spells minus 24 rank and specialization spells.
+      - **Season-of-Discovery recipes are included** (Faintly Glowing Leather, Turtle Scale Gloves, Void-Touched
+        Leather Gloves). Being listed is client data, not proof that a recipe can be learned on Forever.
+    - `GetFilteredRecipeIDs()` returned only the 6 learned recipes ("show unlearned" is forced off) and follows
+      the window's filters (skill-up, have materials, slots).
+    - **`C_SpellBook.IsSpellKnown(recipeID, Enum.SpellBookSpellBank.Player)` agreed with
+      `GetRecipeInfo(id).learned` for all 592**, and confirmed all 6 at login. Known recipes can be read at login
+      with no profession window.
+    - `GetRecipeInfo` and `GetRecipeSchematic` work with the window closed, for known and unknown recipes.
+    - `GetBaseProfessionInfo().professionID` is 165, the Classic skill line.
+    - The schematic yields and reagents matched the generated data (70450) for every recipe checked.
 - **[F-124]** Vendors: `C_MerchantFrame.GetItemInfo(i)` → `{price (for stackCount units), stackCount,
   numAvailable, hasExtendedCost, …}`; `GetMerchantNumItems`, `GetMerchantItemID`, `GetMerchantItemLink` are
   undocumented but present; `GetMerchantItemInfo` is absent. [Source; Probe 70374]
@@ -336,7 +350,8 @@ Use `/wowfprobe full`, then `cli.py probe-report`.
    `diag` SavedVariables answer the AH ones): replicate index base and the
    ReplicateItems cooldown ([F-121]); are reagents commodities; the AH cut from a seller invoice ([F-122]);
    realm/faction keys and which characters share an AH ([F-081]); `GetRecipeSchematic` with the window closed
-   and for an unknown recipe; `GetAllRecipeIDs` signature; `IsPlayerSpell(recipeID)` for learned recipes
-   ([F-123]); merchant `numAvailable` for unlimited stock ([F-124]).
+   and for an unknown recipe; `GetAllRecipeIDs` signature; `C_SpellBook.IsSpellKnown(recipeID)` for learned recipes
+   ([F-123]); merchant `numAvailable` for unlimited stock ([F-124]). BuffettForever's `diag.harvest` answers the
+   profession ones.
 10. Regenerate recipe data from the new build's tables and diff the counts against [F-126]:
     `python tools/wowf/cli.py recipe-catalog build --build <build>` (then `git diff --stat BuffettForever/Data`).
