@@ -21,6 +21,7 @@ Util\Money.lua
 Util\Items.lua
 Economics\Econ.lua
 Economics\Evaluator.lua
+Economics\EvaluatorVectors.lua
 Pricing\PriceDB.lua
 Pricing\Scanner.lua
 Pricing\Search.lua
@@ -31,6 +32,8 @@ Crafting\Tray.lua
 UI\Widgets.lua
 UI\MainFrame.lua
 UI\ReagentTray.lua
+UI\DetailPanel.lua
+UI\ResultsList.lua
 UI\AHButton.lua
 UI\MinimapButton.lua
 Bags.lua

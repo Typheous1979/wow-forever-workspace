@@ -86,6 +86,9 @@ local defaults = {
 local charDefaults = {
     window = {},   -- main window position (per character)
     tray = {},     -- reagent tray: { { itemID, qty }, ... } in slot order (Crafting/Tray.lua)
+    results = {    -- the craftable-items list (UI/ResultsList.lua)
+        sortKey = "rank", sortDesc = true, knownOnly = false, showUnconfirmed = false,
+    },
 }
 
 local migrations = {

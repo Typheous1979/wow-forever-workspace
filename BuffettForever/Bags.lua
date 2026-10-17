@@ -32,7 +32,7 @@ end
 -- Into the tray; returns the slot or nil (full: said so).
 local function AddToTray(itemID)
     local slot = ns.Tray.Add(itemID)
-    if not slot then ns.Print(L["The tray is full (10 reagents)."]) end
+    if not slot then ns.Print(string.format(L["The tray is full (%d reagents)."], ns.Tray.SIZE)) end
     return slot
 end
 

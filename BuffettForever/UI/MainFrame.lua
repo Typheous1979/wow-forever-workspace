@@ -10,13 +10,11 @@ local L = ns.L
 local Main = {}
 ns.Main = Main
 
-local WIDTH, HEIGHT = 900, 560
+local WIDTH, HEIGHT = 1040, 600   -- fits a 1366 x 768 UIParent (1080p at UI scale 1)
 local FRAME_NAME = "BuffettForeverFrame"
-local TRAY_SLOTS, TRAY_COLUMNS = 10, 5
+local TRAY_SLOTS, TRAY_COLUMNS = 25, 5   -- Crafting/Tray.lua holds Tray.SIZE (25)
 local SLOT_SIZE, SLOT_GAP = 36, 8
-local LEFT_WIDTH, RIGHT_WIDTH, PICK_HEIGHT = 232, 260, 150
-local COLUMNS = { "Cost", "Vendor", "AH", "Best", "Profit", "ROI" }   -- right-aligned, after Item
-local COLUMN_WIDTH = 56
+local LEFT_WIDTH, RIGHT_WIDTH, PICK_HEIGHT = 232, 260, 180
 local EMPTY_SLOT = "Interface\\Buttons\\UI-EmptySlot-Disabled"     -- Blizzard's empty-slot art
 
 local frame
@@ -64,11 +62,13 @@ local function BuildTray(content)
     panel.LoadButton:SetPoint("TOPLEFT", 10, buttonsY)
     panel.ClearButton = UI.Button(panel, L["Clear"], half)
     panel.ClearButton:SetPoint("TOPLEFT", panel.LoadButton, "TOPRIGHT", 6, 0)
-    local hint = Note(panel, L["Drop up to 10 reagents to see every recipe that uses them."], LEFT_WIDTH - 20)
+    local hint = Note(panel, string.format(L["Drop up to %d reagents to see every recipe that uses them."], TRAY_SLOTS),
+        LEFT_WIDTH - 20)
     hint:SetPoint("TOPLEFT", 10, buttonsY - 28)
     return panel
 end
 
+-- Top pick, then (when it's a different recipe) "Most gold" under its own heading: UI/ResultsList.lua.
 local function BuildPick(content)
     local panel = UI.TitledPanel(content, L["Top pick"])
     panel:SetPoint("BOTTOMLEFT")
@@ -76,6 +76,12 @@ local function BuildPick(content)
     panel.Text = Note(panel, L["The best return on investment, and where to sell it, shows here."], LEFT_WIDTH - 20,
         "GameFontHighlightSmall")
     panel.Text:SetPoint("TOPLEFT", 10, -28)
+    panel.MostTitle = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    panel.MostTitle:SetPoint("TOPLEFT", panel.Text, "BOTTOMLEFT", -2, -10)
+    panel.MostTitle:SetText(L["Most gold"])
+    panel.MostTitle:Hide()
+    panel.MostText = Note(panel, "", LEFT_WIDTH - 20, "GameFontHighlightSmall")
+    panel.MostText:SetPoint("TOPLEFT", panel.MostTitle, "BOTTOMLEFT", 2, -6)
     return panel
 end
 
@@ -90,23 +96,12 @@ local function BuildDetails(content)
     return panel
 end
 
+-- The column headings, rows and filters are UI/ResultsList.lua's.
 local function BuildResults(content, tray, details)
     local panel = UI.TitledPanel(content, L["Craftable items"])
     panel:SetPoint("TOPLEFT", tray, "TOPRIGHT", 6, 0)
     panel:SetPoint("BOTTOMRIGHT", details, "BOTTOMLEFT", -6, 0)
 
-    local item = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    item:SetPoint("TOPLEFT", 10, -28)
-    item:SetText(L["Item"])
-    local x = -22   -- room for the scroll bar
-    for i = #COLUMNS, 1, -1 do
-        local header = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        header:SetPoint("TOPRIGHT", x, -28)
-        header:SetWidth(COLUMN_WIDTH)
-        header:SetJustifyH("RIGHT")
-        header:SetText(L[COLUMNS[i]])
-        x = x - COLUMN_WIDTH
-    end
     local divider = panel:CreateTexture(nil, "ARTWORK")
     divider:SetColorTexture(1, 1, 1, 0.12)
     divider:SetHeight(1)
@@ -175,6 +170,7 @@ local function Build()
     frame:SetScript("OnShow", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
         Main.RefreshStatus()
+        ns.Fire("MAIN_SHOWN")
     end)
     frame:SetScript("OnHide", function() PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE) end)
     Main.RefreshStatus()

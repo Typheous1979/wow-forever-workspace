@@ -22,9 +22,10 @@ ns.Evaluator = Evaluator
 local GRADES = { "A", "B", "C", "D" }
 local STALE = 48 * 3600     -- older AH data: fair value instead of the latest scan
 
+-- The grade of one AH price, and the test that set it (Econ.Grade).
 local function Grade(ctx, itemID, need)
     local info = ctx.priceInfo[itemID]
-    if not info then return "D" end
+    if not info then return "D", "unlisted" end
     return Econ.Grade(info.age, info.days, info.observations, info.cv, info.listed, need)
 end
 
@@ -41,9 +42,14 @@ function Evaluator.Evaluate(recipe, crafts, ctx)
     local s = ctx.settings
     local r = { recipe = recipe, crafts = crafts, units = recipe.count * crafts, lines = {}, warnings = {}, reasons = {} }
     local cogs, liquidation, complete, worst, ownedAny = 0, 0, true, 1, false
-    local function note(grade)
+    -- The recipe's grade is its weakest AH price; remember which one and why (r.gradeWhy).
+    local function note(itemID, need)
+        local grade, why = Grade(ctx, itemID, need)
         local rank = Econ.GRADE_RANK[grade]
-        if rank > worst then worst = rank end
+        if rank > worst then
+            worst = rank
+            r.gradeWhy = { itemID = itemID, reason = why, need = need, info = ctx.priceInfo[itemID] or nil }
+        end
     end
 
     for _, g in ipairs(recipe.reagents) do
@@ -62,7 +68,7 @@ function Evaluator.Evaluate(recipe, crafts, ctx)
                 unit = cost and cost / owned
             else
                 unit = unitLiq
-                if unit and fromAH then note(Grade(ctx, itemID, nil)) end
+                if unit and fromAH then note(itemID, nil) end
             end
             if unit then
                 line.ownedCost = owned * unit
@@ -76,7 +82,7 @@ function Evaluator.Evaluate(recipe, crafts, ctx)
             local cost, source = Econ.Acquire(itemID, rest, ctx)
             if cost then
                 line.buyCost, line.source = cost, source
-                if source == "ah" then note(Grade(ctx, itemID, rest)) end
+                if source == "ah" then note(itemID, rest) end
             else
                 complete = false
                 local ladder = ctx.ladder[itemID]
@@ -106,7 +112,7 @@ function Evaluator.Evaluate(recipe, crafts, ctx)
     end
     if r.ahExit and (not r.vendorExit or r.ahExit >= r.vendorExit * (1 + s.margin)) then
         r.best, r.bestSource = r.ahExit, "ah"
-        note(Grade(ctx, recipe.output, nil))
+        note(recipe.output, nil)
     elseif r.vendorExit then
         r.best, r.bestSource = r.vendorExit, "vendor"
         r.underMargin = r.ahExit ~= nil and r.ahExit > r.vendorExit
@@ -186,12 +192,21 @@ function Evaluator.LiveContext()
         return nil
     end)
     -- Selling: the lower of market value and min buyout; the fair value once the scan is stale.
+    -- An item a vendor sells is worth at most the vendor's price: nobody pays more on the AH
+    -- (Coarse Thread listed at 19c sells for 10c at a vendor).
     ctx.sellPrice = Lazy(function(itemID)
         local row, age = Row(itemID)
         if not row then return nil end
-        if age <= STALE then return math.min(row.mv, row.min) end
-        local fair = Econ.FairValue((ns.PriceDB.History(row)), today, 3, ns.db.settings.historyDays)
-        return fair and math.min(fair, row.min) or nil
+        local price
+        if age <= STALE then
+            price = math.min(row.mv, row.min)
+        else
+            local fair = Econ.FairValue((ns.PriceDB.History(row)), today, 3, ns.db.settings.historyDays)
+            price = fair and math.min(fair, row.min) or nil
+        end
+        local vendor = ctx.vendorBuy[itemID]
+        if price and vendor and vendor < price then price = vendor end
+        return price
     end)
     -- Buying: the latest ladder; once stale, one level at the fair value (the grade says so).
     ctx.ladder = Lazy(function(itemID)
@@ -228,8 +243,11 @@ function Evaluator.LiveContext()
     return ctx
 end
 
--- Every recipe that uses the tray's reagents, evaluated for the crafts the tray quantities allow
--- (at least 1), ranked. tray: { { itemID, qty } }. filter: RecipeIndex filter.
+-- Every recipe that uses the tray's reagents, plus every recipe made entirely from goods a vendor
+-- sells (those are craftable whatever the tray holds), evaluated and ranked; and the context the
+-- results came from. Batch size: the crafts the tray quantities allow (at least 1), but a tray
+-- reagent a vendor sells doesn't cap it (the vendor has more) unless it is all the tray offers.
+-- tray: { { itemID, qty } }. filter: RecipeIndex filter.
 function Evaluator.ForTray(tray, filter)
     local ids, qty = {}, {}
     for _, e in ipairs(tray) do
@@ -237,21 +255,76 @@ function Evaluator.ForTray(tray, filter)
         qty[e.itemID] = (qty[e.itemID] or 0) + e.qty
     end
     local ctx = Evaluator.LiveContext()
+    local candidates, vendorOnly = {}, {}
+    for _, recipeID in ipairs(ns.RecipeIndex.UsingAny(ids, filter)) do candidates[#candidates + 1] = recipeID end
+    local listed = {}
+    for _, recipeID in ipairs(candidates) do listed[recipeID] = true end
+    local function vendorSold(itemID) return ctx.vendorBuy[itemID] end
+    for _, recipeID in ipairs(ns.RecipeIndex.FromVendorGoods(vendorSold, filter)) do
+        if not listed[recipeID] then
+            candidates[#candidates + 1] = recipeID
+            vendorOnly[recipeID] = true
+        end
+    end
     local results = {}
-    for _, recipeID in ipairs(ns.RecipeIndex.UsingAny(ids, filter)) do
+    for _, recipeID in ipairs(candidates) do
         local recipe = ns.RecipeIndex.Get(recipeID)
-        local crafts
+        local crafts, vendorCrafts
         for _, g in ipairs(recipe.reagents) do
-            if qty[g.itemID] then
-                local n = math.floor(qty[g.itemID] / g.count)
-                crafts = crafts and math.min(crafts, n) or n
+            local have = qty[g.itemID]
+            if have then
+                local n = math.floor(have / g.count)
+                if vendorSold(g.itemID) then
+                    vendorCrafts = vendorCrafts and math.min(vendorCrafts, n) or n
+                else
+                    crafts = crafts and math.min(crafts, n) or n
+                end
             end
         end
-        local result = Evaluator.Evaluate(recipe, math.max(1, crafts or 1), ctx)
+        local result = Evaluator.Evaluate(recipe, math.max(1, crafts or vendorCrafts or 1), ctx)
         result.known = ns.RecipeIndex.IsKnown(recipeID, "char")
+        result.vendorOnly = vendorOnly[recipeID]
         results[#results + 1] = result
     end
-    return Evaluator.Rank(results)
+    return Evaluator.Rank(results), ctx
+end
+
+-- What /bf eval saw and decided, for `cli.py econ check` to replay in Python: the tray, the
+-- settings, every context value looked up (false = unknown), and the ranked results.
+local SNAPSHOT_MAX = 300
+
+local function RawCopy(t)
+    local out = {}
+    for k, v in pairs(t) do out[k] = v end   -- the lazy tables' cached entries only
+    return out
+end
+
+function Evaluator.Snapshot(tray, results, ctx)
+    if not ns.db or ns.readOnlyDB then return end
+    local snap = {
+        t = GetServerTime(), build = select(2, GetBuildInfo()), dataBuild = ns.RecipesBuild,
+        settings = RawCopy(ctx.settings), tray = {}, ctx = {}, results = {},
+    }
+    for _, e in ipairs(tray) do snap.tray[#snap.tray + 1] = { itemID = e.itemID, qty = e.qty } end
+    for _, name in ipairs({ "vendorBuy", "vendorSell", "sellPrice", "ladder", "owned", "deposit", "priceInfo", "recipeFor" }) do
+        snap.ctx[name] = RawCopy(ctx[name])
+    end
+    for i = 1, math.min(SNAPSHOT_MAX, #results) do
+        local r = results[i]
+        local reagents, sources = {}, {}
+        for _, g in ipairs(r.recipe.reagents) do
+            reagents[#reagents + 1] = g.itemID
+            reagents[#reagents + 1] = g.count
+        end
+        for _, line in ipairs(r.lines) do sources[#sources + 1] = line.source or "-" end
+        snap.results[i] = {
+            recipeID = r.recipe.recipeID, output = r.recipe.output, count = r.recipe.count, bop = r.recipe.bop,
+            reagents = reagents, crafts = r.crafts, cogs = r.cogs, vendorExit = r.vendorExit, ahExit = r.ahExit,
+            best = r.best, bestSource = r.bestSource, profit = r.profit, roi = r.roi, valueAdded = r.valueAdded,
+            grade = r.grade, recommended = r.recommended, reasons = r.reasons, sources = sources,
+        }
+    end
+    ns.db.diag.eval = snap
 end
 
 -- ---------------------------------------------------------------- wording
@@ -316,11 +389,12 @@ function Evaluator.PrintTray()
         ns.Print(L["The tray is empty: drag reagents into it, or use Load from bags."])
         return
     end
-    local results = Evaluator.ForTray(entries, { confirmed = true })
+    local results, ctx = Evaluator.ForTray(entries, { confirmed = true })
     if #results == 0 then
         ns.Print(L["No confirmed recipe uses these reagents."])
         return
     end
+    Evaluator.Snapshot(entries, results, ctx)
     local ids = {}
     for i = 1, math.min(EVAL_LINES, #results) do
         ids[#ids + 1] = results[i].recipe.output
@@ -392,5 +466,33 @@ function Evaluator.SelfTest(report)
         and r.bestSource == "vendor",
         string.format("COGS %s, vendor %s, profit %s, ROI %s", tostring(r.cogs), tostring(r.vendorExit), tostring(r.profit),
             tostring(r.roi)))
+
+    -- Branch scenarios with results from the Python reference (Economics/EvaluatorVectors.lua,
+    -- generated by `cli.py econ vectors`): every field must match.
+    for _, v in ipairs(ns.EvaluatorVectors or {}) do
+        r = Evaluator.Evaluate(v.recipe, v.crafts, v.ctx)
+        local e, problems = v.expect, {}
+        local function num(field, tolerance)
+            local a, b = r[field], e[field]
+            if (a == nil) ~= (b == nil) or (a ~= nil and math.abs(a - b) > tolerance) then
+                problems[#problems + 1] = string.format("%s %s, expected %s", field, tostring(a), tostring(b))
+            end
+        end
+        local function same(field, a, b)
+            if a ~= b then problems[#problems + 1] = string.format("%s %s, expected %s", field, tostring(a), tostring(b)) end
+        end
+        for _, field in ipairs({ "cogs", "vendorExit", "ahExit", "best", "profit", "valueAdded" }) do num(field, 0.01) end
+        num("roi", 1e-6)
+        same("bestSource", r.bestSource, e.bestSource)
+        same("grade", r.grade, e.grade)
+        same("recommended", r.recommended, e.recommended)
+        same("reasons", table.concat(r.reasons, ","), e.reasons)
+        local sources, warnings = {}, {}
+        for _, line in ipairs(r.lines) do sources[#sources + 1] = line.source or "-" end
+        for _, w in ipairs(r.warnings) do warnings[#warnings + 1] = w[1] end
+        same("sources", table.concat(sources, ","), e.sources)
+        same("warnings", table.concat(warnings, ","), e.warnings)
+        check("VEC " .. v.name, #problems == 0, #problems == 0 and "matches the Python reference" or table.concat(problems, "; "))
+    end
     return passed, failed
 end

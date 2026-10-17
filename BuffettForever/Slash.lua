@@ -14,9 +14,12 @@ local function Help()
     ns.Print("/bf help | minimap")
 end
 
+-- Runs every suite and saves the outcome in diag.selftest, so it can be read from SavedVariables.
 local function SelfTest()
+    local failures = {}
     local function report(name, ok, detail)
         ns.Print((ok and "|cff33ff33PASS|r " or "|cffff3333FAIL|r ") .. name .. ": " .. detail)
+        if not ok then failures[#failures + 1] = name .. ": " .. detail end
     end
     local passed, failed = 0, 0
     for _, suite in ipairs({ ns.Econ.SelfTest, ns.Evaluator.SelfTest, ns.RecipeIndex.SelfTest }) do
@@ -24,6 +27,10 @@ local function SelfTest()
         passed, failed = passed + p, failed + f
     end
     ns.Print(string.format(ns.L["selftest: %d passed, %d failed"], passed, failed))
+    if ns.db and not ns.readOnlyDB then
+        ns.db.diag.selftest = { t = GetServerTime(), build = select(2, GetBuildInfo()), version =
+            C_AddOns.GetAddOnMetadata(addonName, "Version"), passed = passed, failed = failed, failures = failures }
+    end
 end
 
 -- "/bf recipes [Linen Cloth]" (a shift-clicked link) or "/bf recipes 2589"; "all" at the end lists

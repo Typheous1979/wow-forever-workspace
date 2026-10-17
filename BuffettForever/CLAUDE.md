@@ -6,7 +6,7 @@ Not shipped (package.py leaves CLAUDE.md out). Skills to load for this addon: `w
 auction-house.md and professions-and-vendors.md) and `wowf-economics`.
 
 ## Purpose
-Scan the Auction House, keep prices for every item, and advise on crafting. The player drops up to 10 reagents
+Scan the Auction House, keep prices for every item, and advise on crafting. The player drops up to 25 reagents
 into a tray; BuffettForever lists every recipe that uses them, prices each recipe's inputs (vendor, AH, craft or
 owned) and outputs (vendor or AH), shows ROI %, and recommends what to craft and where to sell it. Named for
 Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cost.
@@ -33,7 +33,15 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   Economics/Evaluator.lua (pure Evaluate over a context; LiveContext; ForTray; Advice), Crafting/Tray.lua,
   UI/ReagentTray.lua, Bags → tray, `/bf eval`, 29 selftests, ns.ItemSellPrice in the data. Tested on 70425:
   selftest 29/29, tray works and persists. Justin asked for richer validation than eyeballing `/bf eval`, so a
-  Python reference evaluator cross-checks the Lua (next).
+  Python reference evaluator cross-checks the Lua.
+- 0.4.0 validation (2026-10-16): `tools/wowf/econ.py` (committed), Economics/EvaluatorVectors.lua (20 scenarios
+  replayed by the selftest), the `/bf eval` snapshot in diag.eval. `econ check` on 70425: 143 of 143 recipes and the
+  ranking match.
+- 0.4.0 M3 pass 2 (2026-10-16): UI/ResultsList.lua, UI/DetailPanel.lua, top pick, vendor cap, diag.selftest,
+  window 1,040 px. Tested on 70425: selftest 49/49, everything works; `econ check` 91/91, cap holds.
+- 0.4.0 M3 pass 2 review (2026-10-16): 25-slot tray, window 600 px tall, "Most gold" heading, Grade column and
+  explanations (Econ.Grade returns the deciding test; r.gradeWhy), scrolling details with section spacing,
+  vendor goods always available. Tested on 70425: selftest 50/50, `econ check` 92/92. **M3 complete.**
 
 ## Decisions (2026-10-16, M3)
 - **List columns** (pass 2): Item (with the batch), Cost, Best exit (V/AH), Profit, ROI, Grade. The middle pane is
@@ -47,6 +55,16 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   them at the auctioneer.
 - **Selling prices:** the lower of market value and min buyout; past 48 h, the fair value. **Buying:** the latest
   ladder; past 48 h, one level at the fair value. The grade shows the age either way.
+- **Vendor cap** (Justin, 2026-10-16): an item a vendor sells is worth at most the vendor's price, both owned and sold.
+- **Asks aren't sales** (Justin, 2026-10-16): the minimum grade stays C. The details pane shows the depth behind each AH
+  price and flags one-price walls; persistence and the sales ledger (M4) will confirm demand.
+- **Window 1,040 × 600:** the list's six columns and the 25-slot tray need it. It fits a 1366 × 768 UIParent.
+- **Vendor goods are always available** (Justin, 2026-10-16):
+  - recipes made entirely from vendor-sold reagents (vendor harvest + seed list) are listed even with nothing in the
+    tray;
+  - a vendor-sold tray reagent doesn't cap the batch.
+
+  On 70425 no recipe is made from vendor goods alone yet; the list grows as more vendors are harvested.
 
 ## Decisions (2026-10-16, Justin)
 - **Bag clicks:** Alt+Right-click is context-aware. At the AH it price-checks the item (targeted search) and adds it

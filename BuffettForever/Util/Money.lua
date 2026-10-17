@@ -23,3 +23,13 @@ function Money.Format(copper, fontHeight)
     end
     return sign .. C_CurrencyInfo.GetCoinTextureString(whole)
 end
+
+-- The two largest units only ("1g 87s", "88s 35c", "7c"), for narrow list columns.
+function Money.Compact(copper, fontHeight)
+    if type(copper) ~= "number" or copper ~= copper then return "?" end
+    local sign = ""
+    if copper < 0 then sign, copper = "-", -copper end
+    local whole = math.floor(copper + 0.5)
+    if whole >= COPPER_PER_GOLD then whole = math.floor(whole / COPPER_PER_SILVER + 0.5) * COPPER_PER_SILVER end
+    return sign .. C_CurrencyInfo.GetCoinTextureString(whole, fontHeight or 10)
+end

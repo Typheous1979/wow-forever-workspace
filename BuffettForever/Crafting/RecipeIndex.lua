@@ -121,6 +121,23 @@ function RecipeIndex.UsingAny(itemIDs, filter)
     return out
 end
 
+-- Recipes whose every reagent a vendor sells (isVendorSold(itemID) truthy), filtered, sorted.
+function RecipeIndex.FromVendorGoods(isVendorSold, filter)
+    local out = {}
+    for recipeID, r in pairs(ns.Recipes or {}) do
+        local all = true
+        for i = FIRST_REAGENT, #r, 2 do
+            if not isVendorSold(r[i]) then
+                all = false
+                break
+            end
+        end
+        if all and RecipeIndex.Matches(recipeID, filter) then out[#out + 1] = recipeID end
+    end
+    table.sort(out)
+    return out
+end
+
 function RecipeIndex.Count()
     Ensure()
     return total

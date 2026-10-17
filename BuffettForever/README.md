@@ -5,14 +5,15 @@
 Auction House scanner and crafting ROI advisor for World of Warcraft: Forever: what to craft, where to sell
 it, and the return on every gold piece.
 
-> **Status: 0.4.0, early development.** Auction House prices, Forever's recipes, the reagent tray and the crafting
-> evaluator (`/bf eval`) work; the result and detail panes arrive next.
+> **Status: 0.4.0, early development.** Auction House prices, Forever's recipes, the reagent tray, the crafting
+> evaluator, the craftable-items list, the top pick and the details pane work. Confidence and market-depth refinements
+> come next.
 
 - **Auction House prices:** scan the whole Auction House while you talk to an auctioneer, or price-check one item
   with **Alt+Right-click** in your bags (away from the AH it shows the stored prices). Prices are kept with their
   history, so one odd scan doesn't fool you, and item tooltips show the market value, min buyout and vendor
   prices.
-- **Reagent tray:** drop up to 10 crafting materials into the tray (drag them in, or Alt+Right-click them) and see
+- **Reagent tray:** drop up to 25 crafting materials into the tray (drag them in, or Alt+Right-click them) and see
   every recipe that uses them, from every profession, with the ones your characters know marked.
 - **Cost vs. sale:** each recipe shows what its materials cost (vendor, Auction House, crafting them yourself, or
   what the ones you own are worth) against what the result sells for at a vendor or on the Auction House,

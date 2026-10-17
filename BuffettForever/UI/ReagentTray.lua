@@ -19,7 +19,7 @@ local function AddFromCursor()
     local kind, itemID = GetCursorInfo()
     if kind ~= "item" or not itemID then return false end
     ClearCursor()
-    if not ns.Tray.Add(itemID) then ns.Print(L["The tray is full (10 reagents)."]) end
+    if not ns.Tray.Add(itemID) then ns.Print(string.format(L["The tray is full (%d reagents)."], ns.Tray.SIZE)) end
     return true
 end
 

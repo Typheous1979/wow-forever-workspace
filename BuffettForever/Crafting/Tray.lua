@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
--- The reagent tray: up to 10 reagents with quantities, saved per character in
+-- The reagent tray: up to 25 reagents with quantities, saved per character in
 -- BuffettForeverCharDB.tray = { { itemID, qty }, ... } (slot order). Adding an item that's already
 -- there merges into its slot. A new item's quantity defaults to what you own (bags and bank), at
 -- least 1; the evaluator crafts as many as the tray quantities allow. Fires TRAY_CHANGED.
@@ -8,7 +8,7 @@ local addonName, ns = ...
 local Tray = {}
 ns.Tray = Tray
 
-Tray.SIZE = 10
+Tray.SIZE = 25
 local MAX_QTY = 9999
 
 local function Entries()

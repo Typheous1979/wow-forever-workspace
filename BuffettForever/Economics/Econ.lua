@@ -184,25 +184,31 @@ Econ.GRADE_RANK = { A = 1, B = 2, C = 3, D = 4 }
 
 -- Confidence grade of an AH price (risk-and-recommendation.md): the worst of age, days observed
 -- (of 14; a single observation is D), volatility and depth. need nil = no depth test (an exit).
+-- Also returns which test set the grade: "age", "single", "days", "volatile", "depth", "unlisted"
+-- (the first one to reach the worst grade), or nil for A.
 function Econ.Grade(ageSeconds, daysObserved, observations, cv, listed, need)
-    local g = 1
-    local function worse(x) if x > g then g = x end end
-    if not ageSeconds then return "D" end
-    if ageSeconds >= 7 * 86400 then worse(4) elseif ageSeconds >= 48 * 3600 then worse(3) elseif ageSeconds >= 24 * 3600 then worse(2) end
-    if (observations or 0) <= 1 then worse(4)
-    elseif daysObserved >= 5 then worse(1)
-    elseif daysObserved >= 3 then worse(2)
-    else worse(3) end
+    local g, why = 1, nil
+    local function worse(x, reason)
+        if x > g then g, why = x, reason end
+    end
+    if not ageSeconds then return "D", "unlisted" end
+    if ageSeconds >= 7 * 86400 then worse(4, "age") elseif ageSeconds >= 48 * 3600 then worse(3, "age")
+    elseif ageSeconds >= 24 * 3600 then worse(2, "age") end
+    if (observations or 0) <= 1 then worse(4, "single")
+    elseif daysObserved >= 5 then worse(1, "days")
+    elseif daysObserved >= 3 then worse(2, "days")
+    else worse(3, "days") end
     if cv then
-        if cv >= 0.60 then worse(4) elseif cv >= 0.30 then worse(3) elseif cv >= 0.15 then worse(2) end
+        if cv >= 0.60 then worse(4, "volatile") elseif cv >= 0.30 then worse(3, "volatile")
+        elseif cv >= 0.15 then worse(2, "volatile") end
     end
     listed = listed or 0
     if need then
-        if listed < need then worse(4) elseif listed < 2 * need then worse(2) end
+        if listed < need then worse(4, "depth") elseif listed < 2 * need then worse(2, "depth") end
     elseif listed <= 0 then
-        worse(4)
+        worse(4, "unlisted")
     end
-    return GRADES[g]
+    return GRADES[g], why
 end
 
 -- Test vectors: MV-1..3 from price-estimation.md, plus ladder merging and depth.
@@ -269,5 +275,10 @@ function Econ.SelfTest(report)
     check("GRADE-B", Econ.Grade(30 * 3600, 5, 6, 0.10, 200, 50) == "B", "a day and a half old")
     check("GRADE-C", Econ.Grade(3600, 1, 2, nil, 80, 50) == "C", "one day of data, two scans")
     check("GRADE-D", Econ.Grade(3600, 5, 6, 0.10, 40, 50) == "D", "can't fill the need")
+    local _, whyC = Econ.Grade(3600, 1, 2, nil, 80, 50)
+    local _, whyD = Econ.Grade(3600, 5, 6, 0.10, 40, 50)
+    local _, whyB = Econ.Grade(30 * 3600, 5, 6, 0.10, 200, 50)
+    check("GRADE-WHY", whyC == "days" and whyD == "depth" and whyB == "age",
+        string.format("the deciding test: C %s, D %s, B %s", tostring(whyC), tostring(whyD), tostring(whyB)))
     return passed, failed
 end
