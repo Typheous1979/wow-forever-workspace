@@ -49,12 +49,23 @@ local function BuildTray(content)
         bg:SetSize(45, 45)
         bg:SetPoint("CENTER", 0, -1)
         bg:SetTexCoord(0.140625, 0.84375, 0.140625, 0.84375)
-        UI.Tooltip(slot, L["Empty reagent slot"], L["Drag a reagent here, or Alt+Right-click it in your bags."])
-        panel.slots[i] = slot
+        slot.icon = slot:CreateTexture(nil, "ARTWORK")
+        slot.icon:SetAllPoints()
+        slot.count = slot:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        slot.count:SetPoint("BOTTOMRIGHT", -2, 2)
+        slot:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+        slot.index = i
+        panel.slots[i] = slot   -- behaviour: UI/ReagentTray.lua
     end
     local rows = math.ceil(TRAY_SLOTS / TRAY_COLUMNS)
+    local buttonsY = -30 - rows * (SLOT_SIZE + SLOT_GAP) - 2
+    local half = (LEFT_WIDTH - 26) / 2
+    panel.LoadButton = UI.Button(panel, L["Load from bags"], half)
+    panel.LoadButton:SetPoint("TOPLEFT", 10, buttonsY)
+    panel.ClearButton = UI.Button(panel, L["Clear"], half)
+    panel.ClearButton:SetPoint("TOPLEFT", panel.LoadButton, "TOPRIGHT", 6, 0)
     local hint = Note(panel, L["Drop up to 10 reagents to see every recipe that uses them."], LEFT_WIDTH - 20)
-    hint:SetPoint("TOPLEFT", 10, -30 - rows * (SLOT_SIZE + SLOT_GAP) - 2)
+    hint:SetPoint("TOPLEFT", 10, buttonsY - 28)
     return panel
 end
 

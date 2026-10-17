@@ -1,9 +1,9 @@
 local addonName, ns = ...
 
--- Pure pricing functions from the wowf-economics references (price-estimation.md). No game
--- state in here: numbers in, numbers out, so /bf selftest can check them against the
--- reference test vectors. M3 adds FairValue, CostToBuy and the crafting math.
--- Listings are flat { unitPrice1, qty1, unitPrice2, qty2, ... } in copper per unit.
+-- Pure pricing functions from the wowf-economics references (price-estimation.md,
+-- crafting-economics.md, risk-and-recommendation.md). No game state in here: numbers in, numbers
+-- out, so /bf selftest can check them against the reference test vectors.
+-- Listings and ladders are flat { unitPrice1, qty1, unitPrice2, qty2, ... } in copper per unit.
 
 local Econ = ns.Econ or {}
 ns.Econ = Econ
@@ -80,6 +80,131 @@ function Econ.BuildLadder(listings)
     return ladder
 end
 
+-- Cost to buy qty units by walking the ladder (price-estimation.md). Returns cost, filled, unitsAvailable.
+function Econ.CostToBuy(ladder, qty)
+    local need, cost = qty, 0
+    for i = 1, #ladder, 2 do
+        local take = math.min(need, ladder[i + 1])
+        cost = cost + take * ladder[i]
+        need = need - take
+        if need <= 0 then return cost, true, qty end
+    end
+    return cost, false, qty - need
+end
+
+-- Decay-weighted fair value of daily values { [day] = value } (price-estimation.md); nil = unknown.
+function Econ.FairValue(history, today, halfLife, window)
+    halfLife, window = halfLife or 3, window or 14
+    local num, den = 0, 0
+    for day, v in pairs(history) do
+        local age = today - day
+        if age >= 0 and age < window then
+            local w = 0.5 ^ (age / halfLife)
+            num = num + w * v
+            den = den + w
+        end
+    end
+    if den == 0 then return nil end
+    return num / den
+end
+
+-- What one unit nets on the AH (crafting-economics.md): price after the cut, minus the deposits
+-- expected to be lost on listings that don't sell (deposit x (1 - p) / p).
+function Econ.AHNet(price, cut, deposit, p)
+    if not price then return nil end
+    deposit, p = deposit or 0, p or 0.5
+    return price * (1 - (cut or 0.05)) - deposit * (1 - p) / p
+end
+
+-- Liquidation value of one unit you own: the better of selling it to a vendor or on the AH.
+function Econ.Liquidation(vendorSell, ahNet)
+    if ahNet and vendorSell then return math.max(vendorSell, ahNet) end
+    return ahNet or vendorSell
+end
+
+-- ROI is undefined when nothing was spent (everything owned and valued free): nil, rank by profit.
+function Econ.ROI(profit, cogs)
+    if not profit or not cogs or cogs <= 0 then return nil end
+    return profit / cogs
+end
+
+-- Cheapest way to obtain qty of itemID (crafting-economics.md "Make-or-buy"). ctx supplies tables
+-- vendorBuy[id], ladder[id] and recipeFor[id] = { yield, reagents = { id, qty, ... } }.
+-- Returns cost, source ("vendor", "ah", "craft"), or nil when no source is known.
+function Econ.Acquire(itemID, qty, ctx, depth, visiting)
+    depth, visiting = depth or 0, visiting or {}
+    local best, source
+    local unit = ctx.vendorBuy[itemID]
+    if unit then best, source = unit * qty, "vendor" end
+    local ladder = ctx.ladder[itemID]
+    if ladder then
+        local cost, filled = Econ.CostToBuy(ladder, qty)
+        if filled and (not best or cost < best) then best, source = cost, "ah" end
+    end
+    local recipe = ctx.recipeFor[itemID]
+    if recipe and depth < 3 and not visiting[itemID] then
+        visiting[itemID] = true
+        local crafts = math.ceil(qty / recipe.yield)
+        local cost = 0
+        for i = 1, #recipe.reagents, 2 do
+            local c = Econ.Acquire(recipe.reagents[i], recipe.reagents[i + 1] * crafts, ctx, depth + 1, visiting)
+            if not c then
+                cost = nil
+                break
+            end
+            cost = cost + c
+        end
+        visiting[itemID] = nil
+        if cost and (not best or cost < best) then best, source = cost, "craft" end
+    end
+    return best, source
+end
+
+-- Mean and coefficient of variation (sd / mean) of daily values { [day] = value } in the window.
+function Econ.Volatility(history, today, window)
+    window = window or 14
+    local n, sum = 0, 0
+    for day, v in pairs(history) do
+        if today - day >= 0 and today - day < window then
+            n, sum = n + 1, sum + v
+        end
+    end
+    if n == 0 then return nil, nil end
+    local mean = sum / n
+    local var = 0
+    for day, v in pairs(history) do
+        if today - day >= 0 and today - day < window then var = var + (v - mean) ^ 2 end
+    end
+    if mean <= 0 then return mean, nil end
+    return mean, math.sqrt(var / n) / mean
+end
+
+local GRADES = { "A", "B", "C", "D" }
+Econ.GRADE_RANK = { A = 1, B = 2, C = 3, D = 4 }
+
+-- Confidence grade of an AH price (risk-and-recommendation.md): the worst of age, days observed
+-- (of 14; a single observation is D), volatility and depth. need nil = no depth test (an exit).
+function Econ.Grade(ageSeconds, daysObserved, observations, cv, listed, need)
+    local g = 1
+    local function worse(x) if x > g then g = x end end
+    if not ageSeconds then return "D" end
+    if ageSeconds >= 7 * 86400 then worse(4) elseif ageSeconds >= 48 * 3600 then worse(3) elseif ageSeconds >= 24 * 3600 then worse(2) end
+    if (observations or 0) <= 1 then worse(4)
+    elseif daysObserved >= 5 then worse(1)
+    elseif daysObserved >= 3 then worse(2)
+    else worse(3) end
+    if cv then
+        if cv >= 0.60 then worse(4) elseif cv >= 0.30 then worse(3) elseif cv >= 0.15 then worse(2) end
+    end
+    listed = listed or 0
+    if need then
+        if listed < need then worse(4) elseif listed < 2 * need then worse(2) end
+    elseif listed <= 0 then
+        worse(4)
+    end
+    return GRADES[g]
+end
+
 -- Test vectors: MV-1..3 from price-estimation.md, plus ladder merging and depth.
 -- report(name, ok, detail) is called for each case; returns passed, failed.
 function Econ.SelfTest(report)
@@ -112,5 +237,37 @@ function Econ.SelfTest(report)
     end
     local ladder = Econ.BuildLadder(deep)
     check("LADDER-2", #ladder / 2 == 10, string.format("%d levels cover 100 units", #ladder / 2))
+
+    -- price-estimation.md: BUY-1..3, FAIR-1..2
+    local buy = { 950, 20, 1000, 40, 1100, 100 }
+    local c1, f1 = Econ.CostToBuy(buy, 8)
+    check("BUY-1", c1 == 7600 and f1, string.format("8 units cost %s", tostring(c1)))
+    local c2, f2 = Econ.CostToBuy(buy, 70)
+    check("BUY-2", c2 == 70000 and f2, string.format("70 units cost %s", tostring(c2)))
+    local c3, f3, a3 = Econ.CostToBuy(buy, 200)
+    check("BUY-3", c3 == 169000 and not f3 and a3 == 160, string.format("200 units: %s, filled %s, %s available",
+        tostring(c3), tostring(f3), tostring(a3)))
+    local fair = Econ.FairValue({ [100] = 100, [99] = 120, [97] = 80 }, 100, 3, 14)
+    check("FAIR-1", near(fair, 102.561), string.format("fair value %s", tostring(fair)))
+    check("FAIR-2", Econ.FairValue({ [80] = 100 }, 100) == nil, "nothing in the window -> unknown")
+
+    -- crafting-economics.md: NET-1, MOB-1, ROI-0
+    local net = Econ.AHNet(2900, 0.05, 60, 0.5)
+    check("NET-1", near(net, 2695), string.format("AH net %s", tostring(net)))
+    local mob = {
+        vendorBuy = { [2840] = 60, [3576] = 90 },
+        ladder = { [2841] = { 80, 10 } },
+        recipeFor = { [2841] = { yield = 2, reagents = { 2840, 1, 3576, 1 } } },
+    }
+    local cost, source = Econ.Acquire(2841, 4, mob)
+    check("MOB-1", cost == 300 and source == "craft", string.format("4 Bronze Bars: %s via %s (buying costs 320)",
+        tostring(cost), tostring(source)))
+    check("ROI-0", Econ.ROI(500, 0) == nil and near(Econ.ROI(55, 45), 1.22222), "ROI nil when nothing was spent")
+
+    -- risk-and-recommendation.md grade table
+    check("GRADE-A", Econ.Grade(3600, 5, 6, 0.10, 200, 50) == "A", "fresh, 5 days, steady, deep")
+    check("GRADE-B", Econ.Grade(30 * 3600, 5, 6, 0.10, 200, 50) == "B", "a day and a half old")
+    check("GRADE-C", Econ.Grade(3600, 1, 2, nil, 80, 50) == "C", "one day of data, two scans")
+    check("GRADE-D", Econ.Grade(3600, 5, 6, 0.10, 40, 50) == "D", "can't fill the need")
     return passed, failed
 end

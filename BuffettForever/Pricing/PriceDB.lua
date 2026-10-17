@@ -131,6 +131,20 @@ function PriceDB.Get(itemID)
     return row, GetServerTime() - (row.t or 0)
 end
 
+-- A row's daily market values { [day] = mv }, the number of days, and the scans behind them.
+function PriceDB.History(row)
+    local history, days, observations = {}, 0, 0
+    for day, text in pairs(row and row.h or {}) do
+        local mv, _, _, _, k = PriceDB.UnpackDay(text)
+        if mv then
+            history[day] = mv
+            days = days + 1
+            observations = observations + (k or 1)
+        end
+    end
+    return history, days, observations
+end
+
 -- Number of items priced in this market, and the last full scan ({ t, items, n }) if any.
 function PriceDB.Summary()
     local market = PriceDB.Market()

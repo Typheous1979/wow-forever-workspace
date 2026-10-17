@@ -8,6 +8,7 @@ local function Help()
     ns.Print("/bf scan  " .. L["full Auction House scan (at an auctioneer)"])
     ns.Print("/bf options  " .. L["open the settings"])
     ns.Print("/bf recipes <" .. L["item link or ID"] .. ">  " .. L["the recipes that use or make an item"])
+    ns.Print("/bf eval  " .. L["the best recipes for the reagents in your tray"])
     ns.Print("/bf diag  " .. L["scanner diagnostics"])
     ns.Print("/bf selftest  " .. L["check the price math and the recipe data"])
     ns.Print("/bf help | minimap")
@@ -18,7 +19,7 @@ local function SelfTest()
         ns.Print((ok and "|cff33ff33PASS|r " or "|cffff3333FAIL|r ") .. name .. ": " .. detail)
     end
     local passed, failed = 0, 0
-    for _, suite in ipairs({ ns.Econ.SelfTest, ns.RecipeIndex.SelfTest }) do
+    for _, suite in ipairs({ ns.Econ.SelfTest, ns.Evaluator.SelfTest, ns.RecipeIndex.SelfTest }) do
         local p, f = suite(report)
         passed, failed = passed + p, failed + f
     end
@@ -57,6 +58,8 @@ SlashCmdList["BUFFETTFOREVER"] = function(msg)
         SelfTest()
     elseif cmd == "recipes" then
         Recipes(msg)
+    elseif cmd == "eval" then
+        ns.Evaluator.PrintTray()
     elseif cmd == "options" then
         if ns.OpenOptions then ns.OpenOptions() end
     elseif cmd == "minimap" then

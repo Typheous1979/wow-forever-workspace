@@ -29,6 +29,24 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 - 0.3.0 M2 follow-up (2026-10-16): known recipes read at login with IsSpellKnown (13 found, 0 ms), recipesSeen
   dropped (migration 1 → 2), `/bf recipes` ordered known → confirmed → unconfirmed, with `all`. Tested on 70425.
   **M2 complete.** M3 (tray, evaluator, panes) next.
+- 0.4.0 M3 pass 1 (2026-10-16): Econ (CostToBuy, FairValue, AHNet, Liquidation, ROI, Acquire, Volatility, Grade),
+  Economics/Evaluator.lua (pure Evaluate over a context; LiveContext; ForTray; Advice), Crafting/Tray.lua,
+  UI/ReagentTray.lua, Bags → tray, `/bf eval`, 29 selftests, ns.ItemSellPrice in the data. Tested on 70425:
+  selftest 29/29, tray works and persists. Justin asked for richer validation than eyeballing `/bf eval`, so a
+  Python reference evaluator cross-checks the Lua (next).
+
+## Decisions (2026-10-16, M3)
+- **List columns** (pass 2): Item (with the batch), Cost, Best exit (V/AH), Profit, ROI, Grade. The middle pane is
+  about 376 px, so the separate vendor and AH figures live in the details pane.
+- **Tray quantity** defaults to what you own (bags and bank), at least 1. A recipe is evaluated for the crafts the
+  tray allows (at least 1); reagents not in the tray are bought: owned stock first, then the cheapest source.
+- **Alt+Right-click** adds to the tray everywhere, and also price-checks at the AH (the tooltip has the stored prices).
+- **Make-or-buy** only through recipes this character knows, depth 3, the highest yield first.
+- **Defaults until M5:** cut 5%, sale chance 0.5, margin 20%, minimum grade C, owned materials at opportunity cost,
+  **minimum profit 10s per craft** (Justin, 2026-10-16: 1g suits level 60 only). Deposits count as 0 until M4 caches
+  them at the auctioneer.
+- **Selling prices:** the lower of market value and min buyout; past 48 h, the fair value. **Buying:** the latest
+  ladder; past 48 h, one level at the fair value. The grade shows the age either way.
 
 ## Decisions (2026-10-16, Justin)
 - **Bag clicks:** Alt+Right-click is context-aware. At the AH it price-checks the item (targeted search) and adds it

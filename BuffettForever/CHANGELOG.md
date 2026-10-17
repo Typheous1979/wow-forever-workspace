@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0 (not released)
+- **Reagent tray:**
+  - Drag up to 10 reagents onto the slots, or Alt+Right-click them in your bags (at the AH it also price-checks).
+  - Right-click removes; the mouse wheel sets the quantity (Shift: 10). A new reagent starts at what you own.
+  - "Load from bags" fills the tray with your reagents, those your known recipes use first. "Clear" empties it.
+  - The tray is saved per character.
+- **Crafting evaluator:**
+  - Each recipe that uses the tray's reagents is evaluated for the crafts your quantities allow.
+  - Reagents you own count at what they'd sell for; the rest come from the cheapest of vendor, AH or a recipe you
+    know (up to 3 levels deep).
+  - The result can go to a vendor or the AH (after the 5% cut). The AH is chosen only when it beats the vendor by
+    the 20% margin of safety.
+  - Each recipe gets a profit, an ROI, the value added over selling the materials raw, and a confidence grade A–D.
+  - A recipe is recommended only at ROI ≥ 20%, profit ≥ 10s per craft and grade ≥ C.
+- `/bf eval`: the tray's five best recipes and the top pick in chat (the window panes come next).
+- `/bf selftest` runs every test vector in the economics references (29 checks).
+- Vendor sell prices for all 2,006 recipe items ship with the data, so no item-cache wait.
+- Pass 1 (engine and tray) tested on client 1.60.1.70425, 2026-10-16: selftest 29/29; the tray (drag, Alt+Right-click,
+  load from bags, clear) works and is saved per character; `/bf eval` output looked right, and a cross-check
+  against an independent implementation follows.
+
 ## 0.3.0 (not released)
 - Recipe data: 1,976 Forever recipes from the 1.60.1.70450 game tables (`Data/Recipes.lua`, IDs and numbers only),
   each with its profession, skill-up colors, output and reagents. Recipes added after Classic (860: Forever-new and

@@ -69,7 +69,14 @@ local DB_VERSION = 2
 local defaults = {
     minimap = { angle = 200, shown = true },   -- minimap button: degrees around the edge, visible
     settings = {
-        historyDays = 14,                       -- days of price history kept per item (pruned at login)
+        historyDays = 14,       -- days of price history kept per item (pruned at login)
+        -- Economics (wowf-economics defaults; Settings controls arrive in M5):
+        cut = 0.05,             -- AH house cut, unmeasured on Forever [F-122]
+        saleChance = 0.5,       -- chance a listing sells before it expires (expected deposit loss)
+        margin = 0.20,          -- margin of safety: AH over vendor, and the minimum ROI to recommend
+        minProfit = 1000,       -- copper per craft (10s while leveling; the reference's 1g suits level 60)
+        minGrade = "C",         -- weakest confidence grade a recommendation may rest on
+        ownedPolicy = "opportunity",  -- owned materials at what they'd sell for ("free", "replacement")
     },
     markets = {},   -- [marketKey] = { items = { [itemID] = price row }, scan = last full scan } (Pricing/PriceDB.lua)
     vendor = {},    -- [itemID] = { p = unit buy price, t, lim } (Pricing/Merchant.lua)
@@ -78,6 +85,7 @@ local defaults = {
 }
 local charDefaults = {
     window = {},   -- main window position (per character)
+    tray = {},     -- reagent tray: { { itemID, qty }, ... } in slot order (Crafting/Tray.lua)
 }
 
 local migrations = {
