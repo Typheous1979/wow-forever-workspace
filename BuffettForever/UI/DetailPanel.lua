@@ -5,8 +5,10 @@ local addonName, ns = ...
 -- - each reagent: the units owned (valued at what they'd sell for) and the units bought, from which
 --   source (Vendor, AH, Craft), and what that costs;
 -- - Sell: the vendor and AH exits for the batch, the AH's parts (price, cut, deposit, sale chance),
---   the listings behind the price and your own;
--- - Result: where to sell, profit, ROI, value added, confidence; then the verdict.
+--   the listings behind the price (walls flagged) and your own;
+-- - Result: where to sell, profit, ROI, value added, confidence, and the best batch (the reagents or the
+--   market sets it);
+-- - Mr. Market, when a price is well away from its fair value; then the verdict.
 -- Numbers sit in label/value rows; each row's tooltip says where its number comes from (Justin,
 -- 2026-10-17: data, not paragraphs). The pane scrolls (ScrollFrameTemplate).
 
@@ -149,8 +151,15 @@ local function GradeReason(why)
     elseif why.reason == "depth" then
         return string.format(L["Only %d %s listed for the %d needed (A wants twice that)."], info.listed or 0, link,
             why.need or 0)
+    elseif why.reason == "stale" then
+        return string.format(L["%s: the cheapest price hasn't moved in %d days and the quantity never fell, so there's no sign of sales (D until you sell some)."],
+            link, info.stale or 0)
     end
     return string.format(L["No %s listed now."], link)
+end
+
+local function Crafts(n)
+    return n == 1 and L["1 craft"] or string.format(L["%d crafts"], n)
 end
 
 -- ---------------------------------------------------------------- Sell
@@ -195,8 +204,10 @@ local function AHParts(r)
     }, true)
 end
 
--- The listings behind the AH price; orange when every listing is at one price.
-local function Listed(itemID)
+-- The listings behind the AH price (your own left out); orange when every listing is at one price, or
+-- when the cheapest price has held for days while the quantity never fell (a wall nobody buys from).
+local function Listed(r)
+    local itemID = r.recipe.output
     local row, age = ns.PriceDB.Get(itemID)
     if not row then return end
     local ladder = ns.PriceDB.UnpackLadder(row.ladder)
@@ -204,11 +215,18 @@ local function Listed(itemID)
     local lo, hi = ladder[1] or row.min, ladder[#ladder - 1] or row.min
     local prices = lo == hi and Money.Compact(lo) or string.format(L["%s to %s"], Money.Compact(lo), Money.Compact(hi))
     local wall = #ladder == 2 and (row.n or 0) >= WALL
-    local tip = { string.format(L["%s listed at %s; %d day(s) of data; the last scan was %s ago."],
+    local info = r.ctx and r.ctx.priceInfo[itemID]
+    local stale = info and (info.sold or 0) == 0 and (info.stale or 0) >= ns.Econ.STALE_DAYS and info.stale or nil
+    local tip = { string.format(L["%s listed at %s, not counting yours; %d day(s) of data; the last scan was %s ago."],
         BreakUpLargeNumbers(row.q or 0), prices, days, ns.FormatAge(age)) }
     if wall then tip[#tip + 1] = ORANGE .. L["Every listing is at one price: perhaps a single seller, so demand is unproven."] .. "|r" end
-    Row(L["Listed"], (wall and ORANGE or "") .. string.format(L["%s at %s"], BreakUpLargeNumbers(row.q or 0), prices)
-        .. (wall and "|r" or ""), tip)
+    if stale then
+        tip[#tip + 1] = ORANGE .. string.format(L["The cheapest price has held at %s for %d days and the quantity never fell: no sign anyone buys at that price. Confidence D until you sell some."],
+            Money.Compact(lo), stale) .. "|r"
+    end
+    local flag = wall or stale
+    Row(L["Listed"], (flag and ORANGE or "") .. string.format(L["%s at %s"], BreakUpLargeNumbers(row.q or 0), prices)
+        .. (flag and "|r" or ""), tip)
 end
 
 -- Your own auctions and sales of the item, when there are any.
@@ -246,7 +264,7 @@ local function Sell(r)
             r.ahExit == 0 and (ORANGE .. L["The deposits it would likely lose outweigh its price."] .. "|r") or nil,
         })
         AHParts(r)
-        Listed(recipe.output)
+        Listed(r)
     else
         Row(L["AH"], GREY .. L["no price"] .. "|r", { L["Scan at the Auction House."] })
     end
@@ -254,6 +272,80 @@ local function Sell(r)
 end
 
 -- ---------------------------------------------------------------- Result and verdict
+
+-- Batch size (Evaluator.BatchAdvice, worked out once per result): the smaller of what the reagents
+-- support (the most profit) and what the market takes (a quarter of what's listed), and which one set
+-- it. Orange when this batch is bigger, green when it could be bigger.
+local LIMIT_TEXT = { reagents = "reagents", market = "market" }
+
+local function BatchRow(r)
+    if not r.ctx then return end
+    r.batch = r.batch or ns.Evaluator.BatchAdvice(r.recipe, r.crafts, r.ctx)
+    local a = r.batch
+    if not a.size then return end
+    local tip = {}
+    if a.best >= ns.Evaluator.BATCH_LIMIT then
+        tip[#tip + 1] = string.format(L["Reagents: profit still grows at %d crafts."], a.best)
+    elseif a.best == a.searched then
+        tip[#tip + 1] = string.format(L["Reagents: only enough can be had for %s."], Crafts(a.best))
+    else
+        tip[#tip + 1] = string.format(L["Reagents: the most profit at %s (%s); past that each craft costs more than it earns."],
+            Crafts(a.best), Money.Format(a.profit))
+    end
+    if a.cap then
+        local info = r.ctx.priceInfo[r.recipe.output]
+        tip[#tip + 1] = string.format(L["Market: a quarter of the %s listed is %s; selling more at once risks flooding it."],
+            BreakUpLargeNumbers(info and info.listed or 0), Crafts(a.cap))
+    end
+    local color = ""
+    if r.crafts > a.size then
+        color = ORANGE
+        tip[#tip + 1] = string.format(L["This batch is %s: make fewer."], Crafts(r.crafts))
+    elseif r.crafts < a.size then
+        color = GREEN
+        tip[#tip + 1] = string.format(L["This batch is %s: you could make more."], Crafts(r.crafts))
+    end
+    local value = a.limit == "none" and L["no limit"]
+        or string.format("%s (%s)", Crafts(a.size), L[LIMIT_TEXT[a.limit]])
+    Row(L["Best batch"], color .. value .. (color ~= "" and "|r" or ""), tip)
+end
+
+-- Mr. Market (wowf-economics strategy-ideas.md): an AH price well away from its fair value, for the
+-- reagents bought there and the result sold there. Hints only; nothing shows without 5 days of data.
+local function MrMarket(r)
+    local today, window = ns.PriceDB.Today(), ns.db.settings.historyDays
+    local moods = {}
+    local function consider(itemID, selling)
+        local row = ns.PriceDB.Get(itemID)
+        if not row then return end
+        local z, share, fair = ns.Econ.MrMarket((ns.PriceDB.History(row)), today, row.mv, window)
+        local mood = z and ns.Econ.Mood(z, share)
+        if not mood then return end
+        local good = (mood == "cheap") ~= selling   -- cheap is good when buying, dear when selling
+        local advice
+        if selling then
+            advice = mood == "dear" and L["A good day to sell."] or L["Cheap today: hold if you can."]
+        else
+            advice = mood == "cheap" and L["A good day to buy."] or L["Dear today: buy later if you can."]
+        end
+        moods[#moods + 1] = {
+            itemID = itemID,
+            value = (good and GREEN or ORANGE) .. string.format("%s%d%% %s", share < 0 and "-" or "+",
+                math.floor(math.abs(share) * 100 + 0.5), mood == "cheap" and L["cheap"] or L["dear"]) .. "|r",
+            tip = { string.format(L["Today %s against a fair value of %s over %d days: %.1f standard deviations %s."],
+                Money.Format(row.mv), Money.Format(fair), window, math.abs(z), z < 0 and L["below"] or L["above"]), advice },
+        }
+    end
+    for _, line in ipairs(r.lines) do
+        if line.source == "ah" then consider(line.itemID, false) end
+    end
+    if r.bestSource == "ah" then consider(r.recipe.output, true) end
+    if #moods == 0 then return end
+    Heading(L["Mr. Market"])
+    for _, m in ipairs(moods) do
+        Row(C_Item.GetItemNameByID(m.itemID) or ("item " .. m.itemID), m.value, m.tip)
+    end
+end
 
 local function Result(r)
     local s = ns.db.settings
@@ -282,6 +374,7 @@ local function Result(r)
         GradeReason(r.gradeWhy),
         L["A recipe gets the grade of the weakest Auction House price it relies on."],
     })
+    BatchRow(r)
 end
 
 local function Verdict(r)
@@ -344,6 +437,7 @@ function DetailPanel.Refresh()
 
     Sell(r)
     Result(r)
+    MrMarket(r)
     Verdict(r)
     child:SetHeight(math.max(1, height + 8))
 end

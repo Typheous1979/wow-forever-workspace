@@ -193,12 +193,14 @@ end
 local function GradeTooltip(owner)
     GameTooltip:SetOwner(owner, "ANCHOR_TOP")
     GameTooltip:SetText(L["Confidence grade: A best, D worst"], 1, 1, 1)
-    GameTooltip:AddLine(L["A recipe gets the grade of the weakest Auction House price it relies on. Each price is graded on four tests, and its worst test wins:"],
+    GameTooltip:AddLine(L["A recipe gets the grade of the weakest Auction House price it relies on. Each price is graded on these tests, and its worst test wins:"],
         nil, nil, nil, true)
     GameTooltip:AddLine(L["Age of the latest scan: A under 24 h, B under 48 h, C under 7 days."], 1, 1, 1, true)
     GameTooltip:AddLine(L["Days seen in the last 14: A 5 or more, B 3 or more, C 1 or 2; seen in one scan only: D."], 1, 1, 1, true)
     GameTooltip:AddLine(L["Day-to-day price swing: A under 15%, B under 30%, C under 60%."], 1, 1, 1, true)
     GameTooltip:AddLine(L["Listed now: A at least twice what you need, B at least what you need, D not enough or none."], 1, 1, 1, true)
+    GameTooltip:AddLine(L["Selling into a wall: its cheapest price held 3 days while the quantity never fell: D, until you sell some."],
+        1, 1, 1, true)
     GameTooltip:AddLine(L["Vendor prices are always A. A recipe is recommended only at C or better. Scans on more days raise the grades."],
         0.6, 0.8, 1, true)
     GameTooltip:AddLine(L["Click to sort; click again to reverse."], 1, 0.82, 0)

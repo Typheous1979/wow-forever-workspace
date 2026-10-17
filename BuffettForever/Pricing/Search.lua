@@ -9,9 +9,9 @@ local addonName, ns = ...
 -- Results arrive as COMMODITY_SEARCH_RESULTS_UPDATED/ADDED or ITEM_SEARCH_RESULTS_UPDATED/ADDED;
 -- up to MAX_PAGES pages are read, then PriceDB.Record stores them like a scan.
 --   Search.Request(itemID, itemKey or nil, callback(itemID, result, problem))
---   result = { mv, min, q, n or prices, full } (full = every listing was read), or nil with a
---   problem. Commodity rows are grouped by unit price [F-121], so a commodity result counts
---   prices, not auctions (n stays nil).
+--   result = { mv, min, q, n or prices, full, own } (full = every listing was read; own = your units,
+--   left out of the rest), or nil with a problem. Commodity rows are grouped by unit price [F-121],
+--   so a commodity result counts prices, not auctions (n stays nil).
 
 local L = ns.L
 local Search = {}
@@ -79,26 +79,36 @@ local function Kind(itemID, key)
     return "unknown"
 end
 
+-- Your own units in a row (numOwnerItems) aren't the market: they're left out, and counted in q.own.
 local function ReadCommodity(q)
     local listings = {}
+    q.own = 0
     local n = C_AuctionHouse.GetNumCommoditySearchResults(q.itemID) or 0
     for i = 1, n do
         local r = C_AuctionHouse.GetCommoditySearchResultInfo(q.itemID, i)
         if r and (r.quantity or 0) > 0 and (r.unitPrice or 0) > 0 then
-            listings[#listings + 1] = r.unitPrice
-            listings[#listings + 1] = r.quantity
+            local mine = math.min(r.quantity, r.numOwnerItems or 0)
+            q.own = q.own + mine
+            if r.quantity > mine then
+                listings[#listings + 1] = r.unitPrice
+                listings[#listings + 1] = r.quantity - mine
+            end
         end
     end
     return listings, n, C_AuctionHouse.HasFullCommoditySearchResults(q.itemID)
 end
 
 -- buyoutAmount pays for the whole auction (Blizzard's buy frame bids it), so unit = buyout / quantity.
+-- Your own auctions (containsOwnerItem) are left out.
 local function ReadItems(q)
     local listings = {}
+    q.own = 0
     local n = C_AuctionHouse.GetNumItemSearchResults(q.key) or 0
     for i = 1, n do
         local r = C_AuctionHouse.GetItemSearchResultInfo(q.key, i)
-        if r and (r.quantity or 0) > 0 and (r.buyoutAmount or 0) > 0 then
+        if r and r.containsOwnerItem then
+            q.own = q.own + (r.quantity or 0)
+        elseif r and (r.quantity or 0) > 0 and (r.buyoutAmount or 0) > 0 then
             listings[#listings + 1] = r.buyoutAmount / r.quantity
             listings[#listings + 1] = r.quantity
         end
@@ -114,11 +124,15 @@ local function Finish(q, problem)
     local listings = q.listings
     if not problem then
         if not listings or #listings == 0 then
-            problem = (q.n or 0) == 0 and L["none listed."] or L["listed, but bid-only."]
+            if (q.own or 0) > 0 then
+                problem = string.format(L["only your own %d are listed."], q.own)
+            else
+                problem = (q.n or 0) == 0 and L["none listed."] or L["listed, but bid-only."]
+            end
         else
             local mv, min, qty, rows = ns.Econ.MarketValue(listings)
             local commodity = q.kind == "commodity"
-            result = { mv = mv, min = min, q = qty, full = q.full }
+            result = { mv = mv, min = min, q = qty, full = q.full, own = q.own }
             if commodity then result.prices = rows else result.n = rows end
             ns.PriceDB.Record(q.itemID, listings, nil, commodity)
         end
@@ -128,7 +142,7 @@ local function Finish(q, problem)
         diag.searches = diag.searches or {}
         diag.searches[#diag.searches + 1] = {
             t = q.t, itemID = q.itemID, kind = q.kind, results = q.n, pages = q.pages, full = q.full,
-            ms = math.floor(NowMs() - q.started), problem = problem,
+            ms = math.floor(NowMs() - q.started), problem = problem, own = q.own,
         }
         while #diag.searches > DIAG_KEEP do table.remove(diag.searches, 1) end
     end

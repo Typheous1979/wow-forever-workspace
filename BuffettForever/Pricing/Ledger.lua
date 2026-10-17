@@ -11,7 +11,8 @@ local addonName, ns = ...
 --     names = { [item name] = itemID },          -- sales mail names the item but carries no ID
 --     pending = { [item name] = { s, bid, cut, t } },   -- sales whose item isn't identified yet
 --     seen = { [mail key] = { expiry time, ... } },     -- mails counted already (Mail.Reconcile)
---     listed = { [itemID] = { q = units, n = auctions } }, listedAt = time,   -- your active auctions
+--     listed = { [itemID] = { q = units, n = auctions, levels = { unit price, qty, ... } } },
+--     listedAt = time,                                                      -- your active auctions
 --   }
 -- Item names are learned from your auctions list, from items that come back in the mail, and from the
 -- next full scan (Scanner); a pending sale is filed the moment its name is known.
@@ -164,6 +165,18 @@ function Ledger.SetListed(listed, t)
     local book = Ledger.Book(true)
     if not book then return end
     book.listed, book.listedAt = listed, t
+end
+
+-- Your active auctions' unit prices per item, { [itemID] = { unit price, qty, ... } }, when the last look
+-- at them is under maxAge seconds old (a full scan leaves them out of the market); else nil.
+function Ledger.OwnLevels(maxAge)
+    local book = Ledger.Book()
+    if not book or not book.listedAt or GetServerTime() - book.listedAt > maxAge then return nil end
+    local levels = {}
+    for itemID, entry in pairs(book.listed or {}) do
+        if entry.levels and #entry.levels > 0 then levels[itemID] = entry.levels end
+    end
+    return levels
 end
 
 -- Your active auctions of an item at the last look: units, auctions, seconds since; nil when none.

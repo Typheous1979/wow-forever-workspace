@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0 (not released)
+- **Your own auctions aren't the market:** full scans leave out the auctions you have listed (from your auctions
+  list read at this visit), and searches leave out yours too, so your own listings don't count as depth, set the
+  price you compete with, or look like demand. Alt+Right-click says how many of yours it left out.
+- **Walls that never shrink:** when a result's cheapest price has held (within 1%) for 3 days while the quantity
+  listed never fell, nobody seems to buy at that price. Selling it there gets confidence D (not recommended) until
+  you've sold some yourself. The Listed row turns orange and says so.
+- **Best batch:** the smaller of what the reagents support and what the market takes, and which one set it
+  ("23 crafts (market)", "10 crafts (reagents)"); orange when your batch is bigger, green when it could be bigger.
+  - Reagents: the batch with the most profit, searched up to 200 crafts. Past it, each extra craft buys reagents
+    higher up the price ladder than it's worth.
+  - Market: a quarter of what's listed (at least 1); selling more at once risks flooding the market.
+  - The tooltip gives both limits.
+- **Mr. Market:** once an item has 5 days of prices, a reagent bought on the AH or a result sold there that's at
+  least a standard deviation and 10% away from its fair value shows as cheap or dear, with the advice in the
+  tooltip.
+- `/bf selftest`: 99 checks, with 5 more scenarios from the Python reference (34).
+- Tested on client 1.60.1.70425, 2026-10-17: selftest 98/98; your 2 listed units were left out of a full scan and
+  a search; `econ check` matched all 188 recipes and the ranking. Best batch and market cap showed the same
+  number for 90 of 155 recipes because the batch search stopped at the cap; they're now independent limits in one
+  row.
+
 ## 0.5.0 (not released)
 - **Sales ledger:** opening a mailbox reads your Auction House mail without opening any of it: what sold (units,
   sale total, the house cut), what expired or was cancelled (the items that came back) and what you bought. Each

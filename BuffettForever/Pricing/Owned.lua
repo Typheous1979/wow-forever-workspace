@@ -2,8 +2,9 @@ local addonName, ns = ...
 
 -- Your active auctions (auction-house.md "Your auctions"): when the AH opens, QueryOwnedAuctions
 -- (through the search throttle, Search.WhenReady), then OWNED_AUCTIONS_UPDATED -> GetOwnedAuctions().
--- It tells the ledger what you have listed (units and auctions per item) and the names your sales
--- mail will use (an item link's name -> its itemID). Posting (AUCTION_HOUSE_AUCTION_CREATED) and
+-- It tells the ledger what you have listed (units, auctions and unit prices per item, so a full scan
+-- can leave your own auctions out of the market) and the names your sales mail will use (an item
+-- link's name -> its itemID). Posting (AUCTION_HOUSE_AUCTION_CREATED) and
 -- cancelling (AUCTION_CANCELED) ask again. Sold auctions (waiting for their mail) aren't listed.
 -- diag.owned keeps the raw fields of the first auctions it sees: is buyoutAmount per unit or per
 -- auction?
@@ -61,8 +62,16 @@ local function Read()
             if a.status == Enum.AuctionStatus.Sold then
                 sold = sold + 1
             else
-                local entry = listed[itemID] or { q = 0, n = 0 }
+                local entry = listed[itemID] or { q = 0, n = 0, levels = {} }
                 entry.q, entry.n = entry.q + (a.quantity or 0), entry.n + 1
+                -- the unit price, to leave your auctions out of the market (a commodity's buyout is per
+                -- unit [F-131]; an item's is taken as per auction, like its search results)
+                local buyout, qty = a.buyoutAmount, a.quantity or 0
+                if type(buyout) == "number" and buyout > 0 and qty > 0 then
+                    local unit = ns.Deposits.IsCommodity(itemID) and buyout or buyout / qty
+                    entry.levels[#entry.levels + 1] = unit
+                    entry.levels[#entry.levels + 1] = qty
+                end
                 listed[itemID] = entry
             end
             local name = NameOf(a.itemLink)

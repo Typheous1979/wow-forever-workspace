@@ -26,11 +26,13 @@ ns.Evaluator = Evaluator
 local GRADES = { "A", "B", "C", "D" }
 local STALE = 48 * 3600     -- older AH data: fair value instead of the latest scan
 
--- The grade of one AH price, and the test that set it (Econ.Grade).
-local function Grade(ctx, itemID, need)
+-- The grade of one AH price, and the test that set it (Econ.Grade). exit: a price you'd sell at, where
+-- a wall that never shrinks counts unless you've sold the item yourself (priceInfo.stale, .sold).
+local function Grade(ctx, itemID, need, exit)
     local info = ctx.priceInfo[itemID]
     if not info then return "D", "unlisted" end
-    return Econ.Grade(info.age, info.days, info.observations, info.cv, info.listed, need)
+    local stale = exit and (info.sold or 0) == 0 and info.stale or nil
+    return Econ.Grade(info.age, info.days, info.observations, info.cv, info.listed, need, stale)
 end
 
 -- The deposit per unit when selling qty units of itemID: the context's own figure if it has one,
@@ -69,8 +71,8 @@ function Evaluator.Evaluate(recipe, crafts, ctx)
     local r = { recipe = recipe, crafts = crafts, units = recipe.count * crafts, lines = {}, warnings = {}, reasons = {} }
     local cogs, liquidation, complete, worst, ownedAny = 0, 0, true, 1, false
     -- The recipe's grade is its weakest AH price; remember which one and why (r.gradeWhy).
-    local function note(itemID, need)
-        local grade, why = Grade(ctx, itemID, need)
+    local function note(itemID, need, exit)
+        local grade, why = Grade(ctx, itemID, need, exit)
         local rank = Econ.GRADE_RANK[grade]
         if rank > worst then
             worst = rank
@@ -140,7 +142,7 @@ function Evaluator.Evaluate(recipe, crafts, ctx)
     end
     if r.ahExit and (not r.vendorExit or r.ahExit >= r.vendorExit * (1 + s.margin)) then
         r.best, r.bestSource = r.ahExit, "ah"
-        note(recipe.output, nil)
+        note(recipe.output, nil, true)
     elseif r.vendorExit then
         r.best, r.bestSource = r.vendorExit, "vendor"
         r.underMargin = r.ahExit ~= nil and r.ahExit > r.vendorExit
@@ -172,6 +174,43 @@ function Evaluator.Evaluate(recipe, crafts, ctx)
     end
     r.recommended = #reasons == 0
     return r
+end
+
+-- Batch size (risk-and-recommendation.md "Liquidity and saturation"), from two independent limits:
+-- - best: as far as the reagents go, the batch with the most profit (the smallest on a tie), searched
+--   from 1 to BATCH_LIMIT crafts and stopping where the reagents can't all be had (searched = the last
+--   batch tried);
+-- - cap: when the AH is the exit at this batch, a quarter of what's listed, in crafts (at least 1).
+-- size is the smaller; limit says which set it: "reagents", "market", or "none" when profit still grows
+-- at BATCH_LIMIT and no cap is smaller. Returns { best, profit, cap, size, limit, searched }.
+local CAP_SHARE, BATCH_LIMIT = 0.25, 200
+Evaluator.BATCH_LIMIT = BATCH_LIMIT
+
+function Evaluator.BatchAdvice(recipe, crafts, ctx)
+    local best, bestProfit, searched = nil, nil, 0
+    for n = 1, BATCH_LIMIT do
+        local r = Evaluator.Evaluate(recipe, n, ctx)
+        if not r.complete then break end
+        searched = n
+        if r.profit and (not bestProfit or r.profit > bestProfit + 1e-9) then best, bestProfit = n, r.profit end
+    end
+    local cap
+    if Evaluator.Evaluate(recipe, crafts, ctx).bestSource == "ah" then
+        local info = ctx.priceInfo[recipe.output]
+        local listed = info and info.listed or 0
+        if listed > 0 then cap = math.max(1, math.floor(listed * CAP_SHARE / recipe.count)) end
+    end
+    local size, limit
+    if best then
+        if cap and cap < best then
+            size, limit = cap, "market"
+        elseif best >= BATCH_LIMIT then
+            size, limit = best, "none"
+        else
+            size, limit = best, "reagents"
+        end
+    end
+    return { best = best, profit = bestProfit, cap = cap, size = size, limit = limit, searched = searched }
 end
 
 -- Recommended first, then by ROI (nothing spent = infinite; unknown profit = last), then profit.
@@ -250,12 +289,17 @@ function Evaluator.LiveContext()
         local fair = Econ.FairValue((ns.PriceDB.History(row)), today, 3, ns.db.settings.historyDays)
         return fair and { fair, row.q or 0 } or nil
     end)
+    -- stale: days the cheapest price has held while the quantity never fell (a wall); sold: your own
+    -- units sold (the ledger), which prove demand.
     ctx.priceInfo = Lazy(function(itemID)
         local row, age = Row(itemID)
         if not row then return nil end
+        local window = ns.db.settings.historyDays
         local history, days, observations = ns.PriceDB.History(row)
-        local _, cv = Econ.Volatility(history, today, ns.db.settings.historyDays)
-        return { age = age, days = days, observations = observations, cv = days > 1 and cv or nil, listed = row.q or 0 }
+        local _, cv = Econ.Volatility(history, today, window)
+        local item = ns.Ledger.Item(itemID)
+        return { age = age, days = days, observations = observations, cv = days > 1 and cv or nil, listed = row.q or 0,
+                 stale = (ns.PriceDB.StaleRun(row, today, window)), sold = item and item.s or 0 }
     end)
     ctx.owned = Lazy(function(itemID) return C_Item.GetItemCount(itemID, true) end)
     -- Deposits come from Forever's formula (settings.duration, the batch size, commodity or not);
@@ -323,6 +367,7 @@ function Evaluator.ForTray(tray, filter)
         local result = Evaluator.Evaluate(recipe, math.max(1, crafts or vendorCrafts or 1), ctx)
         result.known = ns.RecipeIndex.IsKnown(recipeID, "char")
         result.vendorOnly = vendorOnly[recipeID]
+        result.ctx = ctx   -- the details pane re-evaluates other batch sizes against it (BatchAdvice)
         results[#results + 1] = result
     end
     return Evaluator.Rank(results), ctx
@@ -532,6 +577,13 @@ function Evaluator.SelfTest(report)
         for _, w in ipairs(r.warnings) do warnings[#warnings + 1] = w[1] end
         same("sources", table.concat(sources, ","), e.sources)
         same("warnings", table.concat(warnings, ","), e.warnings)
+        if e.batchLimit then
+            local advice = Evaluator.BatchAdvice(v.recipe, v.crafts, v.ctx)
+            same("batch best", advice.best, e.batchBest)
+            same("batch cap", advice.cap, e.batchCap)
+            same("batch size", advice.size, e.batchSize)
+            same("batch limit", advice.limit, e.batchLimit)
+        end
         check("VEC " .. v.name, #problems == 0, #problems == 0 and "matches the Python reference" or table.concat(problems, "; "))
     end
     return passed, failed

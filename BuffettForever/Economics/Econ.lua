@@ -231,14 +231,88 @@ function Econ.Volatility(history, today, window)
     return mean, math.sqrt(var / n) / mean
 end
 
+-- ---------------------------------------------------------------- market reality (M4 pass 2)
+
+local STALE_DAYS, STALE_PRICE = 3, 0.01
+local MOOD_DAYS, MOOD_Z, MOOD_SHARE = 5, 1.0, 0.10
+Econ.STALE_DAYS = STALE_DAYS
+
+-- A wall that never shrinks (risk-and-recommendation.md "Walls"). days = { { cheapest price, quantity
+-- listed }, ... } oldest first, one per observed day. Counting back from the latest day: how many days
+-- the cheapest price held (within 1%) while the quantity never fell. Returns days, price.
+function Econ.StaleRun(days)
+    local n = #days
+    if n == 0 then return 0, nil end
+    local price, run = days[n][1], 1
+    for i = n - 1, 1, -1 do
+        local older, newer = days[i], days[i + 1]
+        if math.abs(older[1] - price) > price * STALE_PRICE or older[2] > newer[2] then break end
+        run = run + 1
+    end
+    return run, price
+end
+
+-- Mr. Market (strategy-ideas.md): how far today's market value is from the fair value, as z (standard
+-- deviations of the daily values in the window) and share (latest / fair - 1); and the fair value.
+-- nil under MOOD_DAYS days of history, or with no spread.
+function Econ.MrMarket(history, today, latest, window)
+    window = window or 14
+    local n, sum = 0, 0
+    for day, v in pairs(history) do
+        if today - day >= 0 and today - day < window then n, sum = n + 1, sum + v end
+    end
+    if n < MOOD_DAYS then return nil end
+    local mean, var = sum / n, 0
+    for day, v in pairs(history) do
+        if today - day >= 0 and today - day < window then var = var + (v - mean) ^ 2 end
+    end
+    local sd = math.sqrt(var / n)
+    local fair = Econ.FairValue(history, today, 3, window)
+    if not fair or fair <= 0 or sd <= 0 then return nil end
+    return (latest - fair) / sd, latest / fair - 1, fair
+end
+
+-- "cheap", "dear", or nil when it's within a standard deviation or 10% of fair value.
+function Econ.Mood(z, share)
+    if math.abs(z) < MOOD_Z or math.abs(share) < MOOD_SHARE then return nil end
+    return z < 0 and "cheap" or "dear"
+end
+
+-- Listings without your own auctions: own = { unit price, qty, ... } takes its units from the listings
+-- at its price (within half a copper). Returns the listings left and the units removed.
+function Econ.ExcludeOwn(listings, own)
+    local out, removed = {}, 0
+    for i = 1, #listings do out[i] = listings[i] end
+    for k = 1, #own, 2 do
+        local price, left = own[k], own[k + 1]
+        for i = 1, #out, 2 do
+            if left <= 0 then break end
+            if math.abs(out[i] - price) <= 0.5 and out[i + 1] > 0 then
+                local take = math.min(left, out[i + 1])
+                out[i + 1], left, removed = out[i + 1] - take, left - take, removed + take
+            end
+        end
+    end
+    local kept = {}
+    for i = 1, #out, 2 do
+        if out[i + 1] > 0 then
+            kept[#kept + 1] = out[i]
+            kept[#kept + 1] = out[i + 1]
+        end
+    end
+    return kept, removed
+end
+
 local GRADES = { "A", "B", "C", "D" }
 Econ.GRADE_RANK = { A = 1, B = 2, C = 3, D = 4 }
 
 -- Confidence grade of an AH price (risk-and-recommendation.md): the worst of age, days observed
 -- (of 14; a single observation is D), volatility and depth. need nil = no depth test (an exit).
--- Also returns which test set the grade: "age", "single", "days", "volatile", "depth", "unlisted"
--- (the first one to reach the worst grade), or nil for A.
-function Econ.Grade(ageSeconds, daysObserved, observations, cv, listed, need)
+-- stale (a sell price only, when you haven't sold the item yourself): days its wall hasn't shrunk;
+-- STALE_DAYS or more is D.
+-- Also returns which test set the grade: "age", "single", "days", "volatile", "depth", "unlisted",
+-- "stale" (the first one to reach the worst grade), or nil for A.
+function Econ.Grade(ageSeconds, daysObserved, observations, cv, listed, need, stale)
     local g, why = 1, nil
     local function worse(x, reason)
         if x > g then g, why = x, reason end
@@ -260,6 +334,7 @@ function Econ.Grade(ageSeconds, daysObserved, observations, cv, listed, need)
     elseif listed <= 0 then
         worse(4, "unlisted")
     end
+    if stale and stale >= STALE_DAYS then worse(4, "stale") end
     return GRADES[g], why
 end
 
@@ -359,5 +434,27 @@ function Econ.SelfTest(report)
     local thread = Econ.DepositPerUnit(2, 2, 2, true)
     check("DEP-4", thread == 50 and Econ.DepositPerUnit(875, 5, 2, false) == 172,
         string.format("2 Coarse Thread for 8 hours: %s each; gear pays per auction", tostring(thread)))
+
+    -- risk-and-recommendation.md: WALL-1..4, MOOD-1..3, OWN-1..3 (M4 pass 2; computed in econ.py)
+    local w1, wp = Econ.StaleRun({ { 4400, 90 }, { 4400, 95 }, { 4400, 97 } })
+    check("WALL-1", w1 == 3 and wp == 4400, string.format("44s held 3 days, 90 to 97 listed: %s days", tostring(w1)))
+    check("WALL-2", Econ.StaleRun({ { 4400, 97 }, { 4400, 90 }, { 4400, 95 } }) == 2, "the quantity fell once: 2 days")
+    check("WALL-3", Econ.StaleRun({ { 4500, 90 }, { 4400, 95 }, { 4400, 97 } }) == 2, "the price moved: 2 days")
+    check("WALL-4", Econ.StaleRun({ { 4400, 90 }, { 4430, 90 }, { 4410, 95 } }) == 3, "within 1% counts as held")
+    local z, share = Econ.MrMarket({ [96] = 1000, [97] = 1100, [98] = 900, [99] = 1000, [100] = 700 }, 100, 700)
+    check("MOOD-1", close(z, -1.5167250658) and close(share, -0.2271500831) and Econ.Mood(z, share) == "cheap",
+        string.format("700 against a fair value near 906: z %s, %s", tostring(z), tostring(share)))
+    local z2, share2 = Econ.MrMarket({ [96] = 1000, [97] = 1000, [98] = 1010, [99] = 990, [100] = 1300 }, 100, 1300)
+    check("MOOD-2", Econ.Mood(z2, share2) == "dear", string.format("1300 after a steady 1000: z %s", tostring(z2)))
+    check("MOOD-3", Econ.MrMarket({ [99] = 1000, [100] = 700 }, 100, 700) == nil, "under 5 days: no mood")
+    local own1, removed1 = Econ.ExcludeOwn({ 2900, 20, 2900, 8, 3100, 5 }, { 2900, 20 })
+    check("OWN-1", table.concat(own1, ",") == "2900,8,3100,5" and removed1 == 20, "your 20 at 29s leave the listings")
+    local own2, removed2 = Econ.ExcludeOwn({ 2900, 20, 2900, 8, 3100, 5 }, { 2900, 25 })
+    check("OWN-2", table.concat(own2, ",") == "2900,3,3100,5" and removed2 == 25, "25 of yours across two rows")
+    local own3, removed3 = Econ.ExcludeOwn({ 2900, 20 }, { 5000, 2 })
+    check("OWN-3", table.concat(own3, ",") == "2900,20" and removed3 == 0, "yours at another price: nothing removed")
+    local gs, gsWhy = Econ.Grade(3600, 5, 6, 0.10, 200, nil, 3)
+    check("GRADE-STALE", gs == "D" and gsWhy == "stale" and Econ.Grade(3600, 5, 6, 0.10, 200, nil, 2) == "A",
+        "a sell price walled for 3 days is D")
     return passed, failed
 end

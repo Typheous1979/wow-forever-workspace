@@ -145,6 +145,27 @@ function PriceDB.History(row)
     return history, days, observations
 end
 
+-- A row's days in order, oldest first: { { day, mv, min, q }, ... } (q = the day's latest quantity).
+function PriceDB.Days(row)
+    local days = {}
+    for day, text in pairs(row and row.h or {}) do
+        local mv, min, q = PriceDB.UnpackDay(text)
+        if mv and min and q then days[#days + 1] = { day, mv, min, q } end
+    end
+    table.sort(days, function(a, b) return a[1] < b[1] end)
+    return days
+end
+
+-- Days the cheapest price has held (within 1%) while the quantity listed never fell, up to today
+-- (Econ.StaleRun over the history window), and that price.
+function PriceDB.StaleRun(row, today, window)
+    local days = {}
+    for _, d in ipairs(PriceDB.Days(row)) do
+        if today - d[1] < window then days[#days + 1] = { d[3], d[4] } end
+    end
+    return ns.Econ.StaleRun(days)
+end
+
 -- Number of items priced in this market, and the last full scan ({ t, items, n }) if any.
 function PriceDB.Summary()
     local market = PriceDB.Market()

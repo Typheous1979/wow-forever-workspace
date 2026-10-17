@@ -53,6 +53,14 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   mail matched on the exact days-left first [F-130], your auctions' samples kept. Tested on 70425: selftest 83/83,
   Alt+Right-click prints the deposit for one and for all, owned buyout is per unit [F-131]. Then the details pane
   became label/value rows with tooltips (Justin: data, not paragraphs): to check in game.
+- 0.6.0 M4 pass 2 (2026-10-17, built, not yet tested in game): market reality. Your own auctions left out of
+  scans (Ledger.OwnLevels + Econ.ExcludeOwn) and searches (numOwnerItems, containsOwnerItem); stale walls grade D
+  on the sell side (Econ.StaleRun, priceInfo.stale/sold); Evaluator.BatchAdvice (best batch, market cap);
+  Mr. Market moods (Econ.MrMarket, Econ.Mood) in the details pane. Python reference: stale_run, mr_market, mood,
+  exclude_own, batch_advice; 33 scenarios. Tested on 70425 (2026-10-17): selftest 98/98, your 2 units left out of
+  a scan and a search, `econ check` 188/188. Justin saw best batch equal the market cap most of the time (90 of
+  155): the search stopped at the cap. Reworked into one row from two independent limits (reagents up to 200
+  crafts, market a quarter of what's listed; BATCH-VENDOR added, 34 scenarios): to check in game.
 - **Tests logged for later** (Justin, 2026-10-17; run them when the mail exists):
   - the 2 Light Leather posted for 2 hours at 5g each: once expired, open a mailbox, and `/bf ledger` shows
     2 expired;
@@ -199,9 +207,9 @@ make-or-buy depth 3; owned materials at opportunity cost.
   - the replicate index is 0-based;
   - reagents are commodities;
   - copper values are supported;
-  - the cooldown is over 2 min.
+  - the cooldown is between 14.6 and 18.7 min (2026-10-17, from the request log), consistent with retail's 15 min,
+    which is the scanner's estimate.
 - Still open:
-  - the cooldown's exact length (the `diag.requests` log measures it);
   - the AH cut (seller invoice);
   - who shares an AH (sets `marketKey`): scan with an Alliance character and compare the ladders.
 - Answered by M4 pass 1's diagnostics on 70425: the AH mail subjects and sender, unread mail stays unread,

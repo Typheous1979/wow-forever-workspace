@@ -11,8 +11,9 @@ local addonName, ns = ...
 local L = ns.L
 local Money = ns.Money
 
--- n: auctions (full scans, item searches); prices: price levels (commodity searches group by price).
-local function Listed(link, mv, min, q, n, prices)
+-- n: auctions (full scans, item searches); prices: price levels (commodity searches group by price);
+-- own: your own units, left out of the market.
+local function Listed(link, mv, min, q, n, prices, own)
     local text = string.format(L["%s: market %s, min buyout %s, %s listed"], link, Money.Format(mv),
         Money.Format(min), BreakUpLargeNumbers(q))
     if n then
@@ -20,6 +21,7 @@ local function Listed(link, mv, min, q, n, prices)
     elseif prices then
         text = text .. " " .. string.format(L["at %s prices"], BreakUpLargeNumbers(prices))
     end
+    if own and own > 0 then text = text .. " " .. string.format(L["(plus %d of yours, left out)"], own) end
     return text
 end
 
@@ -75,7 +77,7 @@ local function PriceCheck(itemID, link, itemLocation, inTray)
     local tail = DepositText(itemID, itemLocation) .. (inTray and (" " .. L["(In the tray.)"]) or "")
     ns.Search.Request(itemID, key, function(_, result, problem)
         if result then
-            local text = Listed(link, result.mv, result.min, result.q, result.n, result.prices) .. "."
+            local text = Listed(link, result.mv, result.min, result.q, result.n, result.prices, result.own) .. "."
             if not result.full then text = text .. " " .. L["(Only the cheapest listings were read.)"] end
             ns.Print(text .. VendorText(itemID) .. tail)
         else

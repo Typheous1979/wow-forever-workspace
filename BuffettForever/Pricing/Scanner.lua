@@ -11,7 +11,8 @@ local addonName, ns = ...
 -- the replicate index base, the cooldown (every request, with bounds derived from them),
 -- scan timings, rows missing info, the market-key inputs per character, SupportsCopperValues,
 -- and which reagents are commodities. While reading, it names the items of sales waiting in the
--- ledger for an ID (sales mail gives the item's name only).
+-- ledger for an ID (sales mail gives the item's name only). Pricing leaves out your own auctions
+-- (from the auctions list read at this visit, Pricing/Owned.lua; Econ.ExcludeOwn).
 
 local L = ns.L
 local Scanner = {}
@@ -19,6 +20,7 @@ ns.Scanner = Scanner
 local events = ns.events
 
 local BUDGET_MS = 8            -- work per frame
+local OWN_MAX_AGE = 30 * 60    -- your auctions list is used to clean a scan only when it's this fresh
 local REPLICATE_TIMEOUT = 60   -- seconds to wait for REPLICATE_ITEM_LIST_UPDATE
 local COOLDOWN_GUESS = 15 * 60 -- retail's full-scan cooldown; Forever's is over 2 min [F-121]
 local DIAG_KEEP = 20           -- entries kept in each diagnostics list
@@ -177,10 +179,17 @@ local Finish
 local function PriceStep(s)
     if scan ~= s or state ~= "pricing" then return end
     local stop = NowMs() + BUDGET_MS
-    local ids, acc = s.ids, s.acc
+    local ids, acc, own = s.ids, s.acc, s.own
     while s.j <= #ids and NowMs() < stop do
         local itemID = ids[s.j]
-        ns.PriceDB.Record(itemID, acc[itemID], s.t)
+        local listings = acc[itemID]
+        if own and own[itemID] then
+            -- your own auctions aren't the market: you'd neither buy them nor compete with them
+            local removed
+            listings, removed = ns.Econ.ExcludeOwn(listings, own[itemID])
+            s.ownRemoved = s.ownRemoved + removed
+        end
+        ns.PriceDB.Record(itemID, listings, s.t)
         s.j = s.j + 1
     end
     Progress("pricing", s.j - 1, #ids)
@@ -194,6 +203,7 @@ end
 local function StartPricing(s)
     s.readMs = math.floor(NowMs() - s.readStarted)
     s.pricingStarted = NowMs()
+    s.own, s.ownRemoved = ns.Ledger.OwnLevels(OWN_MAX_AGE), 0
     state = "pricing"
     s.ids, s.j = {}, 1
     for itemID in pairs(s.acc) do s.ids[#s.ids + 1] = itemID end
@@ -261,6 +271,7 @@ Finish = function(s)
         bidOnly = s.bidOnly, waitMs = s.request.waitMs, readMs = s.readMs,
         pricingMs = s.pricingStarted and math.floor(NowMs() - s.pricingStarted) or 0,
         totalMs = math.floor(NowMs() - s.started), late = s.late, updates = s.updates,
+        ownRemoved = s.ownRemoved, ownChecked = s.own ~= nil,
     }
     if s.items == 0 then summary.empty = true end
     Push(Diag().scans, summary)
@@ -467,9 +478,10 @@ function Scanner.PrintDiag()
         elseif s.aborted then
             out("last scan: stopped while %s", tostring(s.aborted))
         else
-            out("last scan: %d rows, %d items, %d missing info, %d bid-only, %d without itemID; wait %s ms, read %s ms, price %s ms; %s extra updates",
+            out("last scan: %d rows, %d items, %d missing info, %d bid-only, %d without itemID; wait %s ms, read %s ms, price %s ms; %s extra updates; %s of your units left out",
                 s.rows or 0, s.items or 0, s.missing or 0, s.bidOnly or 0, s.noItemID or 0,
-                tostring(s.waitMs), tostring(s.readMs), tostring(s.pricingMs), tostring(s.updates or 0))
+                tostring(s.waitMs), tostring(s.readMs), tostring(s.pricingMs), tostring(s.updates or 0),
+                s.ownChecked and tostring(s.ownRemoved or 0) or "none")
         end
     end
     for _, itemID in ipairs(PROBE_ITEMS) do
