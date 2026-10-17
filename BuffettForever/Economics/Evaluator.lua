@@ -12,9 +12,11 @@ local addonName, ns = ...
 -- Evaluate() reads only its context table, so /bf selftest runs the reference vectors on mock
 -- contexts. LiveContext() builds the real one from PriceDB, Merchant, the bags and known recipes.
 -- Context tables (indexed by itemID): vendorBuy, vendorSell, sellPrice (conservative AH unit price),
--- ladder, recipeFor ({ yield, reagents = { id, qty, ... } }), owned, deposit (per unit), saleChance
--- (optional: settings.saleChance when absent), priceInfo ({ age, days, observations, cv, listed });
--- plus settings (cut = the measured house cut once there is one).
+-- ladder, recipeFor ({ yield, reagents = { id, qty, ... } }), owned, deposit (optional per-unit
+-- figures; without one, Forever's formula for settings.duration), commodity (optional: false = one
+-- auction per unit), saleChance (optional: settings.saleChance when absent), priceInfo ({ age, days,
+-- observations, cv, listed }); plus settings (cut = the measured house cut once there is one,
+-- duration = the auction duration 1-3, nil = no deposits).
 
 local L = ns.L
 local Econ = ns.Econ
@@ -31,20 +33,33 @@ local function Grade(ctx, itemID, need)
     return Econ.Grade(info.age, info.days, info.observations, info.cv, info.listed, need)
 end
 
--- What one unit nets on the AH with its own deposit and sale chance, floored at 0: a listing that
--- loses more in deposits than it earns is worth nothing there. nil when there's no AH price.
-local function AHUnit(ctx, itemID)
+-- The deposit per unit when selling qty units of itemID: the context's own figure if it has one,
+-- else Forever's formula for the settings' auction duration (a commodity as one auction of qty, gear
+-- one auction each; Econ.DepositPerUnit), else 0.
+local function DepositUnit(ctx, itemID, qty)
+    local deposit = ctx.deposit[itemID]
+    if deposit then return deposit end
+    local duration = ctx.settings.duration
+    if not duration then return 0 end
+    local commodity = not (ctx.commodity and ctx.commodity[itemID] == false)
+    return Econ.DepositPerUnit(ctx.vendorSell[itemID] or 0, qty, duration, commodity)
+end
+
+-- What one unit nets on the AH when selling qty, with its own deposit and sale chance, floored at
+-- 0: a listing that loses more in deposits than it earns is worth nothing there. nil when there's no
+-- AH price.
+local function AHUnit(ctx, itemID, qty)
     local s = ctx.settings
     local p = ctx.saleChance and ctx.saleChance[itemID] or s.saleChance
-    local net = Econ.AHNet(ctx.sellPrice[itemID] or nil, s.cut, ctx.deposit[itemID] or 0, p)
+    local net = Econ.AHNet(ctx.sellPrice[itemID] or nil, s.cut, DepositUnit(ctx, itemID, qty), p)
     if net and net < 0 then net = 0 end
     return net
 end
 
--- Per-unit liquidation value (the better of vendor and AH net), and whether the AH set it.
-local function Liquidation(ctx, itemID)
+-- Per-unit liquidation value of qty units (the better of vendor and AH net), and whether the AH set it.
+local function Liquidation(ctx, itemID, qty)
     local vendor = ctx.vendorSell[itemID] or nil
-    local ahNet = AHUnit(ctx, itemID)
+    local ahNet = AHUnit(ctx, itemID, qty)
     return Econ.Liquidation(vendor, ahNet), ahNet ~= nil and (not vendor or ahNet > vendor)
 end
 
@@ -66,7 +81,7 @@ function Evaluator.Evaluate(recipe, crafts, ctx)
     for _, g in ipairs(recipe.reagents) do
         local itemID, need = g.itemID, g.count * crafts
         local line = { itemID = itemID, need = need, owned = 0, ownedCost = 0, buyCost = 0 }
-        local unitLiq, fromAH = Liquidation(ctx, itemID)
+        local unitLiq, fromAH = Liquidation(ctx, itemID, need)
         local owned = math.min(need, ctx.owned[itemID] or 0)
         if owned > 0 then
             ownedAny = true
@@ -115,10 +130,12 @@ function Evaluator.Evaluate(recipe, crafts, ctx)
     local vendorUnit = ctx.vendorSell[recipe.output] or nil
     r.vendorExit = vendorUnit and vendorUnit * r.units
     if not recipe.bop then
-        local unit = AHUnit(ctx, recipe.output)
+        local unit = AHUnit(ctx, recipe.output, r.units)
         if unit then
             r.ahUnit = unit
             r.ahExit = unit * r.units
+            -- for the details pane: the price before the cut, and the deposit per unit
+            r.ahPrice, r.ahDeposit = ctx.sellPrice[recipe.output], DepositUnit(ctx, recipe.output, r.units)
         end
     end
     if r.ahExit and (not r.vendorExit or r.ahExit >= r.vendorExit * (1 + s.margin)) then
@@ -192,12 +209,14 @@ local function Row(itemID)
 end
 
 -- Context over this character's data; lookups are cached for one evaluation run. The settings are a
--- copy carrying the house cut measured from your sales mail once there is one (Pricing/Ledger.lua).
+-- copy carrying the house cut measured from your sales mail once there is one (Pricing/Ledger.lua),
+-- and the auction duration Blizzard's sell frame will use (deposits by Forever's formula).
 function Evaluator.LiveContext()
     local today = ns.PriceDB.Today()
     local settings = {}
     for k, v in pairs(ns.db.settings) do settings[k] = v end
     settings.cut = (ns.Ledger.Cut())
+    settings.duration = ns.Deposits.Duration()
     local ctx = { settings = settings }
     ctx.vendorBuy = Lazy(function(itemID) return (ns.Merchant.Get(itemID)) end)
     ctx.vendorSell = Lazy(function(itemID)
@@ -239,9 +258,10 @@ function Evaluator.LiveContext()
         return { age = age, days = days, observations = observations, cv = days > 1 and cv or nil, listed = row.q or 0 }
     end)
     ctx.owned = Lazy(function(itemID) return C_Item.GetItemCount(itemID, true) end)
-    -- Per unit for the duration Blizzard's sell frame uses: measured at the auctioneer, else estimated
-    -- from what a vendor pays; unknown counts as 0 (the details pane says so).
-    ctx.deposit = Lazy(function(itemID) return (ns.Deposits.PerUnit(itemID)) end)
+    -- Deposits come from Forever's formula (settings.duration, the batch size, commodity or not);
+    -- no per-item figures.
+    ctx.deposit = {}
+    ctx.commodity = Lazy(function(itemID) return ns.Deposits.IsCommodity(itemID) end)
     -- From your sales mail: the item's own sold and expired units, pulled toward your rate over all items.
     ctx.saleChance = Lazy(function(itemID) return (ns.Ledger.SaleChance(itemID)) end)
     -- Make-or-buy only through recipes this character knows; the highest yield wins.
@@ -325,8 +345,8 @@ function Evaluator.Snapshot(tray, results, ctx)
         settings = RawCopy(ctx.settings), tray = {}, ctx = {}, results = {},
     }
     for _, e in ipairs(tray) do snap.tray[#snap.tray + 1] = { itemID = e.itemID, qty = e.qty } end
-    for _, name in ipairs({ "vendorBuy", "vendorSell", "sellPrice", "ladder", "owned", "deposit", "saleChance",
-                            "priceInfo", "recipeFor" }) do
+    for _, name in ipairs({ "vendorBuy", "vendorSell", "sellPrice", "ladder", "owned", "deposit", "commodity",
+                            "saleChance", "priceInfo", "recipeFor" }) do
         snap.ctx[name] = RawCopy(ctx[name])
     end
     for i = 1, math.min(SNAPSHOT_MAX, #results) do

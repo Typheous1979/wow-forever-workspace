@@ -65,7 +65,7 @@ function ns.RunOutOfCombat(fn)
 end
 
 -- SavedVariables: defaults + forward-only migrations (never wipe player data).
-local DB_VERSION = 2
+local DB_VERSION = 3
 local defaults = {
     minimap = { angle = 200, shown = true },   -- minimap button: degrees around the edge, visible
     settings = {
@@ -81,7 +81,7 @@ local defaults = {
     markets = {},   -- [marketKey] = { items = { [itemID] = price row }, scan = last full scan (Pricing/PriceDB.lua),
                     --                 ledger = your sales, returns and auctions (Pricing/Ledger.lua) }
     vendor = {},    -- [itemID] = { p = unit buy price, t, lim } (Pricing/Merchant.lua)
-    deposits = {},  -- [itemID] = { per-unit deposit for durations 1-3, s = vendor price, t } (Pricing/Deposits.lua)
+    deposits = {},  -- [itemID] = { k = "c" commodity or "i" gear, t } (Pricing/Deposits.lua)
     recipesKnown = {},  -- [charKey][recipeID] = true (Crafting/Harvest.lua)
     diag = {},      -- answers to the open probes: scanner, searches, merchant, harvest, mail, deposits, auctions
 }
@@ -97,6 +97,12 @@ local migrations = {
     -- 1 -> 2: recipesSeen (recipes a profession window listed) proved nothing: GetAllRecipeIDs lists
     -- the whole skill line, Season-of-Discovery recipes included [F-123].
     [1] = function(db) db.recipesSeen = nil end,
+    -- 2 -> 3: deposits follow Forever's formula [F-129]; the measured per-unit figures are dropped and the
+    -- table now records commodity or gear per item.
+    [2] = function(db)
+        db.deposits = {}
+        if db.diag then db.diag.deposits = nil end
+    end,
 }
 
 local function CopyDefaults(src, dst)

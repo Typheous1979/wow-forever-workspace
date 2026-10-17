@@ -11,10 +11,14 @@ local addonName, ns = ...
 --   invoices) count as expired: a cancel counted as an expiry only lowers the sale chance.
 -- GetInboxText is never called (it opens a mail, marking it read). No player names are kept.
 -- Mails carry no ID. Each one is keyed by kind, item and amount, and told apart from an identical one
--- by its expiry time (now + days left): a mail read again matches its stored time within TOLERANCE
--- seconds, and identical mails count once each (Mail.Reconcile). Returned items are keyed without
--- their count, so taking some of them doesn't make the mail look new. The inbox is read on MAIL_SHOW
--- and every MAIL_INBOX_UPDATE while the mailbox is open, so "Open All" can't take a mail unseen.
+-- by its days left and expiry time (now + days left), stored per mail (Mail.Reconcile):
+-- - "days left" is a snapshot of the last inbox refresh, and the refresh is rate-limited, so a
+--   reopened mailbox can show the old list [F-130]: an exact days-left match is the same mail;
+-- - after a refresh, a mail matches the nearest stored expiry time within TOLERANCE seconds;
+-- - identical mails count once each. Returned items are keyed without their count, so taking some of
+--   them doesn't make the mail look new.
+-- The inbox is read on MAIL_SHOW and every MAIL_INBOX_UPDATE while the mailbox is open, so "Open All"
+-- can't take a mail unseen.
 -- diag.mail answers the open probes: do the subject strings exist, who sends AH mail, how precise is
 -- "days left", does reading an unread invoice mark it read.
 
@@ -22,8 +26,9 @@ local Mail = {}
 ns.Mail = Mail
 local events = ns.events
 
-local TOLERANCE = 300        -- seconds: one mail's expiry time, read twice
-local KEEP = 86400           -- a stored expiry time is forgotten this long after it passed
+local TOLERANCE = 300        -- seconds: one mail's expiry time, read after two refreshes
+local SAME_SNAPSHOT = 1e-7   -- days (under 0.01 s): the same days-left value, as saved and reloaded
+local KEEP = 86400           -- a stored mail is forgotten this long after it expired
 local SAMPLES = 12           -- AH mails kept in diag.mail.samples
 local ATTACHMENTS = 16       -- attachment slots (Blizzard's ATTACHMENTS_MAX_RECEIVE)
 local SUBJECTS = {           -- Blizzard's subject formats, by kind
@@ -58,10 +63,12 @@ local function Patterns()
     return patterns
 end
 
--- Which mails of this read are new. seen = { [key] = { expiry, ... } } is updated; mails = { { key,
--- expires, ... } }. Each mail takes the nearest unused stored time within TOLERANCE (and moves it, to
--- follow a slow drift); the unmatched ones are new and get stored. Times more than KEEP past are
--- forgotten. Returns the new mails and the largest drift of a matched mail.
+-- Which mails of this read are new. seen = { [key] = { { e = expiry, dl = days left }, ... } } is
+-- updated (a bare number is an expiry stored by 0.5.0); mails = { { key, expires, daysLeft } }.
+-- Each mail first takes an unused stored entry with the same days left (the same snapshot), else the
+-- nearest unused expiry within TOLERANCE (a refresh; the entry takes the new values); the unmatched
+-- ones are new and get stored. Entries more than KEEP past expiry are forgotten. Returns the new mails
+-- and the largest expiry gap among the mails matched by time.
 function Mail.Reconcile(seen, mails, now)
     local byKey = {}
     for _, m in ipairs(mails) do
@@ -76,20 +83,33 @@ function Mail.Reconcile(seen, mails, now)
     for key, list in pairs(byKey) do
         local stored = seen[key] or {}
         seen[key] = stored
-        local used = {}
+        for j, entry in ipairs(stored) do
+            if type(entry) == "number" then stored[j] = { e = entry } end
+        end
+        local used, rest = {}, {}
         table.sort(list, function(a, b) return a.expires < b.expires end)
         for _, m in ipairs(list) do
+            local same
+            for j, entry in ipairs(stored) do
+                if not used[j] and entry.dl and m.daysLeft and math.abs(entry.dl - m.daysLeft) < SAME_SNAPSHOT then
+                    same = j
+                    break
+                end
+            end
+            if same then used[same] = true else rest[#rest + 1] = m end
+        end
+        for _, m in ipairs(rest) do
             local best, bestGap
-            for j, e in ipairs(stored) do
-                local gap = math.abs(e - m.expires)
+            for j, entry in ipairs(stored) do
+                local gap = math.abs(entry.e - m.expires)
                 if not used[j] and gap <= TOLERANCE and (not bestGap or gap < bestGap) then best, bestGap = j, gap end
             end
             if best then
                 used[best] = true
-                stored[best] = m.expires
+                stored[best] = { e = m.expires, dl = m.daysLeft }
                 if bestGap > drift then drift = bestGap end
             else
-                stored[#stored + 1] = m.expires
+                stored[#stored + 1] = { e = m.expires, dl = m.daysLeft }
                 used[#stored] = true
                 new[#new + 1] = m
             end
@@ -97,7 +117,9 @@ function Mail.Reconcile(seen, mails, now)
     end
     for key, stored in pairs(seen) do
         for j = #stored, 1, -1 do
-            if stored[j] < now - KEEP then table.remove(stored, j) end
+            local entry = stored[j]
+            local e = type(entry) == "number" and entry or entry.e
+            if e < now - KEEP then table.remove(stored, j) end
         end
         if #stored == 0 then seen[key] = nil end
     end
@@ -189,7 +211,7 @@ local function Classify(i, now, d)
         end
         m.key = string.format("%s|%s|%s", kind, tostring(m.itemID or "-"), tostring(subject))
     end
-    if invoice and type(sender) == "string" then d.senders[sender] = true end
+    if type(sender) == "string" then d.senders[sender] = true end   -- invoices and subject-matched system mail
     if wasRead == false then
         -- Did reading it mark it read?
         d.markedRead.checked = d.markedRead.checked + 1
@@ -237,7 +259,7 @@ local function ReadInbox()
         d.filed[m.kind] = (d.filed[m.kind] or 0) + 1
     end
     d.t, d.reads, d.inbox, d.kinds = now, (d.reads or 0) + 1, count, kinds
-    if drift > (d.maxDrift or 0) then d.maxDrift = drift end
+    if drift > (d.refreshGap or 0) then d.refreshGap = drift end
     if #new > 0 then ns.Fire("LEDGER_CHANGED") end
 end
 
@@ -273,8 +295,8 @@ function Mail.PrintDiag()
         date("%H:%M:%S", d.t), d.inbox or 0, Counts(d.kinds), Counts(d.filed), table.concat(found, ", ")))
     local senders = 0
     for _ in pairs(d.senders or {}) do senders = senders + 1 end
-    ns.Print(string.format("mail: %d reads, largest expiry drift %s s, %d AH sender(s), unread checked %d, marked read %d",
-        d.reads or 0, tostring(d.maxDrift or 0), senders, d.markedRead and d.markedRead.checked or 0,
+    ns.Print(string.format("mail: %d reads, largest expiry gap after a refresh %s s, %d AH sender(s), unread checked %d, marked read %d",
+        d.reads or 0, tostring(d.refreshGap or 0), senders, d.markedRead and d.markedRead.checked or 0,
         d.markedRead and d.markedRead.flipped or 0))
     if d.errors then ns.Print(string.format("mail: %d mails couldn't be read; last error: %s", d.errors, tostring(d.lastError))) end
 end
@@ -292,23 +314,33 @@ function Mail.SelfTest(report)
         and Mail.SubjectPattern("Outbid on %s (100%)") == "^Outbid on (.+) %(100%%%)$" and Mail.SubjectPattern("no args") == nil,
         "subject formats become anchored patterns with magic characters escaped")
 
-    -- One mail read twice, two identical mails, one taken, a third arriving later, a drift, expiry.
-    local seen, now = {}, 1000000
-    local function mail(expires) return { key = "sold|Bolt of Linen Cloth|1|2900", expires = expires } end
-    local new = Mail.Reconcile(seen, { mail(now + 86400) }, now)
-    local again = Mail.Reconcile(seen, { mail(now + 86400) }, now + 60)
+    -- Mail A arrives at t0; its twin B 5 s later; A is taken; the mailbox reopens an hour later on the
+    -- cached list; then a refresh shows B and a third identical mail C. days left = 30 days minus the
+    -- age at the refresh; a read computes expires = read time + days left.
+    local key, t0, day = "sold|Bolt of Linen Cloth|1|2900", 1000000, 86400
+    local function mail(age, readAt)
+        local daysLeft = 30 - age / day
+        return { key = key, daysLeft = daysLeft, expires = readAt + daysLeft * day }
+    end
+    local seen = {}
+    local new = Mail.Reconcile(seen, { mail(0, t0) }, t0)
+    local again = Mail.Reconcile(seen, { mail(0, t0) }, t0 + 60)   -- the same snapshot read a minute later
     check("MAIL-ONCE", #new == 1 and #again == 0, "a mail read twice counts once")
-    new = Mail.Reconcile(seen, { mail(now + 86400), mail(now + 86405) }, now + 120)
+    new = Mail.Reconcile(seen, { mail(120, t0 + 120), mail(115, t0 + 120) }, t0 + 120)
     check("MAIL-TWINS", #new == 1, string.format("an identical second mail counts too: %d new", #new))
-    new = Mail.Reconcile(seen, { mail(now + 86405) }, now + 180)
+    new = Mail.Reconcile(seen, { mail(175, t0 + 180) }, t0 + 180)
     check("MAIL-TAKEN", #new == 0, "taking one of the two adds nothing")
+    new = Mail.Reconcile(seen, { mail(175, t0 + 3780) }, t0 + 3780)
+    check("MAIL-SNAPSHOT", #new == 0, "the cached list an hour later (its times look an hour off) adds nothing")
     local drift
-    new, drift = Mail.Reconcile(seen, { mail(now + 86403), mail(now + 90000) }, now + 240)
-    check("MAIL-LATER", #new == 1 and drift == 2, string.format("one arriving an hour later is new (%d), a 2 s drift isn't (%s)",
-        #new, tostring(drift)))
-    new = Mail.Reconcile(seen, {}, now + 90000 + 86400 + 1)
-    check("MAIL-FORGET", #new == 0 and seen["sold|Bolt of Linen Cloth|1|2900"] == nil,
-        "expiry times are forgotten a day after they pass")
+    new, drift = Mail.Reconcile(seen, { mail(3795, t0 + 3800), mail(100, t0 + 3800) }, t0 + 3800)
+    check("MAIL-LATER", #new == 1 and drift < 1, string.format("after a refresh B matches (gap %s s) and C is new (%d)",
+        tostring(drift), #new))
+    new = Mail.Reconcile(seen, {}, t0 + 30 * day + 3700 + day + 1)
+    check("MAIL-FORGET", #new == 0 and seen[key] == nil, "mails are forgotten a day after they expire")
+    local old = { [key] = { t0 + 30 * day } }   -- an expiry stored by 0.5.0
+    new = Mail.Reconcile(old, { mail(60, t0 + 60) }, t0 + 60)
+    check("MAIL-OLD-FORMAT", #new == 0 and type(old[key][1]) == "table", "entries stored by 0.5.0 still match")
     return passed, failed
 end
 

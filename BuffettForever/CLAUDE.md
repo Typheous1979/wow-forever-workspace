@@ -49,6 +49,15 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   reference: sale_chance, measured_cut, 26 scenarios. Tested on 70425 (2026-10-17): selftest 74/74; deposits
   and your auctions read at the AH; a cancelled auction filed once however often the mailbox opens; unread mail
   stays unread. Still to check: the details pane's sources, and a real sale.
+- 0.5.0 pass 1 follow-up (2026-10-17): deposits by Forever's formula per auction [F-129] (migration 2 → 3),
+  mail matched on the exact days-left first [F-130], your auctions' samples kept. Tested on 70425: selftest 83/83,
+  Alt+Right-click prints the deposit for one and for all, owned buyout is per unit [F-131]. Then the details pane
+  became label/value rows with tooltips (Justin: data, not paragraphs): to check in game.
+- **Tests logged for later** (Justin, 2026-10-17; run them when the mail exists):
+  - the 2 Light Leather posted for 2 hours at 5g each: once expired, open a mailbox, and `/bf ledger` shows
+    2 expired;
+  - open a mailbox, close it, wait 5 minutes, open it again: `/bf ledger` doesn't change (the cached-list fix);
+  - a real sale: `/bf ledger` shows it, and 3 sales worth 1g in all measure the house cut.
 
 ## Decisions (2026-10-16, M4; Justin approved the plan's recommendations)
 - **Order:** pass 1 an honest AH exit (sales ledger, measured cut, deposits, your auctions); pass 2 market reality
@@ -58,12 +67,18 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 - **The measured cut replaces the setting automatically** (after 3 invoices worth 1g); M5 adds an override.
 - **Sale chance** in units, per item, pulled toward your rate over all items (5 pseudo-units), which is pulled
   toward settings.saleChance (2); floor 0.05; cancels don't count. An AH net below 0 counts as 0.
-- **Deposits:** the duration Blizzard's sell frame remembers (CVar `auctionHouseDurationDropdown`); measured items
-  first, else deposit ÷ vendor price fitted over the measured ones; unknown counts as 0 and the pane says so.
+- **Deposits** (revised 2026-10-17 from the pass 1 diagnostics): Forever's formula [F-129], per auction, at the
+  duration Blizzard's sell frame remembers (CVar `auctionHouseDurationDropdown`). A batch of a commodity goes up
+  as one auction (deposit ÷ units), gear one auction each. Reagents valued for sale use the batch's need. The
+  game's own figures are only checked against the formula (diag.deposits), and the check records commodity or
+  gear per item.
 - **Mail is read without opening it** (never `GetInboxText`); no player names are stored. A mail is identified by
-  key + expiry time (tolerance 300 s). Returns are keyed without their count.
+  its key, then its exact days-left (the inbox list is a snapshot [F-130]), then its expiry time within 300 s.
+  Returns are keyed without their count.
 - **Walls that never shrink get grade D** (pass 2), unless your own sales show the item sells.
 - **Scanners are views in the existing list,** not new windows (pass 3).
+- **The details pane is data** (Justin, 2026-10-17): label/value rows, one number each, with the explanation in
+  the row's tooltip. No sentences in the pane except the verdict and the warnings.
 
 ## Decisions (2026-10-16, M3)
 - **List columns** (pass 2): Item (with the batch), Cost, Best exit (V/AH), Profit, ROI, Grade. The middle pane is
@@ -189,12 +204,11 @@ make-or-buy depth 3; owned materials at opportunity cost.
   - the cooldown's exact length (the `diag.requests` log measures it);
   - the AH cut (seller invoice);
   - who shares an AH (sets `marketKey`): scan with an Alliance character and compare the ladders.
-- Asked by M4 pass 1's diagnostics (`diag.mail`, `diag.deposits`, `diag.owned`):
-  - do `AUCTION_EXPIRED_MAIL_SUBJECT` and `AUCTION_REMOVED_MAIL_SUBJECT` exist, and who sends AH mail;
-  - does reading an unread invoice mark it read; how precise is `daysLeft` (the largest expiry drift);
-  - is an owned auction's `buyoutAmount` per unit or per auction (post 2 units to tell);
-  - the deposit formula (deposit ÷ vendor price per duration; 1 unit vs 100); does the call answer away from
-    the AH; the duration CVar's value.
+- Answered by M4 pass 1's diagnostics on 70425: the AH mail subjects and sender, unread mail stays unread,
+  `daysLeft` is a snapshot [F-130]; the deposit formula, the 1s minimum, durations 2/8/24 h, the call answers
+  away from the AH [F-129].
+- Answered on 70425 (2026-10-17): an owned commodity auction's `buyoutAmount` is per unit [F-131].
+- Still open from M4: the house cut (a sale); an expired auction's mail (counted as expired).
 - `GetRecipeSchematic` with the profession window closed, and for recipes the character doesn't know.
 - `GetAllRecipeIDs` signature; does `IsPlayerSpell(recipeID)` report learned recipes without the window?
 - Merchant `numAvailable` for unlimited stock.

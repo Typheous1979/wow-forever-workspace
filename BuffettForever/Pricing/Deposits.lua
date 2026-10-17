@@ -1,54 +1,49 @@
 local addonName, ns = ...
 
--- Auction deposits (auction-house.md "Deposits and the house cut"), measured at the auctioneer with
--- the calls Blizzard's sell frame makes: CalculateCommodityDeposit(itemID, duration, quantity) for
--- commodities, CalculateItemDeposit(bag item, duration, quantity) for the rest. Measured at all three
--- durations for every bag item the AH would take and for the commodity outputs of the tray's recipes,
--- when the AH opens, after a full scan and when the tray changes there:
---   BuffettForeverDB.deposits[itemID] = { [1] = per unit, [2] = ..., [3] = ..., s = vendor price, t }
--- Deposits.Fit: deposit / what a vendor pays, over the measured items, estimates any other item (a
--- retail deposit is a share of the vendor price; diag.deposits checks that on Forever). The duration
--- is the one Blizzard's sell frame remembers (CVar auctionHouseDurationDropdown).
--- diag.deposits also keeps samples (is the deposit proportional to the quantity?), the durations'
--- names, and whether the call answers away from the AH. Fires DEPOSITS_CHANGED.
+-- Auction deposits (auction-house.md "Deposits and the house cut"). Forever charges per auction
+-- max(1s, floor(vendor price x quantity / 20) x 1, 4 or 12) for 2, 8 or 24 hours [F-129]
+-- (Econ.Deposit), so the evaluator computes any deposit from the vendor price, the units posted
+-- together and the duration Blizzard's sell frame remembers (CVar auctionHouseDurationDropdown).
+-- At the auctioneer this module asks the game for the deposits Blizzard's sell frame shows
+-- (CalculateCommodityDeposit, CalculateItemDeposit) for the bag items and the tray's outputs at all
+-- three durations, and compares them with the formula, so a new build that changes it shows up in
+-- diag.deposits. It also learns which items are commodities (one auction for a whole batch) and
+-- which are gear (one auction each):
+--   BuffettForeverDB.deposits[itemID] = { k = "c" (commodity) or "i" (item), t = time checked }
+-- Fires DEPOSITS_CHANGED when it learns something.
 
 local L = ns.L
 local Deposits = {}
 ns.Deposits = Deposits
 
 local DURATIONS = 3
-local QTY = 100              -- commodity deposits are asked for 100 units, so per-unit rounding vanishes
-local RATE_MIN = 3           -- measured items (that a vendor buys) before the rate estimates others
+local QTY = 100              -- commodities are checked at 100 units (and one sample at 1)
 local OPEN_DELAY = 1         -- seconds after the AH opens
 local CHANGE_DELAY = 0.5     -- after a tray change or a scan
 local AWAY_DELAY = 5         -- after login: does the call answer away from the AH?
-local SAMPLES = 10
+local KEEP = 10              -- mismatches and samples kept in diag.deposits
 local DURATION_NAMES = { "AUCTION_DURATION_ONE", "AUCTION_DURATION_TWO", "AUCTION_DURATION_THREE" }
 
-local measured = {}          -- [itemID] = true once measured during this AH visit
-local rates                  -- [duration] = rate or false, until the next measurement
+local checked = {}           -- [itemID] = true once checked during this AH visit
 local pending
-
-local function Store()
-    return ns.db.deposits
-end
 
 local function Diag()
     local diag = ns.db.diag
     diag.deposits = diag.deposits or {}
     local d = diag.deposits
     d.samples = d.samples or {}
+    d.mismatches = d.mismatches or {}
     return d
 end
 
--- The duration Blizzard's sell frame will use, 1 to 3.
+-- The duration Blizzard's sell frame will use, 1 to 3 (8 hours, 2, when the CVar is unreadable).
 function Deposits.Duration()
     local value = tonumber(C_CVar.GetCVar("auctionHouseDurationDropdown") or "")
     if value and value >= 1 and value <= DURATIONS then return math.floor(value) end
     return 2
 end
 
--- Blizzard's name for a duration ("24 Hours" on retail), or "duration 2".
+-- Blizzard's name for a duration ("8 Hours" on Forever), or "duration 2".
 function Deposits.DurationName(d)
     d = d or Deposits.Duration()
     local name = DURATION_NAMES[d] and _G[DURATION_NAMES[d]]
@@ -56,101 +51,120 @@ function Deposits.DurationName(d)
     return string.format(L["duration %d"], d)
 end
 
-local function VendorSell(itemID)
+-- What a vendor pays, the price the deposit is a share of (0 when a vendor won't buy it).
+function Deposits.VendorSell(itemID)
     local sell = ns.ItemSellPrice and ns.ItemSellPrice[itemID] or select(11, C_Item.GetItemInfo(itemID))
-    if type(sell) ~= "number" then return nil end
-    return sell
+    return type(sell) == "number" and sell or 0
 end
 
-local function Sample(itemID, kind, qty, entry)
-    local samples = Diag().samples
-    for _, s in ipairs(samples) do
-        if s.itemID == itemID then return end
-    end
-    if #samples < SAMPLES then
-        samples[#samples + 1] = { itemID = itemID, kind = kind, qty = qty, sell = entry.s, entry[1], entry[2], entry[3] }
-    end
+-- Whether a batch of the item goes up as one auction (a commodity) or one auction each (gear): as
+-- seen at the AH, else stackable means commodity. Unknown counts as a commodity. Never nil.
+function Deposits.IsCommodity(itemID)
+    local entry = ns.db and ns.db.deposits[itemID]
+    if entry and entry.k then return entry.k == "c" end
+    local stack = C_Item.GetItemMaxStackSizeByID(itemID)
+    if type(stack) == "number" then return stack > 1 end
+    return true
 end
 
--- deposit(d) gives the deposit for qty units at duration d; stores the per-unit deposits.
-local function Measure(itemID, qty, deposit, kind)
-    local per = {}
-    for d = 1, DURATIONS do
-        local ok, value = pcall(deposit, d)
-        if not ok or type(value) ~= "number" or ns.IsSecret(value) then return nil end
-        per[d] = value / qty
-    end
-    local entry = { per[1], per[2], per[3], s = VendorSell(itemID), t = GetServerTime() }
-    measured[itemID] = true
-    if ns.readOnlyDB then return entry end
-    Store()[itemID] = entry
-    rates = nil
-    Sample(itemID, kind, qty, entry)
-    return entry
+-- The deposit per unit when selling qty of the item (default: one) at duration d (default: the sell
+-- frame's), by Forever's formula.
+function Deposits.PerUnit(itemID, qty, d)
+    return ns.Econ.DepositPerUnit(Deposits.VendorSell(itemID), qty or 1, d or Deposits.Duration(),
+        Deposits.IsCommodity(itemID))
 end
 
-function Deposits.MeasureCommodity(itemID)
-    local entry = Measure(itemID, QTY, function(d)
-        return C_AuctionHouse.CalculateCommodityDeposit(itemID, d, QTY)
-    end, "commodity")
-    if not entry then
-        -- in case the game only prices what you could actually post
-        entry = Measure(itemID, 1, function(d)
-            return C_AuctionHouse.CalculateCommodityDeposit(itemID, d, 1)
-        end, "commodity x1")
+local function Push(list, entry)
+    if #list < KEEP then list[#list + 1] = entry end
+end
+
+-- Ask the game (deposit(d, qty)) at every duration and compare with the formula; remember the kind.
+local function Check(itemID, kind, qty, deposit)
+    local d, sell, game = Diag(), Deposits.VendorSell(itemID), {}
+    for duration = 1, DURATIONS do
+        local ok, value = pcall(deposit, duration, qty)
+        if not ok or type(value) ~= "number" or ns.IsSecret(value) then return false end
+        game[duration] = value
     end
-    if not entry or ns.readOnlyDB then return entry end
+    checked[itemID] = true
+    ns.db.deposits[itemID] = { k = kind == "commodity" and "c" or "i", t = GetServerTime() }
+    d.checks = (d.checks or 0) + DURATIONS
+    for duration = 1, DURATIONS do
+        local formula = ns.Econ.Deposit(sell, qty, duration)
+        if math.abs(formula - game[duration]) > 0.5 then
+            d.mismatched = (d.mismatched or 0) + 1
+            Push(d.mismatches, { itemID = itemID, kind = kind, qty = qty, duration = duration, sell = sell,
+                                 game = game[duration], formula = formula })
+        end
+    end
+    local seen = false
+    for _, s in ipairs(d.samples) do
+        if s.itemID == itemID then seen = true end
+    end
+    if not seen then Push(d.samples, { itemID = itemID, kind = kind, qty = qty, sell = sell, game[1], game[2], game[3] }) end
+    return true
+end
+
+local function CheckCommodity(itemID)
+    local ok = Check(itemID, "commodity", QTY, function(duration, qty)
+        return C_AuctionHouse.CalculateCommodityDeposit(itemID, duration, qty)
+    end)
     local d = Diag()
-    if not d.linear then
-        -- Is the deposit for 1 unit the per-unit deposit of 100, or is it rounded up per auction?
-        local ok, one = pcall(C_AuctionHouse.CalculateCommodityDeposit, itemID, 1, 1)
-        d.linear = { itemID = itemID, one = ok and one or nil, perUnitOf100 = entry[1] }
+    if ok and not d.single then
+        -- one unit: the 1s minimum, or a share of the vendor price?
+        local okOne, one = pcall(C_AuctionHouse.CalculateCommodityDeposit, itemID, 1, 1)
+        d.single = { itemID = itemID, game = okOne and one or nil, formula = ns.Econ.Deposit(Deposits.VendorSell(itemID), 1, 1) }
     end
-    return entry
+    return ok
 end
 
--- A bag item (ItemLocation): returns its entry and itemID, or nil when the AH wouldn't take it.
-function Deposits.MeasureLocation(location)
-    if not location or not C_Item.DoesItemExist(location) then return nil end
+-- A bag item (ItemLocation): checked as a commodity or as an item; true when the game answered.
+function Deposits.CheckLocation(location)
+    if not location or not C_Item.DoesItemExist(location) then return false end
     local itemID = C_Item.GetItemID(location)
-    if not itemID then return nil end
+    if not itemID or checked[itemID] then return false end
     local status = C_AuctionHouse.GetItemCommodityStatus(location)
-    if status == Enum.ItemCommodityStatus.Commodity then
-        return Deposits.MeasureCommodity(itemID), itemID
-    elseif status == Enum.ItemCommodityStatus.Item then
-        return Measure(itemID, 1, function(d)
-            return C_AuctionHouse.CalculateItemDeposit(location, d, 1)
-        end, "item"), itemID
+    if status == Enum.ItemCommodityStatus.Commodity then return CheckCommodity(itemID) end
+    if status == Enum.ItemCommodityStatus.Item then
+        return Check(itemID, "item", 1, function(duration, qty)
+            return C_AuctionHouse.CalculateItemDeposit(location, duration, qty)
+        end)
     end
-    return nil
+    return false
 end
 
-local function MeasureBags()
+local function CheckBags()
     local count = 0
     for bag = Enum.BagIndex.Backpack, Enum.BagIndex.ReagentBag do
         for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
             local itemID = C_Container.GetContainerItemID(bag, slot)
-            if itemID and not measured[itemID] then
+            if itemID and not checked[itemID] then
                 local location = ItemLocation:CreateFromBagAndSlot(bag, slot)
                 local ok, valid = pcall(C_AuctionHouse.IsSellItemValid, location, false)
-                if ok and valid and Deposits.MeasureLocation(location) then count = count + 1 end
+                if ok and valid and Deposits.CheckLocation(location) then count = count + 1 end
             end
         end
     end
     return count
 end
 
--- Commodity outputs of the tray's recipes (item-key info that isn't cached yet waits for the next run).
-local function MeasureTray()
+-- The tray's outputs: commodity or gear from the item-key info (not cached yet: the next run).
+local function CheckTray()
     local ids = {}
     for _, entry in ipairs(ns.Tray.Entries()) do ids[#ids + 1] = entry.itemID end
     if #ids == 0 then return 0 end
     local count = 0
     for _, recipeID in ipairs(ns.RecipeIndex.UsingAny(ids, { confirmed = true })) do
         local output = ns.RecipeIndex.Get(recipeID).output
-        if not measured[output] then
+        if not checked[output] then
             local info = C_AuctionHouse.GetItemKeyInfo(C_AuctionHouse.MakeItemKey(output))
-            if info and info.isCommodity and Deposits.MeasureCommodity(output) then count = count + 1 end
+            if info and info.isCommodity then
+                if CheckCommodity(output) then count = count + 1 end
+            elseif info then
+                checked[output] = true
+                ns.db.deposits[output] = { k = "i", t = GetServerTime() }   -- gear: checked when one is in your bags
+                count = count + 1
+            end
         end
     end
     return count
@@ -159,18 +173,12 @@ end
 local function Run()
     pending = nil
     if not ns.ahOpen or not ns.db or ns.readOnlyDB then return end
-    local bags, tray = MeasureBags(), MeasureTray()
+    local bags, tray = CheckBags(), CheckTray()
     local d = Diag()
-    local stored = 0
-    for _ in pairs(Store()) do stored = stored + 1 end
-    d.t, d.bags, d.tray, d.stored = GetServerTime(), bags, tray, stored
+    d.t, d.bags, d.tray = GetServerTime(), bags, tray
     d.duration, d.cvar = Deposits.Duration(), C_CVar.GetCVar("auctionHouseDurationDropdown")
-    d.names, d.rates = {}, {}
-    for k = 1, DURATIONS do
-        d.names[k] = Deposits.DurationName(k)
-        local rate, n, lo, hi = Deposits.Fit(Store(), k)
-        d.rates[k] = { rate = rate, n = n, lo = lo, hi = hi }
-    end
+    d.names = {}
+    for k = 1, DURATIONS do d.names[k] = Deposits.DurationName(k) end
     if bags + tray > 0 then ns.Fire("DEPOSITS_CHANGED") end
 end
 
@@ -178,66 +186,31 @@ local function Schedule(delay)
     if not pending then pending = C_Timer.NewTimer(delay, Run) end
 end
 
--- deposit / vendor price over the entries a vendor buys, for duration d: rate (nil under RATE_MIN
--- entries), entries used, the lowest and the highest ratio.
-function Deposits.Fit(entries, d)
-    local deposit, sell, n, lo, hi = 0, 0, 0, nil, nil
-    for _, entry in pairs(entries) do
-        if entry[d] and (entry.s or 0) > 0 then
-            deposit, sell, n = deposit + entry[d], sell + entry.s, n + 1
-            local ratio = entry[d] / entry.s
-            lo, hi = math.min(lo or ratio, ratio), math.max(hi or ratio, ratio)
-        end
-    end
-    if n < RATE_MIN then return nil, n, lo, hi end
-    return deposit / sell, n, lo, hi
-end
-
-local function Rate(d)
-    rates = rates or {}
-    if rates[d] == nil then rates[d] = Deposits.Fit(Store(), d) or false end
-    return rates[d] or nil
-end
-
--- The deposit per unit at duration d (default: the sell frame's): measured, or estimated from what a
--- vendor pays. Returns deposit, "measured" or "estimated"; nil when unknown.
-function Deposits.PerUnit(itemID, d)
-    if not ns.db then return nil end
-    d = d or Deposits.Duration()
-    local entry = Store()[itemID]
-    if entry and entry[d] then return entry[d], "measured" end
-    local rate, sell = Rate(d), VendorSell(itemID)
-    if rate and sell and sell > 0 then return rate * sell, "estimated" end
-    return nil
-end
-
--- /bf diag: what the auctioneer said.
+-- /bf diag: does the formula still match the game?
 function Deposits.PrintDiag()
     local d = ns.db and ns.db.diag.deposits
     if not d then return end
-    local parts = {}
-    for k = 1, DURATIONS do
-        local r = d.rates and d.rates[k]
-        if r then
-            parts[#parts + 1] = string.format("%s %s (%d items, %s to %s)", tostring(d.names and d.names[k] or k),
-                r.rate and string.format("%.4f", r.rate) or "?", r.n or 0,
-                r.lo and string.format("%.4f", r.lo) or "?", r.hi and string.format("%.4f", r.hi) or "?")
-        end
+    local known = 0
+    for _ in pairs(ns.db.deposits) do known = known + 1 end
+    ns.Print(string.format("deposits: formula checked %d times, %d different from the game; %d items known as commodity or gear; duration %s (%s, CVar %s)",
+        d.checks or 0, d.mismatched or 0, known, tostring(d.duration or "-"), Deposits.DurationName(d.duration),
+        tostring(d.cvar)))
+    local m = d.mismatches and d.mismatches[1]
+    if m then
+        ns.Print(string.format("deposits: first difference: item %d (%s) x%d, duration %d: game %s, formula %s", m.itemID,
+            m.kind, m.qty, m.duration, tostring(m.game), tostring(m.formula)))
     end
-    ns.Print(string.format("deposits: %d items measured (%s bags, %s tray last time), duration %s (CVar %s); deposit/vendor: %s",
-        d.stored or 0, tostring(d.bags or "-"), tostring(d.tray or "-"), tostring(d.duration or "-"), tostring(d.cvar),
-        #parts > 0 and table.concat(parts, "; ") or "not measured yet"))
-    if d.linear or d.away then
-        ns.Print(string.format("deposits: 1 unit of %s costs %s (per unit of 100: %s); away from the AH the call gave %s",
-            tostring(d.linear and d.linear.itemID or "-"), tostring(d.linear and d.linear.one or "-"),
-            tostring(d.linear and d.linear.perUnitOf100 or "-"), tostring(d.away and d.away.value or "-")))
+    if d.single or d.away then
+        ns.Print(string.format("deposits: 1 unit of %s costs %s (formula %s); away from the AH the call gave %s",
+            tostring(d.single and d.single.itemID or "-"), tostring(d.single and d.single.game or "-"),
+            tostring(d.single and d.single.formula or "-"), tostring(d.away and d.away.value or "-")))
     end
 end
 
 -- ---------------------------------------------------------------- events
 
 ns.On("AH_OPEN", function()
-    wipe(measured)
+    wipe(checked)
     Schedule(OPEN_DELAY)
 end)
 
@@ -272,15 +245,10 @@ function Deposits.SelfTest(report)
         if ok then passed = passed + 1 else failed = failed + 1 end
         report(name, ok, detail)
     end
-    local entries = {
-        [1] = { 15, 30, 60, s = 100 },
-        [2] = { 1.5, 3, 6, s = 10 },
-        [3] = { 0.15, 0.3, 0.6, s = 1 },
-        [4] = { 5, 10, 20, s = 0 },      -- a vendor won't buy it: left out of the fit
-    }
-    local rate, n, lo, hi = Deposits.Fit(entries, 2)
-    check("DEP-FIT", rate and math.abs(rate - 0.3) < 1e-9 and n == 3 and math.abs(lo - hi) < 1e-9,
-        string.format("deposit / vendor price at duration 2: %s over %d items", tostring(rate), n))
-    check("DEP-FEW", Deposits.Fit({ [1] = { 15, 30, 60, s = 100 } }, 1) == nil, "one item doesn't estimate the rest")
+    local name = Deposits.DurationName(9)
+    check("DEP-NAME", name == string.format(L["duration %d"], 9), "an unknown duration still gets a name: " .. name)
+    local thread = ns.Econ.DepositPerUnit(Deposits.VendorSell(2320), 2, 2, true)
+    check("DEP-THREAD", thread == 50, string.format("2 Coarse Thread (vendor %dc) for 8 hours: %s each (the sell frame said 1s for both)",
+        Deposits.VendorSell(2320), tostring(thread)))
     return passed, failed
 end

@@ -23,6 +23,23 @@
   estimate, and replays 6 more scenarios from the Python reference (26).
 - Pass 1 tested on client 1.60.1.70425, 2026-10-17: selftest 74/74; deposits and your auctions are read at the
   Auction House; a cancelled auction is filed once however often the mailbox is opened; unread mail stays unread.
+- From the pass 1 diagnostics:
+  - **Deposits by Forever's own formula:** 5% of the vendor price per 2 hours (2, 8 or 24 hours), and **at least
+    1s per auction**. It matched the game on all 60 measurements. Posting 2 Coarse Thread at 19c each risks a 1s
+    deposit, so the evaluator now counts the deposit for the whole batch posted as one auction (gear: one auction
+    each). Cheap outputs in small batches now go to the vendor when the deposit outweighs the price.
+  - The details pane shows the deposit for the batch, says when it's the 1s minimum, and says when the deposits
+    would outweigh the price.
+  - Alt+Right-click at the AH prints the deposit for one and for all you carry.
+  - Mail counting survives the inbox list the game caches between refreshes (a mail's "days left" doesn't change
+    until the inbox refreshes), so reopening the mailbox later can't count a mail twice.
+  - The first auctions seen stay in the diagnostics (to settle whether a stack's buyout is per unit).
+  - `/bf selftest`: 83 checks, with 3 new scenarios for the deposit rule (29).
+  - Tested on client 1.60.1.70425, 2026-10-17: selftest 83/83; Alt+Right-click prints the deposit for one and for
+    all; an auction's buyout is per unit for commodities.
+- **The details pane is data, not prose:** each number is a label/value row (Cost; Vendor, AH, with its price,
+  cut, deposit and sale chance; Listed; Yours; Sell to, Profit, ROI, Value added, Confidence), and its tooltip says
+  where the number comes from. The verdict is one line.
 
 ## 0.4.0 (not released)
 - **Reagent tray:**

@@ -5,14 +5,15 @@ local addonName, ns = ...
 -- It tells the ledger what you have listed (units and auctions per item) and the names your sales
 -- mail will use (an item link's name -> its itemID). Posting (AUCTION_HOUSE_AUCTION_CREATED) and
 -- cancelling (AUCTION_CANCELED) ask again. Sold auctions (waiting for their mail) aren't listed.
--- diag.owned keeps the raw fields of a few auctions: is buyoutAmount per unit or per auction?
+-- diag.owned keeps the raw fields of the first auctions it sees: is buyoutAmount per unit or per
+-- auction?
 
 local Owned = {}
 ns.Owned = Owned
 local events = ns.events
 
 local DELAY = 1              -- seconds after the AH opens, a post or a cancel
-local SAMPLES = 6
+local SAMPLES = 10
 local SORTS = { { sortOrder = Enum.AuctionHouseSortOrder.Name, reverseSort = false } }
 
 local pending
@@ -49,7 +50,11 @@ local function Read()
     if not ns.db or ns.readOnlyDB then return end
     local ok, list = pcall(C_AuctionHouse.GetOwnedAuctions)
     if not ok or type(list) ~= "table" then return end
-    local listed, samples, sold = {}, {}, 0
+    local now, d = GetServerTime(), Diag()
+    -- the first auctions ever seen stay as samples, so a later look at an empty list can't erase them
+    local samples, sampled = d.samples or {}, {}
+    for _, s in ipairs(samples) do sampled[s.auctionID or 0] = true end
+    local listed, sold = {}, 0
     for _, a in ipairs(list) do
         local itemID = a.itemKey and a.itemKey.itemID
         if itemID and not ns.IsSecret(itemID) then
@@ -62,15 +67,15 @@ local function Read()
             end
             local name = NameOf(a.itemLink)
             if name then ns.Ledger.LearnName(name, itemID) end
-            if #samples < SAMPLES then
-                samples[#samples + 1] = { itemID = itemID, quantity = a.quantity, buyoutAmount = a.buyoutAmount,
-                    bidAmount = a.bidAmount, status = a.status, timeLeftSeconds = a.timeLeftSeconds }
+            if #samples < SAMPLES and a.auctionID and not sampled[a.auctionID] then
+                sampled[a.auctionID] = true
+                samples[#samples + 1] = { auctionID = a.auctionID, itemID = itemID, quantity = a.quantity,
+                    buyoutAmount = a.buyoutAmount, bidAmount = a.bidAmount, status = a.status,
+                    timeLeftSeconds = a.timeLeftSeconds, t = now }
             end
         end
     end
-    local now = GetServerTime()
     ns.Ledger.SetListed(listed, now)
-    local d = Diag()
     d.t, d.auctions, d.sold, d.samples = now, #list, sold, samples
     d.full = C_AuctionHouse.HasFullOwnedAuctionResults()
     ns.Fire("LEDGER_CHANGED")
@@ -92,12 +97,12 @@ end
 function Owned.PrintDiag()
     local d = ns.db and ns.db.diag.owned
     if not d or not d.t then return end
-    local first = d.samples and d.samples[1]
+    local last = d.samples and d.samples[#d.samples]
     ns.Print(string.format("your auctions %s: %d (%d sold, waiting for the mail), full %s, %d queries%s",
         date("%H:%M:%S", d.t), d.auctions or 0, d.sold or 0, tostring(d.full), d.queries or 0,
-        first and string.format("; first: item %s x%s, buyout %s, bid %s, %s s left", tostring(first.itemID),
-            tostring(first.quantity), tostring(first.buyoutAmount), tostring(first.bidAmount),
-            tostring(first.timeLeftSeconds)) or ""))
+        last and string.format("; latest sample: item %s x%s, buyout %s, bid %s, %s s left", tostring(last.itemID),
+            tostring(last.quantity), tostring(last.buyoutAmount), tostring(last.bidAmount),
+            tostring(last.timeLeftSeconds)) or ""))
 end
 
 ns.On("AH_OPEN", Schedule)

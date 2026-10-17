@@ -116,6 +116,25 @@ function Econ.AHNet(price, cut, deposit, p)
     return price * (1 - (cut or 0.05)) - deposit * (1 - p) / p
 end
 
+-- Forever's deposit for one auction of qty units [F-129]: 5% of the vendor price per 2 hours, floored
+-- to whole copper, times 1, 4 or 12 for durations 1, 2, 3 (2, 8, 24 hours), and at least 1s.
+-- Dividing by 20 keeps the floor exact for whole-copper prices.
+local DEPOSIT_DIVISOR, DEPOSIT_MIN = 20, 100
+local DEPOSIT_MULT = { 1, 4, 12 }
+Econ.DEPOSIT_MIN = DEPOSIT_MIN
+
+function Econ.Deposit(vendorSell, qty, duration)
+    return math.max(DEPOSIT_MIN, math.floor((vendorSell or 0) * qty / DEPOSIT_DIVISOR) * DEPOSIT_MULT[duration])
+end
+
+-- The deposit per unit when selling qty units: a commodity goes up as one auction of qty, anything
+-- else (commodity == false) one auction per unit.
+function Econ.DepositPerUnit(vendorSell, qty, duration, commodity)
+    if qty <= 0 then return 0 end
+    if commodity == false then return Econ.Deposit(vendorSell, 1, duration) end
+    return Econ.Deposit(vendorSell, qty, duration) / qty
+end
+
 -- Liquidation value of one unit you own: the better of selling it to a vendor or on the AH.
 function Econ.Liquidation(vendorSell, ahNet)
     if ahNet and vendorSell then return math.max(vendorSell, ahNet) end
@@ -328,5 +347,17 @@ function Econ.SelfTest(report)
     check("CUT-2", Econ.MeasuredCut(1000, 20000, 2) == nil and Econ.MeasuredCut(250, 5000, 4) == nil,
         "too few sales, or under 1g in total: not measured yet")
     check("CUT-3", Econ.MeasuredCut(0, 30000, 3) == 0, "no cut at all is a measurement too")
+
+    -- crafting-economics.md: DEP-1..4, the game's own deposits on 70425 [F-129]
+    local d1, d2, d3 = Econ.Deposit(142, 100, 1), Econ.Deposit(142, 100, 2), Econ.Deposit(142, 100, 3)
+    check("DEP-1", d1 == 710 and d2 == 2840 and d3 == 8520,
+        string.format("100 at a 142c vendor price: %s / %s / %s", tostring(d1), tostring(d2), tostring(d3)))
+    check("DEP-2", Econ.Deposit(142, 1, 1) == 100, "one unit pays the 1s minimum")
+    local g1, g2, g3 = Econ.Deposit(875, 1, 1), Econ.Deposit(875, 1, 2), Econ.Deposit(875, 1, 3)
+    check("DEP-3", g1 == 100 and g2 == 172 and g3 == 516,
+        string.format("gear at 875c: %s / %s / %s (floor before the multiplier)", tostring(g1), tostring(g2), tostring(g3)))
+    local thread = Econ.DepositPerUnit(2, 2, 2, true)
+    check("DEP-4", thread == 50 and Econ.DepositPerUnit(875, 5, 2, false) == 172,
+        string.format("2 Coarse Thread for 8 hours: %s each; gear pays per auction", tostring(thread)))
     return passed, failed
 end
