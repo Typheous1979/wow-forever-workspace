@@ -2,7 +2,7 @@
 ## Title: BuffettForever |cff9d9d9dby Typheous|r
 ## Notes: Auction House scanner and crafting ROI advisor: what to craft, where to sell it, and the return on every gold piece.
 ## Author: Typheous
-## Version: 0.4.0
+## Version: 0.5.0
 ## Category: Auction & Economy
 ## IconTexture: Interface\AddOns\BuffettForever\Media\Icon.tga
 ## SavedVariables: BuffettForeverDB
@@ -26,6 +26,10 @@ Pricing\PriceDB.lua
 Pricing\Scanner.lua
 Pricing\Search.lua
 Pricing\Merchant.lua
+Pricing\Ledger.lua
+Pricing\Mail.lua
+Pricing\Deposits.lua
+Pricing\Owned.lua
 Crafting\RecipeIndex.lua
 Crafting\Harvest.lua
 Crafting\Tray.lua

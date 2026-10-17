@@ -1,8 +1,9 @@
 local addonName, ns = ...
 
 -- Alt+Right-click on an item adds it to the reagent tray. At the Auction House it also searches
--- the item's current listings and prints them; anywhere else it says what was added, with the
--- stored AH price. A post-hook on HandleModifiedItemClick: bag buttons send every modified click
+-- the item's current listings and prints them with the deposit (measured from the bag slot, for the
+-- duration Blizzard's sell frame uses); anywhere else it says what was added, with the stored AH
+-- price. A post-hook on HandleModifiedItemClick: bag buttons send every modified click
 -- there, and a modified click never uses, sells or posts the item; Alt+Right-click isn't bound to
 -- anything on Forever [F-125]. Plain clicks stay Blizzard's. Item links Alt+Right-clicked
 -- elsewhere (chat, loot) work the same way.
@@ -27,6 +28,22 @@ local function VendorText(itemID)
     local sell = ns.ItemSellPrice and ns.ItemSellPrice[itemID] or select(11, C_Item.GetItemInfo(itemID))
     if type(sell) ~= "number" or sell <= 0 then return "" end
     return " " .. string.format(L["Vendor pays %s."], Money.Format(sell))
+end
+
+-- " Deposit 3c each for 24 Hours." at the AH: measured from the bag slot when there is one, else the
+-- stored or estimated deposit; "" when unknown.
+local function DepositText(itemID, itemLocation)
+    local deposit, source
+    if type(itemLocation) == "table" and C_Item.DoesItemExist(itemLocation) then
+        local entry = ns.Deposits.MeasureLocation(itemLocation)
+        if entry then deposit, source = entry[ns.Deposits.Duration()], "measured" end
+    end
+    if not deposit then deposit, source = ns.Deposits.PerUnit(itemID) end
+    if not deposit then return "" end
+    if deposit == 0 then return " " .. string.format(L["No deposit for %s."], ns.Deposits.DurationName()) end
+    local each = deposit < 1 and L["under 1c"] or Money.Format(deposit)
+    local text = source == "estimated" and L["Deposit about %s each for %s (estimated)."] or L["Deposit %s each for %s."]
+    return " " .. string.format(text, each, ns.Deposits.DurationName())
 end
 
 -- Into the tray; returns the slot or nil (full: said so).
@@ -54,7 +71,7 @@ local function PriceCheck(itemID, link, itemLocation, inTray)
     if ns.Scanner.IsBusy() and not ns.Search.IsQueued(itemID) then
         ns.Print(string.format(L["%s: queued until the full scan finishes."], link))
     end
-    local tail = inTray and (" " .. L["(In the tray.)"]) or ""
+    local tail = DepositText(itemID, itemLocation) .. (inTray and (" " .. L["(In the tray.)"]) or "")
     ns.Search.Request(itemID, key, function(_, result, problem)
         if result then
             local text = Listed(link, result.mv, result.min, result.q, result.n, result.prices) .. "."

@@ -71,17 +71,19 @@ local defaults = {
     settings = {
         historyDays = 14,       -- days of price history kept per item (pruned at login)
         -- Economics (wowf-economics defaults; Settings controls arrive in M5):
-        cut = 0.05,             -- AH house cut, unmeasured on Forever [F-122]
-        saleChance = 0.5,       -- chance a listing sells before it expires (expected deposit loss)
+        cut = 0.05,             -- AH house cut until your sales mail measures it [F-122] (Pricing/Ledger.lua)
+        saleChance = 0.5,       -- chance a listing sells before it expires, until your sales say otherwise
         margin = 0.20,          -- margin of safety: AH over vendor, and the minimum ROI to recommend
         minProfit = 1000,       -- copper per craft (10s while leveling; the reference's 1g suits level 60)
         minGrade = "C",         -- weakest confidence grade a recommendation may rest on
         ownedPolicy = "opportunity",  -- owned materials at what they'd sell for ("free", "replacement")
     },
-    markets = {},   -- [marketKey] = { items = { [itemID] = price row }, scan = last full scan } (Pricing/PriceDB.lua)
+    markets = {},   -- [marketKey] = { items = { [itemID] = price row }, scan = last full scan (Pricing/PriceDB.lua),
+                    --                 ledger = your sales, returns and auctions (Pricing/Ledger.lua) }
     vendor = {},    -- [itemID] = { p = unit buy price, t, lim } (Pricing/Merchant.lua)
+    deposits = {},  -- [itemID] = { per-unit deposit for durations 1-3, s = vendor price, t } (Pricing/Deposits.lua)
     recipesKnown = {},  -- [charKey][recipeID] = true (Crafting/Harvest.lua)
-    diag = {},      -- scanner diagnostics for the open AH probes (Pricing/Scanner.lua)
+    diag = {},      -- answers to the open probes: scanner, searches, merchant, harvest, mail, deposits, auctions
 }
 local charDefaults = {
     window = {},   -- main window position (per character)

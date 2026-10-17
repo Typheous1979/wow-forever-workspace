@@ -9,8 +9,9 @@ local function Help()
     ns.Print("/bf options  " .. L["open the settings"])
     ns.Print("/bf recipes <" .. L["item link or ID"] .. ">  " .. L["the recipes that use or make an item"])
     ns.Print("/bf eval  " .. L["the best recipes for the reagents in your tray"])
-    ns.Print("/bf diag  " .. L["scanner diagnostics"])
-    ns.Print("/bf selftest  " .. L["check the price math and the recipe data"])
+    ns.Print("/bf ledger  " .. L["your auction results: the house cut, what sold and what expired"])
+    ns.Print("/bf diag  " .. L["diagnostics: scanner, searches, merchant, recipes, mail, deposits, your auctions"])
+    ns.Print("/bf selftest  " .. L["check the price math, the recipe data and the sales ledger"])
     ns.Print("/bf help | minimap")
 end
 
@@ -22,7 +23,8 @@ local function SelfTest()
         if not ok then failures[#failures + 1] = name .. ": " .. detail end
     end
     local passed, failed = 0, 0
-    for _, suite in ipairs({ ns.Econ.SelfTest, ns.Evaluator.SelfTest, ns.RecipeIndex.SelfTest }) do
+    for _, suite in ipairs({ ns.Econ.SelfTest, ns.Evaluator.SelfTest, ns.RecipeIndex.SelfTest, ns.Ledger.SelfTest,
+                             ns.Mail.SelfTest, ns.Deposits.SelfTest }) do
         local p, f = suite(report)
         passed, failed = passed + p, failed + f
     end
@@ -61,6 +63,11 @@ SlashCmdList["BUFFETTFOREVER"] = function(msg)
         ns.Search.PrintDiag()
         ns.Merchant.PrintDiag()
         ns.Harvest.PrintDiag()
+        ns.Mail.PrintDiag()
+        ns.Deposits.PrintDiag()
+        ns.Owned.PrintDiag()
+    elseif cmd == "ledger" then
+        ns.Ledger.PrintSummary()
     elseif cmd == "selftest" then
         SelfTest()
     elseif cmd == "recipes" then

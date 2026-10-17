@@ -4,9 +4,11 @@ local addonName, ns = ...
 -- - what it makes, for which profession, and who knows it;
 -- - each reagent: the units owned (valued at what they'd sell for) and the units bought, from which
 --   source (Vendor, AH, Craft), and what that costs;
--- - the exits: a vendor, and the AH after the cut, with the market depth behind the AH price (how
---   many are listed, at what prices, over how many days of data), flagging a wall of identical asks
---   (asking prices aren't sales);
+-- - the exits: a vendor, and the AH after the cut and the deposits expected to be lost, saying where
+--   each number comes from (the cut measured from your sales or the default, the deposit measured
+--   or estimated, the sale chance from your own sales), your average sale and what you have listed,
+--   and the market depth behind the AH price (how many are listed, at what prices, over how many days
+--   of data), flagging a wall of identical asks (asking prices aren't sales);
 -- - profit, ROI, value added, the confidence grade with the price and the test that set it, and the
 --   verdict with its reasons.
 -- The lines sit in a scroll frame (ScrollFrameTemplate), so a long recipe scrolls instead of
@@ -76,6 +78,50 @@ local function Depth(itemID)
         days, ns.FormatAge(age))
     local wall = #ladder == 2 and (row.n or 0) >= WALL
     return text, wall
+end
+
+local function Coins(copper)
+    if copper > 0 and copper < 1 then return L["under 1c"] end
+    return Money.Format(copper)
+end
+
+-- Where the AH exit's numbers come from: the cut, the deposit, the sale chance, your own sales and
+-- listings (Pricing/Ledger.lua, Pricing/Deposits.lua).
+local function AHNotes(itemID)
+    local notes = {}
+    local cut, measured, sales = ns.Ledger.Cut()
+    if measured then
+        notes[#notes + 1] = string.format(L["Cut %.1f%%, measured from %d of your sales."], cut * 100, sales)
+    else
+        notes[#notes + 1] = string.format(L["Cut %s, the default until your sales measure it."], Pct(cut))
+    end
+    local deposit, source = ns.Deposits.PerUnit(itemID)
+    if deposit == 0 then
+        notes[#notes + 1] = string.format(L["No deposit for %s."], ns.Deposits.DurationName())
+    elseif deposit then
+        local text = source == "measured" and L["Deposit %s each for %s, lost if it doesn't sell."]
+            or L["Deposit about %s each for %s (estimated from what a vendor pays), lost if it doesn't sell."]
+        notes[#notes + 1] = string.format(text, Coins(deposit), ns.Deposits.DurationName())
+    else
+        notes[#notes + 1] = L["Deposit not measured yet, so not counted: visit the Auction House."]
+    end
+    local p, sold, expired = ns.Ledger.SaleChance(itemID)
+    if sold + expired > 0 then
+        notes[#notes + 1] = string.format(L["Sale chance %s: %d of your %d sold."], Pct(p), sold, sold + expired)
+    else
+        notes[#notes + 1] = string.format(L["Sale chance %s: none of yours has sold or expired yet, so your rate over all items."],
+            Pct(p))
+    end
+    if deposit and deposit > 0 and p < 1 then
+        notes[#notes + 1] = string.format(L["About %s of deposits lost per unit sold."], Coins(deposit * (1 - p) / p))
+    end
+    local item = ns.Ledger.Item(itemID)
+    if item and item.s > 0 then
+        notes[#notes + 1] = string.format(L["Your sales: %d at %s each on average."], item.s, Money.Format(item.bid / item.s))
+    end
+    local listed = ns.Ledger.Listed(itemID)
+    if listed and listed > 0 then notes[#notes + 1] = string.format(L["You have %d listed."], listed) end
+    return notes
 end
 
 local function ReagentLine(line)
@@ -151,8 +197,8 @@ function DetailPanel.Refresh()
     if recipe.bop then
         Add(L["AH: binds on pickup, so it can't be sold there."])
     elseif r.ahExit then
-        Add(string.format(L["AH: %s after the %d%% cut (deposits not counted yet)."], Money.Format(r.ahExit),
-            math.floor(s.cut * 100 + 0.5)))
+        Add(string.format(L["AH: %s after the cut and the deposits expected to be lost."], Money.Format(r.ahExit)))
+        for _, note in ipairs(AHNotes(recipe.output)) do Add("    " .. note, nil, 2) end
         local depth, wall = Depth(recipe.output)
         if depth then Add("    " .. depth, nil, 2) end
         if wall then

@@ -8,8 +8,9 @@ local addonName, ns = ...
 --   for the details pane;
 -- - losses are red, recommended rows white, the rest grey;
 -- - "Known only" and "Show unconfirmed" filter the list.
--- Also fills the Top pick panel. Re-evaluates (debounced) when the tray, the prices or the known
--- recipes change, while the window is open; otherwise on the next open.
+-- Also fills the Top pick panel. Re-evaluates (debounced) when the tray, the prices, the known
+-- recipes, the sales ledger or the deposits change, while the window is open; otherwise on the next
+-- open.
 
 local L = ns.L
 local UI = ns.UI
@@ -355,6 +356,6 @@ ns.On("MAIN_BUILT", Build)
 ns.On("MAIN_SHOWN", function()
     if dirty then ResultsList.Update() end
 end)
-for _, message in ipairs({ "TRAY_CHANGED", "SCAN_DONE", "RECIPES_KNOWN_CHANGED" }) do
+for _, message in ipairs({ "TRAY_CHANGED", "SCAN_DONE", "RECIPES_KNOWN_CHANGED", "LEDGER_CHANGED", "DEPOSITS_CHANGED" }) do
     ns.On(message, Schedule)
 end

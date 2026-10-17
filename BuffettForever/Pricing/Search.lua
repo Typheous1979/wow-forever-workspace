@@ -24,10 +24,12 @@ local MAX_PAGES = 5
 local DIAG_KEEP = 20
 local SORTS = { { sortOrder = Enum.AuctionHouseSortOrder.Price, reverseSort = false } }
 
+local READY_GAP = 0.2       -- seconds between two messages sent on one throttle-ready
+
 local queue = {}      -- { itemID, key } waiting to be sent, in order
 local callbacks = {}  -- [itemID] = { fn, ... } for queued and in-flight items
 local current         -- the query in flight
-local readyFn         -- what to send once the throttle is ready
+local readyQueue = {} -- what to send once the throttle is ready, oldest first (searches, Pricing/Owned.lua)
 
 local function NowMs()
     return debugprofilestop()
@@ -42,20 +44,25 @@ local function Notify(itemID, result, problem)
     end
 end
 
--- Send now if the throttle allows, else as soon as AUCTION_HOUSE_THROTTLED_SYSTEM_READY fires.
-local function WhenReady(fn)
-    if C_AuctionHouse.IsThrottledMessageSystemReady() then
-        readyFn = nil
-        fn()
-    else
-        readyFn = fn
-    end
+-- One waiting message per throttle-ready, the next one READY_GAP later. A message whose query is
+-- gone (timed out, the AH closed) does nothing, so the next one goes out.
+local function RunReady()
+    if #readyQueue == 0 or not ns.ahOpen or not C_AuctionHouse.IsThrottledMessageSystemReady() then return end
+    local fn = table.remove(readyQueue, 1)
+    fn()
+    if #readyQueue > 0 then C_Timer.After(READY_GAP, RunReady) end
 end
 
+-- Send now if the throttle allows, else as soon as AUCTION_HOUSE_THROTTLED_SYSTEM_READY fires, in
+-- the order asked. Shared by every AH message BuffettForever sends.
+function Search.WhenReady(fn)
+    readyQueue[#readyQueue + 1] = fn
+    RunReady()
+end
+local WhenReady = Search.WhenReady
+
 function events:AUCTION_HOUSE_THROTTLED_SYSTEM_READY()
-    local fn = readyFn
-    readyFn = nil
-    if fn then fn() end
+    RunReady()
 end
 
 -- commodity, equipment or item from the item-key info; if that isn't cached yet, equipment by
@@ -136,7 +143,6 @@ local function OnTimeout(q)
     elseif q.awaiting then
         Finish(q, L["no answer from the Auction House."])
     else
-        readyFn = nil
         Finish(q, L["the Auction House is busy (throttled); try again in a moment."])
     end
 end
@@ -240,7 +246,7 @@ events.ITEM_SEARCH_RESULTS_ADDED = events.ITEM_SEARCH_RESULTS_UPDATED
 ns.On("SCAN_DONE", function() Search.Pump() end)
 
 ns.On("AH_CLOSED", function()
-    readyFn = nil
+    wipe(readyQueue)
     local pending = queue
     queue = {}
     if current then Finish(current, L["the Auction House closed."]) end

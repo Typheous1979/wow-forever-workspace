@@ -10,7 +10,8 @@ local addonName, ns = ...
 -- The scanner also fills BuffettForeverDB.diag, which answers the open AH probes in CLAUDE.md:
 -- the replicate index base, the cooldown (every request, with bounds derived from them),
 -- scan timings, rows missing info, the market-key inputs per character, SupportsCopperValues,
--- and which reagents are commodities.
+-- and which reagents are commodities. While reading, it names the items of sales waiting in the
+-- ledger for an ID (sales mail gives the item's name only).
 
 local L = ns.L
 local Scanner = {}
@@ -204,14 +205,16 @@ local function ReadStep(s)
     if not ns.ahOpen then return end   -- AH_CLOSED aborts the scan
     local stop = NowMs() + BUDGET_MS
     local GetInfo = C_AuctionHouse.GetReplicateItemInfo
-    local acc = s.acc
+    local acc, waiting = s.acc, s.waiting
     while s.i <= s.last and NowMs() < stop do
-        local _, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemID, hasAllInfo = GetInfo(s.i)
+        local name, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemID, hasAllInfo = GetInfo(s.i)
         s.rows = s.rows + 1
         if not itemID or itemID == 0 then
             s.noItemID = s.noItemID + 1
         else
             if not hasAllInfo then s.missing = s.missing + 1 end
+            -- a sale in your mail named this item before its ID was known (Pricing/Ledger.lua)
+            if waiting and name and waiting[name] then ns.Ledger.LearnName(name, itemID) end
             if count and count > 0 and buyout and buyout > 0 then
                 local t = acc[itemID]
                 if not t then
@@ -288,6 +291,7 @@ local function BeginRead(s)
     s.first, s.last = FindRange(n)
     s.i, s.total = s.first, math.max(0, s.last - s.first + 1)
     s.acc, s.rows, s.items, s.missing, s.noItemID, s.bidOnly = {}, 0, 0, 0, 0, 0
+    s.waiting = ns.Ledger.PendingNames()
     s.readStarted = NowMs()
     state = "reading"
     ReadStep(s)

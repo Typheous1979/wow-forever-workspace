@@ -32,6 +32,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2900,
@@ -104,6 +105,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2900,
@@ -178,6 +180,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2900,
@@ -250,6 +253,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2900,
@@ -322,6 +326,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2900,
@@ -392,6 +397,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2900,
@@ -464,6 +470,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2900,
@@ -536,6 +543,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 46,
@@ -608,6 +616,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2900,
@@ -679,6 +688,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 1500,
@@ -751,6 +761,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
             },
@@ -810,6 +821,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2900,
@@ -878,6 +890,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2100,
@@ -950,6 +963,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 2000,
@@ -1021,6 +1035,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2589] = 950,
                 [2996] = 4000,
@@ -1076,6 +1091,7 @@ ns.EvaluatorVectors = {
             },
             priceInfo = {},
             recipeFor = {},
+            saleChance = {},
             sellPrice = {},
             settings = {
                 cut = 0.05,
@@ -1148,6 +1164,7 @@ ns.EvaluatorVectors = {
                 },
             },
             recipeFor = {},
+            saleChance = {},
             sellPrice = {
                 [2840] = 400,
                 [2841] = 900,
@@ -1222,6 +1239,7 @@ ns.EvaluatorVectors = {
                     yield = 2,
                 },
             },
+            saleChance = {},
             sellPrice = {
                 [2671] = 1500,
             },
@@ -1285,6 +1303,7 @@ ns.EvaluatorVectors = {
                     yield = 1,
                 },
             },
+            saleChance = {},
             sellPrice = {},
             settings = {
                 cut = 0.05,
@@ -1352,6 +1371,7 @@ ns.EvaluatorVectors = {
                     yield = 1,
                 },
             },
+            saleChance = {},
             sellPrice = {},
             settings = {
                 cut = 0.05,
@@ -1393,6 +1413,449 @@ ns.EvaluatorVectors = {
                     itemID = 21,
                 } },
             recipeID = 2,
+        },
+    },
+    {
+        crafts = 10,
+        ctx = {
+            deposit = {
+                [2996] = 60,
+            },
+            ladder = {
+                [2589] = { 950, 20, 1000, 40, 1100, 100 },
+            },
+            owned = {
+                [2589] = 6,
+            },
+            priceInfo = {
+                [2589] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+                [2996] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+            },
+            recipeFor = {},
+            saleChance = {
+                [2996] = 0.8,
+            },
+            sellPrice = {
+                [2589] = 950,
+                [2996] = 2900,
+            },
+            settings = {
+                cut = 0.05,
+                margin = 0.2,
+                minGrade = "C",
+                minProfit = 500,
+                ownedPolicy = "opportunity",
+                saleChance = 0.5,
+            },
+            vendorBuy = {},
+            vendorSell = {
+                [2589] = 13,
+                [2996] = 40,
+            },
+        },
+        expect = {
+            ahExit = 27400.0,
+            best = 27400.0,
+            bestSource = "ah",
+            cogs = 18715.0,
+            grade = "A",
+            profit = 8685.0,
+            reasons = "",
+            recommended = true,
+            roi = 0.4640662570130911,
+            sources = "ah",
+            valueAdded = 9350.0,
+            vendorExit = 400,
+            warnings = "",
+        },
+        name = "BOLT-SALE-CHANCE",
+        recipe = {
+            bop = false,
+            count = 1,
+            output = 2996,
+            reagents = { {
+                    count = 2,
+                    itemID = 2589,
+                } },
+            recipeID = 2963,
+        },
+    },
+    {
+        crafts = 10,
+        ctx = {
+            deposit = {
+                [2589] = 100,
+            },
+            ladder = {
+                [2589] = { 950, 20, 1000, 40, 1100, 100 },
+            },
+            owned = {
+                [2589] = 6,
+            },
+            priceInfo = {
+                [2589] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+                [2996] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+            },
+            recipeFor = {},
+            saleChance = {
+                [2589] = 0.25,
+            },
+            sellPrice = {
+                [2589] = 950,
+                [2996] = 2900,
+            },
+            settings = {
+                cut = 0.05,
+                margin = 0.2,
+                minGrade = "C",
+                minProfit = 500,
+                ownedPolicy = "opportunity",
+                saleChance = 0.5,
+            },
+            vendorBuy = {},
+            vendorSell = {
+                [2589] = 13,
+                [2996] = 40,
+            },
+        },
+        expect = {
+            ahExit = 27550.0,
+            best = 27550.0,
+            bestSource = "ah",
+            cogs = 16915.0,
+            grade = "A",
+            profit = 10635.0,
+            reasons = "",
+            recommended = true,
+            roi = 0.6287318947679574,
+            sources = "ah",
+            valueAdded = 15500.0,
+            vendorExit = 400,
+            warnings = "",
+        },
+        name = "BOLT-OWNED-LOW-P",
+        recipe = {
+            bop = false,
+            count = 1,
+            output = 2996,
+            reagents = { {
+                    count = 2,
+                    itemID = 2589,
+                } },
+            recipeID = 2963,
+        },
+    },
+    {
+        crafts = 10,
+        ctx = {
+            deposit = {},
+            ladder = {
+                [2589] = { 950, 20, 1000, 40, 1100, 100 },
+            },
+            owned = {
+                [2589] = 6,
+            },
+            priceInfo = {
+                [2589] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+                [2996] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+            },
+            recipeFor = {},
+            saleChance = {},
+            sellPrice = {
+                [2589] = 950,
+                [2996] = 2900,
+            },
+            settings = {
+                cut = 0.15,
+                margin = 0.2,
+                minGrade = "C",
+                minProfit = 500,
+                ownedPolicy = "opportunity",
+                saleChance = 0.5,
+            },
+            vendorBuy = {},
+            vendorSell = {
+                [2589] = 13,
+                [2996] = 40,
+            },
+        },
+        expect = {
+            ahExit = 24650.0,
+            best = 24650.0,
+            bestSource = "ah",
+            cogs = 18145.0,
+            grade = "A",
+            profit = 6505.0,
+            reasons = "",
+            recommended = true,
+            roi = 0.3585009644530174,
+            sources = "ah",
+            valueAdded = 8500.0,
+            vendorExit = 400,
+            warnings = "",
+        },
+        name = "BOLT-CUT-15",
+        recipe = {
+            bop = false,
+            count = 1,
+            output = 2996,
+            reagents = { {
+                    count = 2,
+                    itemID = 2589,
+                } },
+            recipeID = 2963,
+        },
+    },
+    {
+        crafts = 10,
+        ctx = {
+            deposit = {
+                [2996] = 400,
+            },
+            ladder = {
+                [2589] = { 950, 20, 1000, 40, 1100, 100 },
+            },
+            owned = {
+                [2589] = 6,
+            },
+            priceInfo = {
+                [2589] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+                [2996] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+            },
+            recipeFor = {},
+            saleChance = {
+                [2996] = 0.1,
+            },
+            sellPrice = {
+                [2589] = 950,
+                [2996] = 2900,
+            },
+            settings = {
+                cut = 0.05,
+                margin = 0.2,
+                minGrade = "C",
+                minProfit = 1000,
+                ownedPolicy = "opportunity",
+                saleChance = 0.5,
+            },
+            vendorBuy = {},
+            vendorSell = {
+                [2589] = 13,
+                [2996] = 40,
+            },
+        },
+        expect = {
+            ahExit = 0.0,
+            best = 400,
+            bestSource = "vendor",
+            cogs = 18715.0,
+            grade = "A",
+            profit = -18315.0,
+            reasons = "loss",
+            recommended = false,
+            roi = -0.9786267699706118,
+            sources = "ah",
+            valueAdded = -17650.0,
+            vendorExit = 400,
+            warnings = "",
+        },
+        name = "BOLT-UNSOLD",
+        recipe = {
+            bop = false,
+            count = 1,
+            output = 2996,
+            reagents = { {
+                    count = 2,
+                    itemID = 2589,
+                } },
+            recipeID = 2963,
+        },
+    },
+    {
+        crafts = 10,
+        ctx = {
+            deposit = {
+                [2996] = 400,
+            },
+            ladder = {
+                [2589] = { 950, 20, 1000, 40, 1100, 100 },
+            },
+            owned = {
+                [2589] = 6,
+            },
+            priceInfo = {
+                [2589] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+                [2996] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+            },
+            recipeFor = {},
+            saleChance = {
+                [2996] = 0.1,
+            },
+            sellPrice = {
+                [2589] = 950,
+                [2996] = 2900,
+            },
+            settings = {
+                cut = 0.05,
+                margin = 0.2,
+                minGrade = "C",
+                minProfit = 1000,
+                ownedPolicy = "opportunity",
+                saleChance = 0.5,
+            },
+            vendorBuy = {},
+            vendorSell = {
+                [2589] = 13,
+            },
+        },
+        expect = {
+            ahExit = 0.0,
+            best = 0.0,
+            bestSource = "ah",
+            cogs = 18715.0,
+            grade = "A",
+            profit = -18715.0,
+            reasons = "loss",
+            recommended = false,
+            roi = -1.0,
+            sources = "ah",
+            valueAdded = -18050.0,
+            warnings = "",
+        },
+        name = "BOLT-UNSOLD-NO-VENDOR",
+        recipe = {
+            bop = false,
+            count = 1,
+            output = 2996,
+            reagents = { {
+                    count = 2,
+                    itemID = 2589,
+                } },
+            recipeID = 2963,
+        },
+    },
+    {
+        crafts = 1,
+        ctx = {
+            deposit = {
+                [31] = 100,
+            },
+            ladder = {},
+            owned = {
+                [31] = 1,
+            },
+            priceInfo = {
+                [31] = {
+                    age = 3600,
+                    cv = 0.1,
+                    days = 5,
+                    listed = 1000,
+                    observations = 6,
+                },
+            },
+            recipeFor = {},
+            saleChance = {
+                [31] = 0.1,
+            },
+            sellPrice = {
+                [31] = 100,
+            },
+            settings = {
+                cut = 0.05,
+                margin = 0.2,
+                minGrade = "C",
+                minProfit = 0,
+                ownedPolicy = "opportunity",
+                saleChance = 0.5,
+            },
+            vendorBuy = {},
+            vendorSell = {
+                [30] = 500,
+            },
+        },
+        expect = {
+            best = 500,
+            bestSource = "vendor",
+            cogs = 0.0,
+            grade = "A",
+            profit = 500.0,
+            reasons = "",
+            recommended = true,
+            sources = "-",
+            valueAdded = 500.0,
+            vendorExit = 500,
+            warnings = "",
+        },
+        name = "OWNED-WORTHLESS",
+        recipe = {
+            bop = false,
+            count = 1,
+            output = 30,
+            reagents = { {
+                    count = 1,
+                    itemID = 31,
+                } },
+            recipeID = 3,
         },
     },
 }

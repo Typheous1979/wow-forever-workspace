@@ -122,6 +122,39 @@ function Econ.Liquidation(vendorSell, ahNet)
     return ahNet or vendorSell
 end
 
+-- Sale chance from your sales ledger (crafting-economics.md "Sale chance"): units sold /
+-- (sold + expired), pulled toward prior by weight pseudo-units so a few outcomes can't read as 0%
+-- or 100%, and kept within [SALE_MIN, 1]. Cancelled auctions count neither way.
+local SALE_MIN = 0.05
+local MARKET_WEIGHT = 2      -- pseudo-units of the default behind your rate over all items
+local ITEM_WEIGHT = 5        -- pseudo-units of that rate behind one item's own record
+
+function Econ.SaleChance(sold, expired, prior, weight)
+    sold, expired, prior, weight = sold or 0, expired or 0, prior or 0.5, weight or 0
+    local n = sold + expired + weight
+    if n <= 0 then return prior end
+    return math.max(SALE_MIN, math.min(1, (sold + weight * prior) / n))
+end
+
+-- One item's sale chance: its own record, pulled toward your rate over all items in the market
+-- (marketSold, marketExpired), which is pulled toward the default.
+function Econ.ItemSaleChance(sold, expired, marketSold, marketExpired, default)
+    local market = Econ.SaleChance(marketSold, marketExpired, default, MARKET_WEIGHT)
+    return Econ.SaleChance(sold, expired, market, ITEM_WEIGHT), market
+end
+
+-- The house cut measured from seller invoices: total cut / total sales, once there are
+-- CUT_MIN_SALES invoices worth CUT_MIN_COPPER together (copper rounding no longer matters); nil before.
+local CUT_MIN_SALES, CUT_MIN_COPPER = 3, 10000
+Econ.CUT_MIN_SALES = CUT_MIN_SALES
+
+function Econ.MeasuredCut(cutTotal, bidTotal, sales)
+    if (sales or 0) < CUT_MIN_SALES or (bidTotal or 0) < CUT_MIN_COPPER then return nil end
+    local rate = cutTotal / bidTotal
+    if rate < 0 or rate >= 0.5 then return nil end
+    return rate
+end
+
 -- ROI is undefined when nothing was spent (everything owned and valued free): nil, rank by profit.
 function Econ.ROI(profit, cogs)
     if not profit or not cogs or cogs <= 0 then return nil end
@@ -280,5 +313,20 @@ function Econ.SelfTest(report)
     local _, whyB = Econ.Grade(30 * 3600, 5, 6, 0.10, 200, 50)
     check("GRADE-WHY", whyC == "days" and whyD == "depth" and whyB == "age",
         string.format("the deciding test: C %s, D %s, B %s", tostring(whyC), tostring(whyD), tostring(whyB)))
+
+    -- crafting-economics.md: SALE-0..3 and CUT-1..3 (the sales ledger; computed in tools/wowf/econ.py)
+    local function close(a, b) return type(a) == "number" and math.abs(a - b) < 1e-6 end
+    check("SALE-0", Econ.SaleChance(0, 0, 0.5, 2) == 0.5, "no record: the prior")
+    local s1 = Econ.SaleChance(18, 12, 0.5, 5)
+    check("SALE-1", close(s1, 20.5 / 35), string.format("18 sold, 12 expired: %s", tostring(s1)))
+    local s2 = Econ.SaleChance(0, 30, 0.5, 2)
+    check("SALE-2", s2 == 0.05, string.format("30 expired, none sold: %s (floored at 5%%)", tostring(s2)))
+    local s3 = Econ.ItemSaleChance(18, 12, 40, 30, 0.5)
+    check("SALE-3", close(s3, 0.5956349206), string.format("18 of 30 sold, 40 of 70 over all items: %s", tostring(s3)))
+    local cut = Econ.MeasuredCut(1500, 30000, 3)
+    check("CUT-1", close(cut, 0.05), string.format("3 sales, 3g in total: %s", tostring(cut)))
+    check("CUT-2", Econ.MeasuredCut(1000, 20000, 2) == nil and Econ.MeasuredCut(250, 5000, 4) == nil,
+        "too few sales, or under 1g in total: not measured yet")
+    check("CUT-3", Econ.MeasuredCut(0, 30000, 3) == 0, "no cut at all is a measurement too")
     return passed, failed
 end

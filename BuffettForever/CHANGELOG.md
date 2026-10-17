@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.0 (not released)
+- **Sales ledger:** opening a mailbox reads your Auction House mail without opening any of it: what sold (units,
+  sale total, the house cut), what expired or was cancelled (the items that came back) and what you bought. Each
+  mail counts once, however often the mailbox is opened. Your characters on the same realm and faction share it.
+- **Measured house cut:** after 3 of your sales totalling at least 1g, the cut measured from your invoices replaces
+  the 5% default.
+- **Sale chance per item:** units sold ÷ (sold + expired) from your own auctions, pulled toward your rate over all
+  items (which starts at 50%) so a couple of sales don't read as 100%. Cancelled auctions don't count.
+- **Deposits:** measured at the auctioneer for your bag items and the outputs of the tray's recipes, for the
+  duration Blizzard's sell frame uses. Items never measured get an estimate from what a vendor pays.
+- **Your auctions:** read when the Auction House opens and after each post or cancel: what you have listed.
+- **An honest AH exit:** price after the cut, minus the deposits expected to be lost on listings that don't sell,
+  using each item's own deposit and sale chance. A listing that would lose more in deposits than it earns is worth
+  nothing on the AH.
+- The details pane says where each number comes from: the cut (measured or the default), the deposit (measured or
+  estimated), the sale chance (from your sales or your overall rate), your average sale and what you have listed.
+- Alt+Right-click at the Auction House also prints the item's deposit.
+- `/bf ledger`: the cut, your sell-through and the items with the most results. `/bf diag` reports mail, deposits and
+  your auctions.
+- `/bf selftest` also checks the sale chance, the measured cut, mail counting, ledger filing and the deposit
+  estimate, and replays 6 more scenarios from the Python reference (26).
+- Pass 1 tested on client 1.60.1.70425, 2026-10-17: selftest 74/74; deposits and your auctions are read at the
+  Auction House; a cancelled auction is filed once however often the mailbox is opened; unread mail stays unread.
+
 ## 0.4.0 (not released)
 - **Reagent tray:**
   - Drag up to 10 reagents onto the slots, or Alt+Right-click them in your bags (at the AH it also price-checks).
