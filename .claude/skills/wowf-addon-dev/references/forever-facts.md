@@ -316,6 +316,10 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
       - **836 Forever-new recipes** (spells ≥ 1.2M, many with items ≥ 250k such as Fish Bowl, Basic Campfire,
         Camp Chair, Mana Well, plus new versions of the Classic healing potions). **117 of their outputs were on
         the beta AH** (70425), so they're crafted on Forever. Confirm the rest in game.
+      - **Gathering and secondary professions craft on Forever.** One character knows these Forever-new recipes:
+        - Skinning *Camp Chair* (3 Light Leather + 2 Simple Wood);
+        - Cooking *Basic Campfire Kit* (1 Simple Wood);
+        - First Aid *Minor Healing Potion* (Empty Vial + Mild Spices + Peacebloom). [Probe 70425]
     - **`BuyPrice / VendorStackCount` equals what a merchant charges** (37 of 37 items checked against a harvest on
       70425). ItemSparse doesn't say *which* items a vendor sells.
     - SkillLine and SkillLineAbility CSVs don't start with the `ID` column, so check the header, not
