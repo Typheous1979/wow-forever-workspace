@@ -239,7 +239,8 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
 - **[F-122]** There is **no AH cut API or constant**. Measure it from seller invoices: `GetInboxInvoiceInfo`
   (undocumented, present) → `consignment / bid`. Deposits: `CalculateCommodityDeposit` /
   `CalculateItemDeposit`; the formula is in [F-129]. `Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5`.
-  The cut rate on Forever: **unmeasured**. The ReplicateItems cooldown is between 14.6 and 18.7 min ([F-121]). [Source; Probe 70374, 70425]
+  The cut rate on Forever: **unmeasured**; a 19c sale paid none ([F-130]), so measure it on sales worth more.
+  The ReplicateItems cooldown is between 14.6 and 18.7 min ([F-121]). [Source; Probe 70374, 70425]
 - **[F-123]** Professions use the modern `Blizzard_Professions` (LoadOnDemand) with Camelot overrides; Forever
   forces "show unlearned" off. `Blizzard_TradeSkillUI` and `Blizzard_CraftUI` don't exist; Enchanting uses the
   normal window. `C_TradeSkillUI`: 89 documented + 57 runtime-only functions (`GetAllRecipeIDs`,
@@ -370,7 +371,14 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     Blizzard's mail frame refreshes the list with `CheckInbox`, rate-limited by `C_Mail.CanCheckInbox` [Source
     70450], so reopening the mailbox can show the cached list. Within one snapshot a mail's `daysLeft` float is
     identical, so match on it before matching on time.
-  - The house cut is still unmeasured ([F-122]): no sale yet.
+  - **A sale** (2026-10-17): 1 Coarse Thread at 19c. The invoice read bid 19, consignment (the cut) 0, deposit 50,
+    and the mail carried 69c, the bid less the cut plus the deposit: a sale returns its deposit.
+    - No cut on 19c. At 5% that's 0.95c, so the cut rounds down to whole copper, or the rate is lower. Small sales
+      can't measure it ([F-122]).
+    - Open: a 1-unit auction pays the 1s minimum [F-129], so 50c is probably half of a 2-unit auction's deposit,
+      returned with the 1 unit sold.
+  - A return of several units names the count in the subject: "Auction expired: Light Leather (2)".
+  - Two expired Light Leather were filed once, and reopening the mailbox about 4 minutes later filed nothing twice.
 
   [Probe 70425]
 - **[F-131]** **Your auctions:** `C_AuctionHouse.QueryOwnedAuctions(sorts)` then `GetOwnedAuctions()` work without

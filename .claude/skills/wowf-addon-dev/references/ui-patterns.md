@@ -73,6 +73,22 @@ Addon frames that you create aren't protected. You only need combat-lockdown car
   - Stack rows and text lines with one helper that anchors each region under the previous one and adds up the
     heights for the scroll child. Pool the rows, and hide them all before a refresh.
   - Colour only the exceptions: red for a loss, orange for a risk, grey for "not available".
+- **A window's views: Blizzard's tabs, not home-made ones.** Justin (2026-10-17): text tabs drawn inside a pane
+  get missed. Forever's own windows use two styles [Source 70450]:
+  - **Bottom text tabs**, `PanelTabButtonTemplate` (Blizzard_SharedXML, the Mainline file Forever loads): the
+    Auction House (Buy, Sell, Auctions), Friends, Merchant. Prefer these for views a player must discover.
+    - Create them on the window and set `window.Tabs = { tab1, ... }`: the `PanelTemplates_*` helpers look there,
+      then for `<WindowName>Tab<i>` globals.
+    - Anchor the first `TOPLEFT` to the window's `BOTTOMLEFT` at (11, 2) on a ButtonFrameTemplate, as the
+      Character frame does. `PanelTemplates_SetNumTabs(window, n)` anchors the rest;
+      `PanelTemplates_SetTab(window, i)` selects one.
+    - The selected tab is disabled, but the template keeps motion scripts, so tooltips still work. The template's
+      own OnEnter only shows a truncated label, so hook OnEnter for yours (`ANCHOR_RIGHT`, as Blizzard's tabs do).
+    - Play `SOUNDKIT.IG_CHARACTER_INFO_TAB` on click, as the Auction House does.
+    - The tabs hang 30 px below the window: `window:SetClampRectInsets(0, 0, 0, -30)` keeps them on screen.
+    - Example: BuffettForever `UI/ResultsList.lua` 0.7.0, tested on 70425.
+  - **Icon side tabs**, `LargeSideTabButtonTemplate`, on the windows Forever redesigned: Character, Professions,
+    Collections, Bank, Inspect. An icon needs a hover to explain itself.
 
 ## Combat lockdown queue
 ```lua
