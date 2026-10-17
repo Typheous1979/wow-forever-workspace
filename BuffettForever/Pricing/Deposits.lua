@@ -3,7 +3,8 @@ local addonName, ns = ...
 -- Auction deposits (auction-house.md "Deposits and the house cut"). Forever charges per auction
 -- max(1s, floor(vendor price x quantity / 20) x 1, 4 or 12) for 2, 8 or 24 hours [F-129]
 -- (Econ.Deposit), so the evaluator computes any deposit from the vendor price, the units posted
--- together and the duration Blizzard's sell frame remembers (CVar auctionHouseDurationDropdown).
+-- together and the duration Blizzard's sell frame remembers (CVar auctionHouseDurationDropdown), or
+-- the one the settings fix.
 -- At the auctioneer this module asks the game for the deposits Blizzard's sell frame shows
 -- (CalculateCommodityDeposit, CalculateItemDeposit) for the bag items and the tray's outputs at all
 -- three durations, and compares them with the formula, so a new build that changes it shows up in
@@ -36,8 +37,13 @@ local function Diag()
     return d
 end
 
--- The duration Blizzard's sell frame will use, 1 to 3 (8 hours, 2, when the CVar is unreadable).
-function Deposits.Duration()
+-- The duration deposits are figured for (1, 2, 3 = 2, 8, 24 hours): the settings' choice
+-- (depositDuration), else the one Blizzard's sell frame remembers, else 8 hours (2, when the CVar is
+-- unreadable). settings: for the self test.
+function Deposits.Duration(settings)
+    settings = settings or (ns.db and ns.db.settings) or {}
+    local fixed = settings.depositDuration
+    if type(fixed) == "number" and fixed >= 1 and fixed <= DURATIONS then return math.floor(fixed) end
     local value = tonumber(C_CVar.GetCVar("auctionHouseDurationDropdown") or "")
     if value and value >= 1 and value <= DURATIONS then return math.floor(value) end
     return 2
@@ -250,5 +256,9 @@ function Deposits.SelfTest(report)
     local thread = ns.Econ.DepositPerUnit(Deposits.VendorSell(2320), 2, 2, true)
     check("DEP-THREAD", thread == 50, string.format("2 Coarse Thread (vendor %dc) for 8 hours: %s each (the sell frame said 1s for both)",
         Deposits.VendorSell(2320), tostring(thread)))
+    local fixed, follow = Deposits.Duration({ depositDuration = 3 }), Deposits.Duration({ depositDuration = 0 })
+    check("DEP-DURATION", fixed == 3 and follow >= 1 and follow <= DURATIONS,
+        string.format("fixed in the settings: %s; 0 follows the sell frame: %s", Deposits.DurationName(fixed),
+            Deposits.DurationName(follow)))
     return passed, failed
 end

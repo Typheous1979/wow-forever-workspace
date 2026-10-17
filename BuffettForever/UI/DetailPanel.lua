@@ -336,9 +336,10 @@ local function AHParts(r)
             L["The lower of the market value and the cheapest listing (the fair value once the last scan is over 48 hours old), and never above what a vendor charges for it."],
         }, true)
     end
-    local cut, measured, sales = ns.Ledger.Cut()
-    Row(L["Cut"], measured and string.format("%.1f%%", cut * 100) or Pct(cut), {
-        measured and string.format(L["Measured from %d of your sales."], sales)
+    local cut, measured, sales, fixed = ns.Ledger.Cut()
+    Row(L["Cut"], ns.Ledger.CutText(cut, measured), {
+        fixed and L["As set in the settings (measuring is off)."]
+            or measured and string.format(L["Measured from %d of your sales."], sales)
             or string.format(L["The default until %d of your sales worth 1g in all measure it."], ns.Econ.CUT_MIN_SALES),
     }, true)
 

@@ -78,9 +78,28 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   does: a round result icon with the count and the quality-coloured name, and reagent slots with "have/need Name"
   (Justin's request). Flips.Recheck loads the items whose vendor price wasn't cached during a scan and looks again.
   Tested on 70425: the icons work; a scan found 13 flips, then loaded all 1,305 unpriced items and found 5 more.
+- 0.8.0 M5 pass 1 (2026-10-17): Options.lua puts every economics setting in
+  Blizzard's panel, plus two new ones: measuredCut (use the cut your sales measure, default on) and
+  depositDuration (0 = what the AH remembers). SETTINGS_CHANGED re-ranks the list. Ledger.Cut(book, settings)
+  and Deposits.Duration(settings) take test inputs; Options.SelfTest checks the defaults; selftest 111.
+  Tested on 70425: selftest 111/111; the panel, live re-ranking and the cut work, and the settings are kept. Justin
+  saw Embossed Leather Cloak's deposit stay 1s at every length. That's correct: a vendor pays 112c for it, so
+  the formula gives 5c, 20c and 60c, all under the 1s minimum. 105 of the 168 recipes in his last snapshot
+  do change with the length.
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). The expiry and mailbox-reopen tests passed on
   70425 (2026-10-17).
+
+## Decisions (2026-10-17, M5; Justin: "Proceed with Pass 1" after the plan and its recommendations)
+- **Order:** pass 1 the settings; pass 2 the release (README, CurseForge page, screenshots, 1.0.0, package, then a
+  check on the stress-test client, build 70245, once it's installed).
+- **Dropped from M4's leftovers:**
+  - profit per hour: a craft takes seconds, so the figure would mislead, and the market is the limit, which
+    Best batch already shows;
+  - a value-added column: the list has no room for a seventh column, and the details pane shows value added.
+- **Settings bind to db.settings** through Blizzard's panel. The defaults live in Core.lua only
+  (ns.DEFAULT_SETTINGS). Lowering the price history deletes the older days at the next login (PriceDB.Prune), and
+  the tooltip says so.
 
 ## Decisions (2026-10-16, M4; Justin approved the plan's recommendations)
 - **Order:** pass 1 an honest AH exit (sales ledger, measured cut, deposits, your auctions); pass 2 market reality
@@ -217,10 +236,11 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 - **M5 publish:** Settings (cut, margin of safety, minimum profit, owned-materials policy, history days, sale chance),
   README/CurseForge page (`docs/BuffettForever-curseforge.md`), screenshots, `package BuffettForever`.
 
-## Economics defaults (wowf-economics; make them settings in M5)
+## Economics defaults (wowf-economics; settings since 0.8.0, Options.lua)
 Cut 5% until measured; sale chance per listing 0.5 until your sales say otherwise; margin of safety 20%; minimum
-profit 10s per craft (the reference's 1g suits level 60); history 14 days, half-life 3 days; stale after 48 h;
-make-or-buy depth 3; owned materials at opportunity cost.
+profit 10s per craft (the reference's 1g suits level 60); minimum grade C; history 14 days; deposits at the
+auction length the AH remembers; owned materials at opportunity cost. Not settings: half-life 3 days, stale after
+48 h, make-or-buy depth 3.
 
 ## Open questions and probes (run in game; record Forever facts in forever-facts.md, decisions here)
 - Answered on 70425 by the scanner's `diag` [F-121]:

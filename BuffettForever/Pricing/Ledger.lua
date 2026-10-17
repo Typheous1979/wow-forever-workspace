@@ -147,16 +147,25 @@ function Ledger.MarketSaleChance(book)
     return market
 end
 
--- The house cut: measured from your sales mail once there are enough sales, else the setting.
--- Returns rate, measured (true/false), seller invoices so far.
-function Ledger.Cut()
-    local default = ns.db and ns.db.settings.cut or 0.05
-    local book = Ledger.Book()
-    if not book then return default, false, 0 end
-    local c = book.cut
-    local rate = ns.Econ.MeasuredCut(c.cut, c.bid, c.n)
-    if rate then return rate, true, c.n end
-    return default, false, c.n
+-- The house cut: measured from your sales mail once there are enough sales, else the setting; always
+-- the setting when the settings turn measuring off. Returns the rate, measured (true/false), the seller
+-- invoices so far, and fixed (true: the setting, by choice). book, settings: for the self test.
+function Ledger.Cut(book, settings)
+    settings = settings or (ns.db and ns.db.settings) or {}
+    local default = settings.cut or 0.05
+    book = book or Ledger.Book()
+    local n = book and book.cut.n or 0
+    if settings.measuredCut == false then return default, false, n, true end
+    local rate = book and ns.Econ.MeasuredCut(book.cut.cut, book.cut.bid, book.cut.n)
+    if rate then return rate, true, n, false end
+    return default, false, n, false
+end
+
+-- The cut as text: a measured rate to one decimal; a set one as "5%", or "5.5%" between whole percents.
+function Ledger.CutText(rate, measured)
+    local p = rate * 100
+    if measured or math.abs(p - math.floor(p + 0.5)) >= 0.01 then return string.format("%.1f%%", p) end
+    return string.format("%d%%", math.floor(p + 0.5))
 end
 
 -- Your active auctions at the auctioneer (Pricing/Owned.lua): { [itemID] = { q, n } }.
@@ -195,12 +204,15 @@ end
 function Ledger.PrintSummary()
     local key = ns.PriceDB.MarketKey() or "?"
     local book = Ledger.Book()
-    local rate, measured, invoices = Ledger.Cut()
-    if measured then
+    local rate, measured, invoices, fixed = Ledger.Cut()
+    if fixed then
+        ns.Print(string.format(L["%s: the AH cut counts as %s, as set in the settings; %d of your sales so far."],
+            key, Ledger.CutText(rate), invoices))
+    elseif measured then
         ns.Print(string.format(L["%s: the AH cut is %.1f%%, measured from %d of your sales."], key, rate * 100, invoices))
     else
         ns.Print(string.format(L["%s: the AH cut counts as %s (the default) until %d of your sales worth 1g in all measure it; %d so far."],
-            key, Pct(rate), ns.Econ.CUT_MIN_SALES, invoices))
+            key, Ledger.CutText(rate), ns.Econ.CUT_MIN_SALES, invoices))
     end
     if book and book.listedAt then
         local auctions = 0
@@ -263,5 +275,14 @@ function Ledger.SelfTest(report)
     local expected = ns.Econ.ItemSaleChance(3, 3, 3, 3, ns.db and ns.db.settings.saleChance or 0.5)
     check("LEDGER-CHANCE", s == 3 and e == 3 and item.c == 4 and math.abs(p - expected) < 1e-9,
         string.format("3 sold, 3 expired, 4 cancelled (not counted): sale chance %s", tostring(p)))
+    -- the cut: measured once 3 sales worth 1g in all have come, unless the settings fix it
+    local sales = NewBook()
+    sales.cut = { bid = 30000, cut = 1500, n = 3 }
+    local rate, measured, invoices, fixed = Ledger.Cut(sales, { cut = 0.07, measuredCut = true })
+    check("LEDGER-CUT-MEASURED", measured and not fixed and invoices == 3 and math.abs(rate - 0.05) < 1e-9,
+        string.format("3 sales, 3g in all, 15s cut: %s, measured", Ledger.CutText(rate, measured)))
+    rate, measured, invoices, fixed = Ledger.Cut(sales, { cut = 0.07, measuredCut = false })
+    check("LEDGER-CUT-FIXED", fixed and not measured and invoices == 3 and rate == 0.07 and Ledger.CutText(0.055) == "5.5%",
+        string.format("measuring turned off: %s, the setting", Ledger.CutText(rate, measured)))
     return passed, failed
 end

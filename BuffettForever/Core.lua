@@ -68,11 +68,13 @@ end
 local DB_VERSION = 3
 local defaults = {
     minimap = { angle = 200, shown = true },   -- minimap button: degrees around the edge, visible
-    settings = {
+    settings = {                -- Blizzard's settings panel shows them all (Options.lua)
         historyDays = 14,       -- days of price history kept per item (pruned at login)
-        -- Economics (wowf-economics defaults; Settings controls arrive in M5):
+        -- Economics (wowf-economics defaults):
         cut = 0.05,             -- AH house cut until your sales mail measures it [F-122] (Pricing/Ledger.lua)
+        measuredCut = true,     -- false: always `cut`, whatever your sales measure
         saleChance = 0.5,       -- chance a listing sells before it expires, until your sales say otherwise
+        depositDuration = 0,    -- deposits at 1, 2, 3 = 2, 8, 24 hours; 0 = what the AH's sell frame remembers
         margin = 0.20,          -- margin of safety: AH over vendor, and the minimum ROI to recommend
         minProfit = 1000,       -- copper per craft (10s while leveling; the reference's 1g suits level 60)
         minGrade = "C",         -- weakest confidence grade a recommendation may rest on
@@ -85,6 +87,8 @@ local defaults = {
     recipesKnown = {},  -- [charKey][recipeID] = true (Crafting/Harvest.lua)
     diag = {},      -- answers to the open probes: scanner, searches, merchant, harvest, mail, deposits, auctions
 }
+ns.DEFAULT_SETTINGS = defaults.settings   -- the settings panel's Defaults button (Options.lua)
+
 local charDefaults = {
     window = {},   -- main window position (per character)
     tray = {},     -- reagent tray: { { itemID, qty }, ... } in slot order (Crafting/Tray.lua)

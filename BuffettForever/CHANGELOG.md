@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.0 (not released)
+- **Settings** in Options > AddOns > BuffettForever (or `/bf options`, or right-click the minimap button).
+  Changing one re-ranks the list.
+  - Recommendations: margin of safety (20%), minimum profit per craft (10s), lowest confidence grade (C).
+  - Costs:
+    - the materials you own, counted at what they'd sell for, at nothing, or at what replacing them costs;
+    - the house cut (5% until your sales measure it, or always your figure);
+    - the sale chance until your sales measure it (50%);
+    - the auction length deposits are figured for (what the Auction House remembers, or 2, 8 or 24 hours).
+  - Price data: days of history kept (14; fewer deletes the older days at your next login).
+- `/bf selftest`: 111 checks (the measured or fixed cut, a fixed auction length, every default a choice the
+  panel offers).
+- Tested on client 1.60.1.70425, 2026-10-17: selftest 111/111. The panel, its tooltips, live re-ranking and the cut
+  work, and the settings are kept. The auction length is to check again on a dearer item: the cloak tried pays
+  the 1s minimum at every length.
+
 ## 0.7.0 (not released)
 - **Three views** in the middle pane: Tray, Vendor crafts and AH flips, picked with Blizzard's tabs under the
   window (as on the Auction House); the pane's heading names the view.

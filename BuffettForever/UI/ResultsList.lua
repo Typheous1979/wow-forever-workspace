@@ -13,8 +13,8 @@ local addonName, ns = ...
 --   would fetch more on the AH;
 -- - "Known only" and "Show unconfirmed" filter the Tray view.
 -- Also fills the Top pick panel. Re-evaluates (debounced) when the tray, the prices, the known
--- recipes, the sales ledger, the deposits, your bags or vendor prices change, while the window is
--- open; otherwise on the next open.
+-- recipes, the sales ledger, the deposits, your bags, vendor prices, the flips or the settings change,
+-- while the window is open; otherwise on the next open.
 
 local L = ns.L
 local UI = ns.UI
@@ -215,13 +215,15 @@ local function GradeTooltip(owner)
     GameTooltip:AddLine(L["A recipe gets the grade of the weakest Auction House price it relies on. Each price is graded on these tests, and its worst test wins:"],
         nil, nil, nil, true)
     GameTooltip:AddLine(L["Age of the latest scan: A under 24 h, B under 48 h, C under 7 days."], 1, 1, 1, true)
-    GameTooltip:AddLine(L["Days seen in the last 14: A 5 or more, B 3 or more, C 1 or 2; seen in one scan only: D."], 1, 1, 1, true)
+    local s = ns.db.settings
+    GameTooltip:AddLine(string.format(L["Days seen in the last %d: A 5 or more, B 3 or more, C 1 or 2; seen in one scan only: D."],
+        math.floor(s.historyDays + 0.5)), 1, 1, 1, true)
     GameTooltip:AddLine(L["Day-to-day price swing: A under 15%, B under 30%, C under 60%."], 1, 1, 1, true)
     GameTooltip:AddLine(L["Listed now: A at least twice what you need, B at least what you need, D not enough or none."], 1, 1, 1, true)
     GameTooltip:AddLine(L["Selling into a wall: its cheapest price held 3 days while the quantity never fell: D, until you sell some."],
         1, 1, 1, true)
-    GameTooltip:AddLine(L["Vendor prices are always A. A recipe is recommended only at C or better. Scans on more days raise the grades."],
-        0.6, 0.8, 1, true)
+    GameTooltip:AddLine(string.format(L["Vendor prices are always A. A recipe is recommended only at %s or better (your settings). Scans on more days raise the grades."],
+        s.minGrade), 0.6, 0.8, 1, true)
     GameTooltip:AddLine(L["Click to sort; click again to reverse."], 1, 0.82, 0)
     GameTooltip:Show()
 end
@@ -455,6 +457,6 @@ ns.On("MAIN_SHOWN", function()
     if dirty then ResultsList.Update() end
 end)
 for _, message in ipairs({ "TRAY_CHANGED", "SCAN_DONE", "RECIPES_KNOWN_CHANGED", "LEDGER_CHANGED", "DEPOSITS_CHANGED",
-                           "BAGS_CHANGED", "VENDOR_PRICES_CHANGED", "FLIPS_CHANGED" }) do
+                           "BAGS_CHANGED", "VENDOR_PRICES_CHANGED", "FLIPS_CHANGED", "SETTINGS_CHANGED" }) do
     ns.On(message, Schedule)
 end
