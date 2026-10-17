@@ -353,14 +353,15 @@ local function AHParts(r)
             or string.format(L["One auction each for %s: %s apiece."], duration, Coins(deposit)),
         L["Returned when it sells, lost when it expires. Forever charges 5% of the vendor price per 2 hours (8 Hours x4, 24 Hours x12), at least 1s per auction."],
     }
-    if math.abs(auction - ns.Econ.DEPOSIT_MIN) < 0.01 then
+    local minimum = math.abs(auction - ns.Econ.DEPOSIT_MIN) < 0.01   -- the same at every auction length
+    if minimum then
         tip[#tip + 1] = commodity and L["This is the 1s minimum: a bigger batch spreads it."] or L["This is the 1s minimum."]
     end
     if deposit > 0 and p < 1 then
         tip[#tip + 1] = string.format(L["Expected loss: %s per unit sold, at a %s sale chance."], Coins(deposit * (1 - p) / p), Pct(p))
     end
-    Row(L["Deposit"], commodity and (units > 1 and string.format(L["%s for %d"], Coins(auction), units) or Coins(auction))
-        or string.format(L["%s each"], Coins(deposit)), tip, true)
+    Row(L["Deposit"], (commodity and (units > 1 and string.format(L["%s for %d"], Coins(auction), units) or Coins(auction))
+        or string.format(L["%s each"], Coins(deposit))) .. (minimum and (" " .. GREY .. L["(min)"] .. "|r") or ""), tip, true)
 
     Row(L["Sale chance"], sold + expired > 0 and string.format("%s (%d/%d)", Pct(p), sold, sold + expired) or Pct(p), {
         sold + expired > 0 and string.format(L["%d of your %d sold (cancelled ones don't count), pulled toward your rate over all items: %s."],

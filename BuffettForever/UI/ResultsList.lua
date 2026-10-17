@@ -353,7 +353,9 @@ function ResultsList.SetView(view)
 end
 
 -- Blizzard's own tabs (PanelTabButtonTemplate) under the window's bottom edge, where the Auction House keeps
--- Buy, Sell and Auctions; the first sits where the Character frame's does on this frame template.
+-- Buy, Sell and Auctions; the first sits where the Character frame's does on this frame template. After the
+-- views, an Options tab opens Blizzard's settings window at BuffettForever's page (Options.lua) instead of
+-- switching the list, so it's never the selected tab (Justin, 2026-10-17: fewer slash commands to learn).
 local function Tabs(frame)
     window = frame
     for i, v in ipairs(VIEWS) do
@@ -367,6 +369,18 @@ local function Tabs(frame)
         UI.Tooltip(tab, L[v.label], L[v.tip], "ANCHOR_RIGHT")
         tabs[i] = tab
     end
+    local options = CreateFrame("Button", nil, frame, "PanelTabButtonTemplate")
+    options:SetID(#VIEWS + 1)
+    options:SetText(L["Options"])
+    options:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB)
+        ns.OpenOptions()
+        frame:Lower()   -- the settings window shares this window's strata: let it show on top
+    end)
+    UI.Tooltip(options, L["Options"],
+        L["Margin of safety, minimum profit, the house cut, deposits and price history, in Blizzard's settings window."],
+        "ANCHOR_RIGHT")
+    tabs[#tabs + 1] = options
     frame.Tabs = tabs   -- PanelTemplates_* find the tabs here (the template's parentArray may fill it too)
     tabs[1]:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 11, 2)
     PanelTemplates_SetNumTabs(frame, #tabs)   -- anchors the rest in a row

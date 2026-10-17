@@ -86,6 +86,10 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   saw Embossed Leather Cloak's deposit stay 1s at every length. That's correct: a vendor pays 112c for it, so
   the formula gives 5c, 20c and 60c, all under the 1s minimum. 105 of the 168 recipes in his last snapshot
   do change with the length.
+- 0.8.0 follow-up (2026-10-17): an Options tab after the view tabs opens Blizzard's settings
+  window at our page and lowers our window under it (Justin: fewer slash commands). The Deposit row marks the
+  1s minimum "(min)". Tested on 70425: both work. Still to see in game: a deposit changing with the auction
+  length (Alt+Right-click a stack in the bags prints it for the length in use).
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). The expiry and mailbox-reopen tests passed on
   70425 (2026-10-17).

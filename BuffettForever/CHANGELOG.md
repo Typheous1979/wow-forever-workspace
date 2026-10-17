@@ -10,11 +10,13 @@
     - the sale chance until your sales measure it (50%);
     - the auction length deposits are figured for (what the Auction House remembers, or 2, 8 or 24 hours).
   - Price data: days of history kept (14; fewer deletes the older days at your next login).
+- An **Options** tab after the view tabs opens the settings.
+- The details pane's Deposit row marks the 1s minimum "(min)": it's the same at every auction length.
 - `/bf selftest`: 111 checks (the measured or fixed cut, a fixed auction length, every default a choice the
   panel offers).
 - Tested on client 1.60.1.70425, 2026-10-17: selftest 111/111. The panel, its tooltips, live re-ranking and the cut
   work, and the settings are kept. The auction length is to check again on a dearer item: the cloak tried pays
-  the 1s minimum at every length.
+  the 1s minimum at every length. Then the Options tab and the "(min)" mark worked.
 
 ## 0.7.0 (not released)
 - **Three views** in the middle pane: Tray, Vendor crafts and AH flips, picked with Blizzard's tabs under the
