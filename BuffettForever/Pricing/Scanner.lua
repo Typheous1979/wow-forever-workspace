@@ -99,14 +99,6 @@ local function ExpireLateRequest()
     end
 end
 
--- "First Surname" (names are two-part on Forever [F-080]); nil if unreadable.
-local function CharKey()
-    local first, surname = UnitFullName("player")
-    if not first or ns.IsSecret(first) or ns.IsSecret(surname) then return nil end
-    if surname and surname ~= "" then return first .. " " .. surname end
-    return first
-end
-
 -- ---------------------------------------------------------------- probes at the auctioneer
 
 -- isCommodity for the probe reagents; item-key info can arrive later (ITEM_KEY_ITEM_INFO_RECEIVED).
@@ -126,7 +118,7 @@ end
 local function ProbeAuctioneer()
     if ns.readOnlyDB then return end
     local diag = Diag()
-    local key = CharKey()
+    local key = ns.CharKey()
     if key then
         diag.chars[key] = {
             t = GetServerTime(),

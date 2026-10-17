@@ -36,6 +36,15 @@ function ns.SafeText(value, fallback)
     return tostring(value)
 end
 
+-- The character's key for per-character data kept account-wide: "First Surname" (names are
+-- two-part on Forever, never name-realm [F-080]); nil if the name can't be read.
+function ns.CharKey()
+    local first, surname = UnitFullName("player")
+    if not first or ns.IsSecret(first) or ns.IsSecret(surname) then return nil end
+    if surname and surname ~= "" then return first .. " " .. surname end
+    return first
+end
+
 -- "<1 min", "12 min", "5 h", "3 d" for a number of seconds (reads well before "ago").
 function ns.FormatAge(seconds)
     if type(seconds) ~= "number" then return "?" end
@@ -64,6 +73,8 @@ local defaults = {
     },
     markets = {},   -- [marketKey] = { items = { [itemID] = price row }, scan = last full scan } (Pricing/PriceDB.lua)
     vendor = {},    -- [itemID] = { p = unit buy price, t, lim } (Pricing/Merchant.lua)
+    recipesKnown = {},  -- [charKey][recipeID] = true (Crafting/Harvest.lua)
+    recipesSeen = {},   -- [recipeID] = true: listed by a profession window, so it exists on Forever
     diag = {},      -- scanner diagnostics for the open AH probes (Pricing/Scanner.lua)
 }
 local charDefaults = {

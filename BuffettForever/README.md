@@ -5,8 +5,8 @@
 Auction House scanner and crafting ROI advisor for World of Warcraft: Forever: what to craft, where to sell
 it, and the return on every gold piece.
 
-> **Status: 0.2.0, early development.** Auction House prices work: full scans, Alt+Right-click price checks,
-> vendor prices and tooltip lines. The crafting features below arrive over the next releases.
+> **Status: 0.3.0, early development.** Auction House prices work: full scans, Alt+Right-click price checks,
+> vendor prices and tooltip lines. Forever's recipe data is in; the tray and ROI arrive next.
 
 - **Auction House prices:** scan the whole Auction House while you talk to an auctioneer, or price-check one item
   with **Alt+Right-click** in your bags (away from the AH it shows the stored prices). Prices are kept with their
@@ -24,8 +24,9 @@ it, and the return on every gold piece.
 - `/bf` or `/buffett`: open or close the window
 - `/bf scan`: scan the whole Auction House (at an auctioneer; also the **Scan** buttons in the window and under
   the Auction House frame)
+- `/bf recipes <item link or ID>`: the recipes that use or make an item
 - `/bf options`: settings
-- `/bf diag`: scanner diagnostics; `/bf selftest`: check the price math
+- `/bf diag`: scanner diagnostics; `/bf selftest`: check the price math and the recipe data
 - `/bf minimap`: show or hide the minimap button
 - `/bf help`: list commands
 

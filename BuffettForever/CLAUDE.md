@@ -19,7 +19,11 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   2,998 items in 5.5 s; selftest 6/6; abort on AH close and the cooldown timeout work.
 - 0.2.0 M1 pass 2 (2026-10-16): Search queue, Bags (Alt+Right-click), Merchant, Tooltip, cooldown hint, index-n
   fix. Tested on 70425: all eight checks pass. Commodity searches answer in about 0.1 s in one page; equipment
-  searches (all item levels) in about 0.3 s.
+  searches (all item levels) in about 0.3 s. M1 complete.
+- 0.3.0 M2 pass 1 (2026-10-16): `recipe-catalog` tool (committed), Data/Recipes.lua (1,976 recipes, 70450),
+  Data/Vendor.lua (26), Util/Items.lua, Crafting/RecipeIndex.lua, `/bf recipes`, recipe selftests. Tested on client
+  70425 with the 70450 data: selftest 14/14, `/bf recipes` lookups, vendor-seed tooltips, no load-time cost.
+  Pass 2 (Harvest) next.
 
 ## Decisions (2026-10-16, Justin)
 - **Bag clicks:** Alt+Right-click is context-aware. At the AH it price-checks the item (targeted search) and adds it
@@ -43,6 +47,18 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 - **Items keyed by itemID only:** suffix variants of green gear ("of the Bear") merge. Fine for reagents; revisit
   for gear in M4.
 - **Market key:** normalized realm + faction (+ ":HC"); the beta gives `ClassicBetaPvP2-Horde` [F-083].
+
+## Decisions (2026-10-16, M2)
+- **Recipe data from the newest beta build** (70450). Regenerate with `recipe-catalog build --build <b>` when a build
+  lands.
+- **Recipes added after Classic are included but flagged 1** ("new"; not "era": 836 of the 860 are Forever-new, with
+  spells ≥ 1.2M). They count as confirmed once a character knows them, a profession window lists them
+  (`recipesSeen`), or their output is seen on the AH. M3 hides the unconfirmed ones by default.
+- **Enchant-only recipes are left out** (no item to price). Wands, oils and rods are in.
+- **Vendor list from evidence only:** `tools/wowf/data/vendor_reagents.json`. `vendor-merge` adds what the merchant
+  harvest saw on sale; its candidate printout is a review aid, not evidence.
+- **Recipe rows are numeric arrays** (`{profession, minRank, yellowAt, greyAt, flags, output, count, reagent,
+  count, ...}`); `RecipeIndex.Get` gives a readable copy.
 
 ## Architecture (planned files; build in this order)
 | File | Job |

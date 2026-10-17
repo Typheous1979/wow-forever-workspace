@@ -7,16 +7,33 @@ local function Help()
     ns.Print("/bf  " .. L["open or close the window"])
     ns.Print("/bf scan  " .. L["full Auction House scan (at an auctioneer)"])
     ns.Print("/bf options  " .. L["open the settings"])
+    ns.Print("/bf recipes <" .. L["item link or ID"] .. ">  " .. L["the recipes that use or make an item"])
     ns.Print("/bf diag  " .. L["scanner diagnostics"])
-    ns.Print("/bf selftest  " .. L["check the price math against its test vectors"])
+    ns.Print("/bf selftest  " .. L["check the price math and the recipe data"])
     ns.Print("/bf help | minimap")
 end
 
 local function SelfTest()
-    local passed, failed = ns.Econ.SelfTest(function(name, ok, detail)
+    local function report(name, ok, detail)
         ns.Print((ok and "|cff33ff33PASS|r " or "|cffff3333FAIL|r ") .. name .. ": " .. detail)
-    end)
+    end
+    local passed, failed = 0, 0
+    for _, suite in ipairs({ ns.Econ.SelfTest, ns.RecipeIndex.SelfTest }) do
+        local p, f = suite(report)
+        passed, failed = passed + p, failed + f
+    end
     ns.Print(string.format(ns.L["selftest: %d passed, %d failed"], passed, failed))
+end
+
+-- "/bf recipes [Linen Cloth]" (a shift-clicked link) or "/bf recipes 2589".
+local function Recipes(msg)
+    local lower = string.lower(msg or "")
+    local itemID = tonumber(string.match(lower, "item:(%d+)") or string.match(lower, "^%s*recipes%s+(%d+)%s*$") or "")
+    if not itemID then
+        ns.Print(ns.L["Usage: /bf recipes <item link or ID>"])
+        return
+    end
+    ns.RecipeIndex.PrintFor(itemID)
 end
 
 SLASH_BUFFETTFOREVER1 = "/bf"
@@ -35,6 +52,8 @@ SlashCmdList["BUFFETTFOREVER"] = function(msg)
         ns.Merchant.PrintDiag()
     elseif cmd == "selftest" then
         SelfTest()
+    elseif cmd == "recipes" then
+        Recipes(msg)
     elseif cmd == "options" then
         if ns.OpenOptions then ns.OpenOptions() end
     elseif cmd == "minimap" then

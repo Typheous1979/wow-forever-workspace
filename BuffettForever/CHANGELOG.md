@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 (not released)
+- Recipe data: 1,976 Forever recipes from the 1.60.1.70450 game tables (`Data/Recipes.lua`, IDs and numbers only),
+  each with its profession, skill-up colors, output and reagents. Recipes added after Classic (860: Forever-new and
+  Season-of-Discovery IDs) are flagged unconfirmed until seen in game; outputs seen on the AH count as seen.
+- Vendor prices for the 26 reagents confirmed on sale at a vendor (`Data/Vendor.lua`). A price harvested at a
+  merchant wins over them, and tooltips show "Vendor sells it for" for these reagents.
+- `/bf recipes <item link or ID>`: the recipes that use or make an item.
+- `/bf selftest` also checks the recipe data.
+- Pass 1 (recipe data and lookup) tested on client 1.60.1.70425 with the 70450 data, 2026-10-16: selftest 14/14.
+
 ## 0.2.0 (not released)
 - Full Auction House scan (`ReplicateItems`), time-sliced so the game never freezes. Start it with the Scan
   button in the window, the Scan button under Blizzard's Auction House frame, or `/bf scan`. Progress shows in

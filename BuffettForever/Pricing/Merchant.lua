@@ -66,10 +66,13 @@ function events:MERCHANT_CLOSED()
 end
 
 -- The vendor's unit buy price for an item, its age in seconds and the limited stock (or nil).
+-- A price harvested at a merchant wins; else the seed list (Data/Vendor.lua, age nil).
 function Merchant.Get(itemID)
     local row = ns.db and ns.db.vendor[itemID]
-    if not row then return nil end
-    return row.p, GetServerTime() - (row.t or 0), row.lim
+    if row then return row.p, GetServerTime() - (row.t or 0), row.lim end
+    local seed = ns.VendorSeed and ns.VendorSeed[itemID]
+    if seed then return seed, nil, nil end
+    return nil
 end
 
 -- /bf diag: the last merchant visit.
