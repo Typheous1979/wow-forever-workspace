@@ -9,6 +9,8 @@
 - writes dist/<Addon>-<Version>.zip with ONE root folder named like the TOC
   (CurseForge and its app require this), leaving out personal and dev files,
   dot-folders (.claude) and the agent notes (CLAUDE.md, AGENTS.md)
+- refuses when those rules would leave out a file the TOC loads, or the TOC's
+  IconTexture (a listed file under tests/, say)
 """
 import argparse
 import fnmatch
@@ -36,6 +38,32 @@ def toc_fields(path):
     return out
 
 
+def toc_files(path):
+    """The files a TOC loads (its lines that aren't comments), with forward slashes. Lines with [conditions]
+    or [Family]/[Game] tokens are left out: which file they mean depends on the client."""
+    out = []
+    with open(path, encoding="utf-8-sig") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "[" not in line:
+                out.append(line.replace("\\", "/"))
+    return out
+
+
+def unpackaged(addon_dir, name, fields, files):
+    """TOC-loaded files and the IconTexture that the zip would leave out."""
+    packaged = {os.path.relpath(p, addon_dir).replace(os.sep, "/").lower() for p in files}
+    missing = [f for f in toc_files(os.path.join(addon_dir, name + ".toc")) if f.lower() not in packaged]
+    icon = fields.get("IconTexture", "").replace("\\", "/")
+    prefix = f"interface/addons/{name.lower()}/"
+    if icon.lower().startswith(prefix):
+        rel = icon[len(prefix):].lower()
+        stems = {os.path.splitext(p)[0] for p in packaged}
+        if rel not in packaged and rel not in stems:   # WoW finds Media/Icon as Media/Icon.tga or .blp
+            missing.append(icon)
+    return missing
+
+
 def collect(addon_dir):
     files = []
     for dirpath, dirnames, filenames in os.walk(addon_dir):
@@ -58,9 +86,12 @@ def build_zip(addon_dir, out_dir):
     version = fields.get("Version")
     if not version:
         raise SystemExit("package: the TOC has no ## Version")
+    files = collect(addon_dir)
+    missing = unpackaged(addon_dir, name, fields, files)
+    if missing:
+        raise SystemExit("package: the zip would leave out what the TOC loads: " + ", ".join(missing))
     os.makedirs(out_dir, exist_ok=True)
     zip_path = os.path.join(out_dir, f"{name}-{version}.zip")
-    files = collect(addon_dir)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for path in files:
             rel = os.path.relpath(path, addon_dir).replace(os.sep, "/")

@@ -58,6 +58,36 @@ class PackageTests(unittest.TestCase):
             finally:
                 os.chdir(old)
 
+    def test_refuses_to_leave_out_a_toc_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            addon = os.path.join(d, "MyAddon")
+            write(os.path.join(addon, "MyAddon.toc"),
+                  "## Interface: 16001\n## Version: 1.0.0\n\nCore.lua\ntests\\Checks.lua\n")
+            write(os.path.join(addon, "Core.lua"), "local addonName, ns = ...\n")
+            write(os.path.join(addon, "tests", "Checks.lua"), "local addonName, ns = ...\n")
+            with self.assertRaises(SystemExit) as caught:
+                package.build_zip(addon, os.path.join(d, "dist"))
+            self.assertIn("tests/Checks.lua", str(caught.exception))
+            self.assertFalse(os.path.exists(os.path.join(d, "dist", "MyAddon-1.0.0.zip")))
+
+    def test_checks_the_icon_with_or_without_extension(self):
+        with tempfile.TemporaryDirectory() as d:
+            addon = os.path.join(d, "MyAddon")
+            toc = "## Interface: 16001\n## Version: 1.0.0\n## IconTexture: Interface\\AddOns\\MyAddon\\Media\\Icon\n\nCore.lua\n"
+            write(os.path.join(addon, "MyAddon.toc"), toc)
+            write(os.path.join(addon, "Core.lua"), "local addonName, ns = ...\n")
+            with self.assertRaises(SystemExit):
+                package.build_zip(addon, os.path.join(d, "dist"))   # no icon file at all
+            write(os.path.join(addon, "Media", "Icon.tga"), "x")
+            zip_path, _, _ = package.build_zip(addon, os.path.join(d, "dist"))   # Media/Icon finds Icon.tga
+            self.assertIn("MyAddon/Media/Icon.tga", zipfile.ZipFile(zip_path).namelist())
+
+    def test_toc_files_skip_comments_and_client_tokens(self):
+        with tempfile.TemporaryDirectory() as d:
+            toc = os.path.join(d, "A.toc")
+            write(toc, "## Title: A\n# a comment\n\nCore.lua\nUI\\Main.lua\n[Family]\\Extra.lua\nOld.lua [AllowLoadGameType classic]\n")
+            self.assertEqual(package.toc_files(toc), ["Core.lua", "UI/Main.lua"])
+
     def test_refuses_dev_only(self):
         with tempfile.TemporaryDirectory() as d:
             addon = os.path.join(d, "Probe")
