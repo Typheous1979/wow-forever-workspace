@@ -38,3 +38,23 @@ python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" --prune                         #
 - Deploy refuses to replace a real folder (an addon installed from CurseForge). `--replace-copy --yes` first moves it to `Interface\AddOns.wowf-backup\`. Ask Justin before using it.
 - `_forever_` and `_classic_beta_` have separate WTF folders. Settings don't carry over.
 - If deploy warns about **OneDrive online-only files**: right-click the AddOns workspace folder and choose OneDrive → **Always keep on this device**.
+
+## Releasing on CurseForge
+Done for MusicForever 0.2.0 and BuffettForever 1.0.0.
+1. Bring the addon's README up to date, add the release to its CHANGELOG.md, and set `## Version`.
+2. Write the project page, `docs/<Addon>-curseforge.md`, using `docs/MusicForever-curseforge.md` as the model:
+   - a one-line pitch;
+   - the features, by section;
+   - how it works;
+   - a feedback line and the signature.
+3. Make the 512 px logo in `dist/` with make-icon, `--size 512` with `--out` and `--preview` (wowf-new-addon, Icon).
+4. Run `python tools/wowf/cli.py package <Addon>`. It writes `dist/<Addon>-<Version>.zip`.
+   - The lint must pass.
+   - The zip has one root folder, with no CLAUDE.md, Screenshots or dot-folders.
+   - It refuses when its rules would leave out a file the TOC loads, or the TOC's IconTexture.
+5. Justin takes the screenshots in game and uploads, because the upload is outward-facing:
+   - the zip, the logo and the page text;
+   - the game version, WoW Forever;
+   - the release type: Beta until the addon has run on the launch client.
+6. Before launch, deploy to `_forever_` (`--client forever`) and check it there: `/reload`, the addon's self-test if
+   it has one, and a real play session.
