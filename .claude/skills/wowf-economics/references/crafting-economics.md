@@ -15,6 +15,11 @@ walks up its price ladder, and owned stock covers the first units.
 Consume owned stock first, then buy the remainder from the cheapest acquisition source. Ties go to the simpler
 source (vendor, then AH, then craft). Record the source of every line; the detail panel shows it.
 
+**Vendor goods are always available.** A vendor's stock is effectively unlimited:
+- A vendor-sold reagent in the player's selection shouldn't cap the batch size; let the other reagents set it.
+- Recipes made entirely from vendor goods are candidates even when the player selected nothing for them. They're the
+  craft-to-vendor scanner's input (strategy-ideas.md).
+
 **The vendor cap.** An item a vendor sells is worth at most the vendor's price, both when you value what you own and
 when you sell it, because nobody pays more on the AH. Cap the AH sell price at the vendor buy price. On the beta
 (70425), 12 vendor reagents were listed above it: Coarse Thread at 19c (vendor 10c), Blue Dye at 2s (50c), Wooden

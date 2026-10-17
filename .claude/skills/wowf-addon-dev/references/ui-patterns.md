@@ -41,6 +41,29 @@ end
 ```
 Addon frames that you create aren't protected. You only need combat-lockdown care for secure templates, or for frames anchored to protected frames.
 
+## Window size, lists and scrolling text (tested on 70425; BuffettForever, MusicForever)
+- **Size:** at UI scale 1 on a 1080p screen, UIParent is about 1366 × 768. A main window up to about 1040 × 600 fits
+  with room to spare.
+- **Fonts:** WoW's default font (Friz Quadrata) has no ∞ and no en dash; they render as boxes. Write "n/a" and "to".
+- **A sortable list:**
+  - `CreateScrollBoxListLinearView(2, 2, 2, 2, 0)`, `view:SetElementExtent(20)`,
+    `view:SetElementInitializer("Button", InitRow)`, then the WowScrollBoxList and MinimalScrollBar pair
+    (BuffettForever `UI.ScrollList`).
+  - Rebuild a `CreateDataProvider()` in the new order and call
+    `box:SetDataProvider(dp, ScrollBoxConstants.RetainScrollPosition)`.
+  - Repaint the rows in place with `box:ForEachFrame(InitRow)`, e.g. after item names load.
+  - Column headings are plain Buttons that set the sort key. Give each column a fixed width, and anchor the row cells
+    and the headings from the same right-hand offsets so they line up (BuffettForever `UI/ResultsList.lua`).
+- **Scrolling text** (a details pane):
+  - `CreateFrame("ScrollFrame", nil, parent, "ScrollFrameTemplate")`; the template loads on Forever, from
+    `Blizzard_SharedXML\SecureUIPanelTemplates.xml`. Its `OnLoad` attaches `self.ScrollBar`, and
+    `ScrollBar:SetHideIfUnscrollable(true)` hides the bar until it's needed.
+  - Put the lines on a child frame (`scroll:SetScrollChild(child)`), stack them with
+    `SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -gap)`, give each a fixed width, then
+    `child:SetHeight(Σ fs:GetStringHeight() + gaps)`. Example: BuffettForever `UI/DetailPanel.lua`.
+- **Money in narrow columns:** `C_CurrencyInfo.GetCoinTextureString(copper, 10)`, rounded to whole silver above
+  1g, so it shows two coins at most.
+
 ## Combat lockdown queue
 ```lua
 local queue = {}
