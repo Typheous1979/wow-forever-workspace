@@ -65,7 +65,7 @@ function ns.RunOutOfCombat(fn)
 end
 
 -- SavedVariables: defaults + forward-only migrations (never wipe player data).
-local DB_VERSION = 1
+local DB_VERSION = 2
 local defaults = {
     minimap = { angle = 200, shown = true },   -- minimap button: degrees around the edge, visible
     settings = {
@@ -74,7 +74,6 @@ local defaults = {
     markets = {},   -- [marketKey] = { items = { [itemID] = price row }, scan = last full scan } (Pricing/PriceDB.lua)
     vendor = {},    -- [itemID] = { p = unit buy price, t, lim } (Pricing/Merchant.lua)
     recipesKnown = {},  -- [charKey][recipeID] = true (Crafting/Harvest.lua)
-    recipesSeen = {},   -- [recipeID] = true: listed by a profession window, so it exists on Forever
     diag = {},      -- scanner diagnostics for the open AH probes (Pricing/Scanner.lua)
 }
 local charDefaults = {
@@ -82,7 +81,9 @@ local charDefaults = {
 }
 
 local migrations = {
-    -- [1] = function(db) ... end,   -- upgrades data written by version 1 to version 2
+    -- 1 -> 2: recipesSeen (recipes a profession window listed) proved nothing: GetAllRecipeIDs lists
+    -- the whole skill line, Season-of-Discovery recipes included [F-123].
+    [1] = function(db) db.recipesSeen = nil end,
 }
 
 local function CopyDefaults(src, dst)

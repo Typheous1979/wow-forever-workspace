@@ -15,6 +15,13 @@
   whether yields and reagents match, and whether recipes can be checked without opening the window.
 - Pass 2 (known recipes) tested on client 1.60.1.70425, 2026-10-16: Leatherworking harvested (6 known of 592 listed),
   yields and reagents match the data, and IsSpellKnown agrees with "learned" on all 592.
+- From the pass 2 diagnostics:
+  - **Known recipes are read at login** from the spellbook, so no profession window needs opening. A dropped
+    profession drops its recipes.
+  - A recipe listed by a profession window no longer counts as confirmed (the window lists Season-of-Discovery
+    recipes too). The saved list of them is removed (data version 2).
+  - `/bf recipes` lists the recipes you know first, then other confirmed ones, then unconfirmed new ones, with counts
+    in its first line. `/bf recipes <item> all` lists every recipe, not just the first 20.
 
 ## 0.2.0 (not released)
 - Full Auction House scan (`ReplicateItems`), time-sliced so the game never freezes. Start it with the Scan

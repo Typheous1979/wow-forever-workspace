@@ -1,15 +1,21 @@
 local addonName, ns = ...
 
--- Which recipes each character knows, read from the profession window (professions-and-vendors.md
--- "Recording which recipes a character knows"). On TRADE_SKILL_SHOW / LIST_UPDATE /
--- DATA_SOURCE_CHANGED (debounced), for the player's own profession only (not a linked, guild or
--- NPC window): every recipe the window lists goes into recipesSeen (it exists on Forever), every
--- learned one into recipesKnown[charKey]. NEW_RECIPE_LEARNED adds one at once.
--- The harvest also answers the open profession probes (CLAUDE.md) in diag.harvest[professionID]:
--- which call lists the recipes and how many; learned recipes missing from Data/Recipes.lua;
--- GetRecipeSchematic yields and reagents against the data; C_SpellBook.IsSpellKnown against
--- "learned"; and (diag.harvest.closed, .login) GetRecipeInfo / GetRecipeSchematic with the window
--- closed and IsSpellKnown at login.
+-- Which recipes each character knows (professions-and-vendors.md "Recording which recipes a
+-- character knows"), kept account-wide in recipesKnown["First Surname"]:
+-- - At login: C_SpellBook.IsSpellKnown for every recipe in Data/Recipes.lua replaces the
+--   character's set, with no profession window needed (it agreed with "learned" on all 592
+--   Leatherworking recipes [F-123]). A dropped profession drops its recipes.
+-- - During the session: NEW_RECIPE_LEARNED adds one at once.
+-- - The profession window (TRADE_SKILL_SHOW / LIST_UPDATE / DATA_SOURCE_CHANGED, debounced; the
+--   player's own profession only, not a linked, guild or NPC window) adds its learned recipes and
+--   fills diag.harvest[professionID]:
+--   - which call lists the recipes and how many;
+--   - learned recipes missing from the data;
+--   - GetRecipeSchematic yields and reagents against the data;
+--   - IsSpellKnown against "learned".
+--   diag.harvest.closed probes the window-closed calls; diag.harvest.login describes the login read.
+--   Being listed by the window isn't evidence a recipe exists on Forever: GetAllRecipeIDs lists the
+--   whole skill line, Season-of-Discovery recipes included.
 
 local L = ns.L
 local Harvest = {}
@@ -19,8 +25,7 @@ local events = ns.events
 local DEBOUNCE = 0.5
 local SAMPLE = 10             -- IDs kept in each diagnostics sample
 local CLOSED_PROBE_DELAY = 1  -- seconds after TRADE_SKILL_CLOSE
-local LOGIN_PROBE_DELAY = 5   -- seconds after login
-local LOGIN_PROBE_MAX = 50    -- known recipes checked with IsSpellKnown at login
+local LOGIN_READ_DELAY = 5    -- seconds after login
 local FLAG_NEW = 1
 local OUTPUT, COUNT, FIRST_REAGENT = 6, 7, 8
 
@@ -98,7 +103,6 @@ local function Run()
     local ids, source, filteredCount = ListRecipes()
     local known = ns.db.recipesKnown[key] or {}
     ns.db.recipesKnown[key] = known
-    local seen = ns.db.recipesSeen
     local recipes = ns.Recipes or {}
     local compare = not checkedSchematics[profID]
     local d = {
@@ -121,7 +125,6 @@ local function Run()
     for _, recipeID in ipairs(ids) do
         local info = C_TradeSkillUI.GetRecipeInfo(recipeID)
         if info then
-            seen[recipeID] = true
             local row = recipes[recipeID]
             if row and bit.band(row[5], FLAG_NEW) ~= 0 then d.newListed = d.newListed + 1 end
             local ok, spellKnown = pcall(C_SpellBook.IsSpellKnown, recipeID, Enum.SpellBookSpellBank.Player)
@@ -187,7 +190,6 @@ function events:NEW_RECIPE_LEARNED(recipeID)
     if not key then return end
     ns.db.recipesKnown[key] = ns.db.recipesKnown[key] or {}
     ns.db.recipesKnown[key][recipeID] = true
-    ns.db.recipesSeen[recipeID] = true
     ns.Fire("RECIPES_KNOWN_CHANGED")
 end
 
@@ -225,27 +227,35 @@ function events:TRADE_SKILL_CLOSE()
     end)
 end
 
--- Probe: at login, does C_SpellBook.IsSpellKnown confirm the recipes harvested earlier?
-ns.On("LOGIN", function()
-    C_Timer.After(LOGIN_PROBE_DELAY, function()
-        if not ns.db or ns.readOnlyDB then return end
-        local key = ns.CharKey()
-        local known = key and ns.db.recipesKnown[key]
-        if not known then return end
-        local d = { t = GetServerTime(), checked = 0, agree = 0, disagree = 0, sample = {} }
-        for recipeID in pairs(known) do
-            if d.checked >= LOGIN_PROBE_MAX then break end
-            local ok, spellKnown = pcall(C_SpellBook.IsSpellKnown, recipeID, Enum.SpellBookSpellBank.Player)
-            d.checked = d.checked + 1
-            if ok and spellKnown then
-                d.agree = d.agree + 1
-            else
-                d.disagree = d.disagree + 1
-                Sample(d.sample, recipeID)
-            end
+-- At login: read this character's known recipes from the spellbook, for every recipe in the data.
+-- Replaces the character's set; other characters' sets are kept.
+local function ReadKnownRecipes()
+    if not ns.db or ns.readOnlyDB then return end
+    local key = ns.CharKey()
+    if not key then return end
+    local started = debugprofilestop()
+    local known, checked, count = {}, 0, 0
+    local bank = Enum.SpellBookSpellBank.Player
+    for recipeID in pairs(ns.Recipes or {}) do
+        checked = checked + 1
+        if C_SpellBook.IsSpellKnown(recipeID, bank) then
+            known[recipeID] = true
+            count = count + 1
         end
-        HarvestDiag().login = d
-    end)
+    end
+    local before = 0
+    for _ in pairs(ns.db.recipesKnown[key] or {}) do before = before + 1 end
+    ns.db.recipesKnown[key] = known
+    HarvestDiag().login = { t = GetServerTime(), checked = checked, known = count, before = before,
+                            ms = math.floor(debugprofilestop() - started) }
+    if count ~= before then
+        ns.Print(string.format(L["%d known recipes read for %s."], count, key))
+    end
+    ns.Fire("RECIPES_KNOWN_CHANGED")
+end
+
+ns.On("LOGIN", function()
+    C_Timer.After(LOGIN_READ_DELAY, ReadKnownRecipes)
 end)
 
 -- Recipes known by this character (a set; empty until a profession window has been opened).
@@ -277,8 +287,9 @@ function Harvest.PrintDiag()
         ns.Print("window closed: known " .. show(c.known) .. "; unknown " .. show(c.unknown))
     end
     local g = h.login
-    if g then
-        ns.Print(string.format("login: IsSpellKnown confirmed %d of %d known recipes", g.agree, g.checked))
+    if g and g.known then
+        ns.Print(string.format("login: %d known recipes read from the spellbook (%d checked, %s before) in %d ms",
+            g.known, g.checked, tostring(g.before), g.ms or 0))
     end
 end
 

@@ -6,8 +6,9 @@ local addonName, ns = ...
 --     reagentItemID1, count1, reagentItemID2, count2, ... }
 -- flags: 1 = added after Classic (unconfirmed on Forever until seen), 2 = output binds on pickup.
 -- Filters (all optional): { professions = { [skillLine] = true }, known = "any" | "char",
---   confirmed = true }. Confirmed = a Classic recipe, or a newer one that a character knows,
---   that a profession window listed, or whose output was seen on the Auction House.
+--   confirmed = true }. Confirmed = a Classic recipe, or a newer one that a character knows or
+--   whose output was seen on the Auction House. (A profession window listing a recipe proves
+--   nothing: GetAllRecipeIDs lists Season-of-Discovery recipes too [F-123].)
 
 local L = ns.L
 local RecipeIndex = {}
@@ -71,7 +72,6 @@ function RecipeIndex.IsConfirmed(recipeID)
     local r = ns.Recipes and ns.Recipes[recipeID]
     if not r then return false end
     if bit.band(r[FLAGS], FLAG_NEW) == 0 then return true end
-    if ns.db and ns.db.recipesSeen[recipeID] then return true end
     if RecipeIndex.IsKnown(recipeID, "any") then return true end
     return ns.PriceDB.Get(r[OUTPUT]) ~= nil
 end
@@ -133,13 +133,39 @@ function RecipeIndex.ProfessionName(skillLine)
     return tostring(skillLine)
 end
 
--- /bf recipes <item>: what uses and what makes an item, printed once the item names are loaded.
-function RecipeIndex.PrintFor(itemID)
+-- Print order: recipes this account knows, then other confirmed ones, then unconfirmed new ones;
+-- within each, by profession, skill (yellowAt) and recipe ID.
+local function SortForPrint(list)
+    local group = {}
+    for _, recipeID in ipairs(list) do
+        group[recipeID] = RecipeIndex.IsKnown(recipeID, "any") and 0 or (RecipeIndex.IsConfirmed(recipeID) and 1 or 2)
+    end
+    table.sort(list, function(a, b)
+        if group[a] ~= group[b] then return group[a] < group[b] end
+        local ra, rb = ns.Recipes[a], ns.Recipes[b]
+        if ra[PROFESSION] ~= rb[PROFESSION] then return ra[PROFESSION] < rb[PROFESSION] end
+        if ra[YELLOW] ~= rb[YELLOW] then return ra[YELLOW] < rb[YELLOW] end
+        return a < b
+    end)
+    return group
+end
+
+-- /bf recipes <item> [all]: what makes and what uses an item, printed once the item names are loaded.
+function RecipeIndex.PrintFor(itemID, showAll)
     local uses, makes = RecipeIndex.UsingReagent(itemID), RecipeIndex.Making(itemID)
+    local group = SortForPrint(uses)
+    SortForPrint(makes)
+    local known, new, unconfirmed = 0, 0, 0
+    for _, recipeID in ipairs(uses) do
+        if group[recipeID] == 0 then known = known + 1 end
+        if group[recipeID] == 2 then unconfirmed = unconfirmed + 1 end
+        if bit.band(ns.Recipes[recipeID][FLAGS], FLAG_NEW) ~= 0 then new = new + 1 end
+    end
+    local limit = showAll and math.huge or PRINT_LIMIT
     local ids = { itemID }
     local shown = {}
     for _, list in ipairs({ makes, uses }) do
-        for i = 1, math.min(#list, PRINT_LIMIT) do
+        for i = 1, math.min(#list, limit) do
             local r = RecipeIndex.Get(list[i])
             shown[#shown + 1] = r
             ids[#ids + 1] = r.output
@@ -148,7 +174,8 @@ function RecipeIndex.PrintFor(itemID)
     end
     ns.Items.Load(ids, function()
         local link = ns.Items.Link(itemID)
-        ns.Print(string.format(L["%s: used by %d recipes, made by %d."], link, #uses, #makes))
+        ns.Print(string.format(L["%s: used by %d recipes (%d known, %d new, %d of them unconfirmed), made by %d."], link,
+            #uses, known, new, unconfirmed, #makes))
         for _, r in ipairs(shown) do
             local parts = {}
             for _, g in ipairs(r.reagents) do parts[#parts + 1] = g.count .. " x " .. ns.Items.Link(g.itemID) end
@@ -158,8 +185,10 @@ function RecipeIndex.PrintFor(itemID)
             ns.Print(string.format("  %s%s x%d - %s %d/%d - %s%s", r.output == itemID and "<- " or "", ns.Items.Link(r.output),
                 r.count, RecipeIndex.ProfessionName(r.profession), r.yellow, r.grey, table.concat(parts, ", "), notes))
         end
-        local hidden = math.max(0, #uses - PRINT_LIMIT) + math.max(0, #makes - PRINT_LIMIT)
-        if hidden > 0 then ns.Print(string.format(L["  ... and %d more."], hidden)) end
+        local hidden = math.max(0, #uses - limit) + math.max(0, #makes - limit)
+        if hidden > 0 then
+            ns.Print(string.format(L["  ... and %d more (/bf recipes %d all lists them)."], hidden, itemID))
+        end
     end)
 end
 

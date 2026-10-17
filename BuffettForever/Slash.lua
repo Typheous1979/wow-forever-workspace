@@ -25,15 +25,17 @@ local function SelfTest()
     ns.Print(string.format(ns.L["selftest: %d passed, %d failed"], passed, failed))
 end
 
--- "/bf recipes [Linen Cloth]" (a shift-clicked link) or "/bf recipes 2589".
+-- "/bf recipes [Linen Cloth]" (a shift-clicked link) or "/bf recipes 2589"; "all" at the end lists
+-- every recipe instead of the first 20.
 local function Recipes(msg)
     local lower = string.lower(msg or "")
-    local itemID = tonumber(string.match(lower, "item:(%d+)") or string.match(lower, "^%s*recipes%s+(%d+)%s*$") or "")
+    local showAll = string.match(lower, "%sall%s*$") ~= nil
+    local itemID = tonumber(string.match(lower, "item:(%d+)") or string.match(lower, "^%s*recipes%s+(%d+)") or "")
     if not itemID then
-        ns.Print(ns.L["Usage: /bf recipes <item link or ID>"])
+        ns.Print(ns.L["Usage: /bf recipes <item link or ID> [all]"])
         return
     end
-    ns.RecipeIndex.PrintFor(itemID)
+    ns.RecipeIndex.PrintFor(itemID, showAll)
 end
 
 SLASH_BUFFETTFOREVER1 = "/bf"

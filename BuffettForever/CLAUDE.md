@@ -25,7 +25,10 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   70425 with the 70450 data: selftest 14/14, `/bf recipes` lookups, vendor-seed tooltips, no load-time cost.
 - 0.3.0 M2 pass 2 (2026-10-16): Crafting/Harvest.lua (recipesKnown per "First Surname", recipesSeen, probes in
   diag.harvest). Tested on 70425 (Leatherworking 49/75). The probes showed GetAllRecipeIDs lists the whole skill line,
-  Season-of-Discovery recipes included, so "listed" can't confirm a recipe. Follow-up below.
+  Season-of-Discovery recipes included, so "listed" can't confirm a recipe.
+- 0.3.0 M2 follow-up (2026-10-16): known recipes read at login with IsSpellKnown (13 found, 0 ms), recipesSeen
+  dropped (migration 1 → 2), `/bf recipes` ordered known → confirmed → unconfirmed, with `all`. Tested on 70425.
+  **M2 complete.** M3 (tray, evaluator, panes) next.
 
 ## Decisions (2026-10-16, Justin)
 - **Bag clicks:** Alt+Right-click is context-aware. At the AH it price-checks the item (targeted search) and adds it
@@ -54,8 +57,11 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 - **Recipe data from the newest beta build** (70450). Regenerate with `recipe-catalog build --build <b>` when a build
   lands.
 - **Recipes added after Classic are included but flagged 1** ("new"; not "era": 836 of the 860 are Forever-new, with
-  spells ≥ 1.2M). They count as confirmed once a character knows them, a profession window lists them
-  (`recipesSeen`), or their output is seen on the AH. M3 hides the unconfirmed ones by default.
+  spells ≥ 1.2M). They count as confirmed once a character knows them or their output is seen on the AH. A profession
+  window listing them doesn't count: `GetAllRecipeIDs` lists the whole skill line, Season-of-Discovery recipes
+  included, so `recipesSeen` was dropped (migration 1 → 2). M3 hides the unconfirmed ones by default.
+- **Known recipes are read at login** with `C_SpellBook.IsSpellKnown` over the data, replacing the character's set
+  (no window needed; verified on 592 recipes). The window harvest stays for diagnostics and same-session learning.
 - **Enchant-only recipes are left out** (no item to price). Wands, oils and rods are in.
 - **Vendor list from evidence only:** `tools/wowf/data/vendor_reagents.json`. `vendor-merge` adds what the merchant
   harvest saw on sale; its candidate printout is a review aid, not evidence.
