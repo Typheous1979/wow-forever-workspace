@@ -152,6 +152,18 @@ function ns.OpenOptions()
 end
 ```
 - If `Settings.VarType` is nil, fall back to `type(default)`.
+- Found building BuffettForever's panel (0.8.0, tested on 70425; [Source 70450] where marked):
+  - A slider saves what its Slider widget holds, a 32-bit float: 6% was saved as 0.05999999865889549. Round
+    before you show it, and compare with a tolerance.
+  - A tooltip may be a function, called each time it shows (`Settings.InitTooltip` [Source 70450]). Use one to
+    show live state, e.g. "In use: 5%, measured from 4 of your sales".
+  - A dropdown option's third field is its tooltip. The control's tooltip then lists the options, with the default
+    marked [Source 70450].
+  - `CreateSettingsListSectionHeaderInitializer(text)` added to the layout between controls makes sections.
+  - Keep the defaults in one table (BuffettForever's Core.lua `ns.DEFAULT_SETTINGS`) and pass them to
+    `RegisterAddOnSetting`. A self-test can then check that each default is a choice the panel offers.
+  - Don't send players to the panel's **Defaults** button: its dialog's first button, "All Settings", resets
+    every game setting, not just yours [Source 70450, Blizzard_Dialogs.lua].
 - Subcategories: `Settings.RegisterVerticalLayoutSubcategory(parent, name)`.
 - Custom frames: `Settings.RegisterCanvasLayoutCategory(frame, name)`.
 
