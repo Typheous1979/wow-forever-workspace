@@ -99,6 +99,17 @@ class ReferenceVectors(unittest.TestCase):
         self.assertEqual(econ.grade(3600, 5, 6, 0.10, 200, None, stale=3), "D")
         self.assertEqual(econ.grade(3600, 5, 6, 0.10, 200, None, stale=2), "A")
 
+    def test_scanners(self):
+        """FLIP-1..4 in strategy-ideas.md, and the vendor-only context (M4 pass 3)."""
+        self.assertEqual(econ.flip([40, 5, 45, 10, 60, 20], 50), (15, 650, 750, 40, 45))
+        self.assertEqual(econ.flip([40, 5], 0)[0], 0)                  # a vendor won't buy it
+        self.assertEqual(econ.flip([60, 5, 70, 1], 50)[0], 0)          # nothing under the vendor price
+        self.assertEqual(econ.flip([49.5, 3], 50), (3, 148.5, 150, 49.5, 49.5))
+        ctx = econ._ctx(sellPrice={1: 5}, ladder={1: [5, 1]}, priceInfo={1: econ._info()}, vendorBuy={2: 3})
+        v = econ.vendor_context(ctx)
+        self.assertEqual((v["sellPrice"], v["ladder"], v["priceInfo"], v["vendorBuy"]), ({}, {}, {}, {2: 3}))
+        self.assertEqual(ctx["sellPrice"], {1: 5})                     # the full context is untouched
+
     def test_measured_cut(self):
         """CUT-1..3 in crafting-economics.md."""
         self.assertAlmostEqual(econ.measured_cut(1500, 30000, 3), 0.05)
@@ -200,6 +211,11 @@ class Branches(unittest.TestCase):
                 self.assertEqual((a["best"], a["cap"], a["size"], a["limit"]), (200, 10, 10, "market"))
             if name == "BATCH-VENDOR":      # vendor goods to a vendor: no limit within the search
                 self.assertEqual((a["best"], a["cap"], a["size"], a["limit"]), (200, None, 200, "none"))
+
+    def test_vendor_craft(self):
+        r = scenario("VENDOR-CRAFT")   # 6 owned at 40c + 3 bought at 25c; 3 x 3s to a vendor
+        self.assertEqual((r["cogs"], r["best"], r["bestSource"], r["profit"], r["ahExit"]), (315, 900, "vendor", 585, None))
+        self.assertEqual(r["grade"], "A")
 
     def test_ah_net_floor(self):
         r = scenario("BOLT-UNSOLD")

@@ -220,6 +220,31 @@ def exclude_own(listings, own):
     return kept, removed
 
 
+def flip(listings, vendor_sell):
+    """AH listings below what a vendor pays (strategy-ideas.md "Vendor flip"). listings: flat [unit price, qty, ...].
+    Returns (units, their cost, their value at a vendor, cheapest and dearest of them); nothing when a vendor won't
+    buy the item."""
+    qty, cost, lo, hi = 0, 0.0, None, None
+    if vendor_sell is None or vendor_sell <= 0:
+        return 0, 0.0, 0.0, None, None
+    for i in range(0, len(listings), 2):
+        price = listings[i]
+        if price < vendor_sell:
+            qty += listings[i + 1]
+            cost += price * listings[i + 1]
+            lo = price if lo is None else min(lo, price)
+            hi = price if hi is None else max(hi, price)
+    return qty, cost, qty * vendor_sell, lo, hi
+
+
+def vendor_context(ctx):
+    """The context with the Auction House taken out: no AH prices, ladders or price data. Evaluating a recipe on it
+    counts vendor prices only (owned reagents at what a vendor pays): the Vendor crafts view's certain profit."""
+    out = dict(ctx)
+    out["sellPrice"], out["ladder"], out["priceInfo"] = {}, {}, {}
+    return out
+
+
 def grade(age, days, observations, cv, listed, need, stale=None):
     """Confidence grade (risk-and-recommendation.md): the worst of age, days observed, volatility, depth, and for a
     sell price, a wall that never shrinks (stale = days, passed only when you haven't sold the item yourself)."""
@@ -563,6 +588,12 @@ def scenarios():
         # Bars from a vendor, bronze to a vendor: every craft adds profit and neither limit applies.
         ("BATCH-VENDOR", bronze, 1, _ctx({"minProfit": 0}, vendorSell={COPPER: 10, TIN: 35, BRONZE: 50},
                                          vendorBuy={COPPER: 10, TIN: 35})),
+        # Scanners (M4 pass 3). Vendor crafts: the AH taken out. 6 of reagent 51 in the bags (a vendor pays 40c;
+        # the AH would pay 9s) and reagent 52 from a vendor at 25c: 3 crafts at a 3s vendor price.
+        ("VENDOR-CRAFT", _recipe(5, 50, 1, [(51, 2), (52, 1)]), 3,
+         vendor_context(_ctx({"minProfit": 0}, vendorSell={50: 300, 51: 40}, vendorBuy={52: 25}, owned={51: 6},
+                             sellPrice={51: 900, 50: 2000}, ladder={51: [900, 50]},
+                             priceInfo={51: _info(), 50: _info()}))),
     ]
     return out
 
