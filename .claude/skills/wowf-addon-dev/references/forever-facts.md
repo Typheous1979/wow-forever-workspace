@@ -372,6 +372,10 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   - The house cut is still unmeasured ([F-122]): no sale yet.
 
   [Probe 70425]
+- **[F-131]** **Your auctions:** `C_AuctionHouse.QueryOwnedAuctions(sorts)` then `GetOwnedAuctions()` work without
+  Blizzard's Auctions tab open (`HasFullOwnedAuctionResults()` true). For a commodity auction,
+  **`buyoutAmount` is per unit**: 2 Light Leather posted at 5g each read quantity 2, buyoutAmount 50000.
+  A 2-hour auction read `timeLeftSeconds` 7198 just after posting. [Probe 70425]
 
 ## 14. Retest checklist (run on every new build)
 

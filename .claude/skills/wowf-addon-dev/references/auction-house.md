@@ -168,7 +168,7 @@ What to know when building on them:
 - Your auctions: `C_AuctionHouse.QueryOwnedAuctions(sorts)` → `OWNED_AUCTIONS_UPDATED` → `GetOwnedAuctions()` →
   `{ auctionID, itemKey, itemLink, status (Enum.AuctionStatus Active 0, Sold 1), quantity, timeLeftSeconds,
   bidAmount, buyoutAmount }`. Blizzard sends that query when its Auctions tab opens. The item link's name is how
-  a sales invoice (name only) finds its itemID.
+  a sales invoice (name only) finds its itemID. For commodities `buyoutAmount` is the **unit** price [F-131].
   - Re-query after `AUCTION_HOUSE_AUCTION_CREATED` and `AUCTION_CANCELED`.
   - Send every AH message through one throttle queue (BuffettForever `Search.WhenReady`).
 - BuffettForever: `Pricing/Mail.lua` (reading, `Mail.Reconcile`), `Pricing/Ledger.lua` (filing, sale chance,
