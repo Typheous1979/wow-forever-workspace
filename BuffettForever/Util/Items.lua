@@ -10,8 +10,9 @@ ns.Items = Items
 
 local LOAD_TIMEOUT = 3
 
--- fn() runs once, when every item in itemIDs is loaded (at once if all are cached) or on timeout.
-function Items.Load(itemIDs, fn)
+-- fn() runs once, when every item in itemIDs is loaded (at once if all are cached) or on timeout
+-- (seconds; LOAD_TIMEOUT unless given).
+function Items.Load(itemIDs, fn, timeout)
     local done = false
     local function finish()
         if done then return end
@@ -24,7 +25,7 @@ function Items.Load(itemIDs, fn)
     end
     container:ContinueOnLoad(finish)
     if not done then
-        C_Timer.After(LOAD_TIMEOUT, function()
+        C_Timer.After(timeout or LOAD_TIMEOUT, function()
             if done then return end
             container:Cancel()
             finish()

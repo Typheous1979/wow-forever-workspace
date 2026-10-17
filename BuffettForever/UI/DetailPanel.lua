@@ -1,9 +1,11 @@
 local addonName, ns = ...
 
 -- The right pane: the selected recipe in full ("show your work", wowf-economics), as data:
--- - what it makes, for which profession, and who knows it;
--- - each reagent: the units owned (valued at what they'd sell for) and the units bought, from which
---   source (Vendor, AH, Craft), and what that costs;
+-- - what it makes, for which profession, and who knows it: the result's round icon (with the count)
+--   and its name in its quality colour, as in the profession window's recipe form;
+-- - each reagent in a slot like the profession window's, "have/need Name" (grey when you have too few),
+--   then the units owned (valued at what they'd sell for) and the units bought, from which source
+--   (Vendor, AH, Craft), and what that costs. Hover an icon for the item; Shift-click links it.
 -- - Sell: the vendor and AH exits for the batch, the AH's parts (price, cut, deposit, sale chance),
 --   the listings behind the price (walls flagged) and your own;
 -- - Result: where to sell, profit, ROI, value added, confidence, and the best batch (the reagents or the
@@ -25,14 +27,20 @@ local INDENT = 10               -- the AH's parts sit under it
 local ROW_HEIGHT = 14
 local WALL = 5                  -- this many listings or more, all at one price: perhaps a single seller
 local GAP, HEADING_GAP, HEADING_AFTER = 3, 12, 5
+local ICON_SIZE = 47            -- the result's round icon, as on the profession window's recipe form
+local ICON_INSET = 8            -- room for its quality ring, which reaches past the button
+local NAME_WIDTH = WIDTH - ICON_INSET - ICON_SIZE - 10
+local SLOT_SIZE, SLOT_GAP = 36, 4   -- a reagent's slot (the profession window's is 39)
+local QUESTION_MARK = 134400
 local GOLD, GREEN, ORANGE, RED, BLUE, GREY = "|cffffd100", "|cff33ff33", "|cffff9933", "|cffff5533", "|cff66ccff", "|cff999999"
 local SOURCE_COLOR = { vendor = GOLD, ah = BLUE, craft = "|cffff88ff" }
 local SOURCE_TEXT = { vendor = "Vendor", ah = "AH", craft = "Craft" }
+local SOURCE_FROM = { vendor = "from a vendor", ah = "from the AH", craft = "crafted" }
 local GRADE_COLOR = { A = GREEN, B = "|cffb4ff33", C = GOLD, D = RED }
 
-local panel, scroll, child, current
-local lines, rows = {}, {}
-local usedLines, usedRows, height, nextGap, last = 0, 0, 0, 0, nil
+local panel, scroll, child, current, header
+local lines, rows, slots = {}, {}, {}
+local usedLines, usedRows, usedSlots, height, nextGap, last = 0, 0, 0, 0, 0, nil
 
 -- Put a line or a row under the previous one; gap = space above it.
 local function Place(region, regionHeight, gap)
@@ -120,7 +128,89 @@ local function Coins(copper)
     return Money.Compact(copper)
 end
 
-local function ReagentLine(line)
+-- ---------------------------------------------------------------- icons
+
+local function ItemName(itemID)
+    return C_Item.GetItemNameByID(itemID) or ("item " .. itemID)
+end
+
+-- The name in its quality colour, without the brackets of a link.
+local function QualityName(itemID)
+    local quality = C_Item.GetItemQualityByID(itemID)
+    local color = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+    return color and (color.hex .. ItemName(itemID) .. "|r") or ItemName(itemID)
+end
+
+-- Hovering an icon shows the item (then self.tip's lines); a modified click acts as on any item button
+-- (Shift: link it in chat, Ctrl: try it on, Alt+Right: into the tray, Bags.lua).
+local function ItemEnter(self)
+    if not self.itemID then return end
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:SetItemByID(self.itemID)
+    if self.tip and #self.tip > 0 then
+        GameTooltip:AddLine(" ")
+        for _, text in ipairs(self.tip) do GameTooltip:AddLine(text, 1, 1, 1, true) end
+    end
+    GameTooltip:Show()
+end
+
+local function ItemClick(self)
+    local _, link = C_Item.GetItemInfo(self.itemID or 0)
+    if link then HandleModifiedItemClick(link) end
+end
+
+-- The result at the top, as the profession window's recipe form shows it: a round icon (Blizzard's
+-- CircularGiantItemButtonTemplate, the Auction House's quality ring) with the count, the name in its
+-- quality colour, and short lines under the name.
+local function Header(itemID, count, subLines)
+    if not header then
+        header = CreateFrame("Frame", nil, child)
+        header:SetWidth(WIDTH)
+        local icon = CreateFrame("Button", nil, header, "CircularGiantItemButtonTemplate")
+        icon:SetSize(ICON_SIZE, ICON_SIZE)
+        icon:SetPoint("TOPLEFT", ICON_INSET, -ICON_INSET)
+        icon:SetScript("OnEnter", ItemEnter)
+        icon:SetScript("OnLeave", GameTooltip_Hide)
+        icon:SetScript("OnClick", ItemClick)
+        header.icon = icon
+        header.name = header:CreateFontString(nil, "OVERLAY", "GameFontHighlightMed2")
+        header.name:SetPoint("TOPLEFT", icon, "TOPRIGHT", 10, -2)
+        header.name:SetWidth(NAME_WIDTH)
+        header.name:SetJustifyH("LEFT")
+        header.name:SetMaxLines(2)
+        header.lines = {}
+    end
+    local icon = header.icon
+    icon.itemID = itemID
+    icon.Icon:SetTexture(C_Item.GetItemIconByID(itemID) or QUESTION_MARK)
+    icon:SetItemButtonQuality(C_Item.GetItemQualityByID(itemID))
+    icon.Count:SetText(tostring(count))
+    icon.Count:SetShown(count > 1)
+    header.name:SetText(QualityName(itemID))
+    local prev, textHeight = header.name, header.name:GetStringHeight()
+    for i, text in ipairs(subLines) do
+        local fs = header.lines[i]
+        if not fs then
+            fs = header:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            fs:SetJustifyH("LEFT")
+            fs:SetWidth(NAME_WIDTH)
+            header.lines[i] = fs
+        end
+        fs:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -3)
+        fs:SetText(text)
+        fs:Show()
+        textHeight = textHeight + 3 + fs:GetStringHeight()
+        prev = fs
+    end
+    for i = #subLines + 1, #header.lines do header.lines[i]:Hide() end
+    local h = math.max(ICON_SIZE + 2 * ICON_INSET, textHeight + ICON_INSET + 4)
+    header:SetHeight(h)
+    header:Show()
+    Place(header, h)
+end
+
+-- Where a reagent's units come from: "2 owned (8s), 2 AH (10s)".
+local function Sources(line)
     local parts = {}
     if line.owned > 0 then
         parts[#parts + 1] = string.format(L["%d owned (%s)"], line.owned, Money.Compact(line.ownedCost))
@@ -133,7 +223,79 @@ local function ReagentLine(line)
             parts[#parts + 1] = string.format("%d %s%s|r", line.rest, RED, L["no price"])
         end
     end
-    return string.format("%d x %s: %s", line.need, ns.Items.Link(line.itemID), table.concat(parts, ", "))
+    return table.concat(parts, ", ")
+end
+
+-- The same per unit, for the slot's tooltip.
+local function SourceTips(line)
+    local tip = {}
+    if line.owned > 0 then
+        tip[#tip + 1] = string.format(L["%d of yours: %s each"], line.owned, Money.Format(line.ownedCost / line.owned))
+    end
+    if line.rest > 0 then
+        tip[#tip + 1] = line.source and string.format(L["%d %s: %s each"], line.rest, L[SOURCE_FROM[line.source]],
+            Money.Format(line.buyCost / line.rest)) or string.format(L["%d with no price yet"], line.rest)
+    end
+    return tip
+end
+
+-- White when you have enough, the profession window's grey when not.
+local function NameColor(enough)
+    local color = enough and HIGHLIGHT_FONT_COLOR or DISABLED_REAGENT_COLOR
+    if color then return color:GetRGB() end
+    if enough then return 1, 1, 1 end
+    return 0.6, 0.6, 0.6
+end
+
+-- One reagent as the profession window shows it: a slot (Blizzard's slot art and quality frame) and
+-- "have/need Name"; under the name, where the units come from. have: what you carry and bank.
+local function Slot(line, have)
+    usedSlots = usedSlots + 1
+    local row = slots[usedSlots]
+    if not row then
+        row = CreateFrame("Button", nil, child)
+        row:SetSize(WIDTH, SLOT_SIZE)
+        row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        row.bg = row:CreateTexture(nil, "BACKGROUND")
+        row.bg:SetAtlas("Professions-Slot-bg")
+        row.bg:SetSize(SLOT_SIZE, SLOT_SIZE)
+        row.bg:SetPoint("LEFT")
+        row.icon = row:CreateTexture(nil, "ARTWORK")
+        row.icon:SetAllPoints(row.bg)
+        row.border = row:CreateTexture(nil, "OVERLAY")
+        row.border:SetPoint("TOPLEFT", row.icon, "TOPLEFT")
+        row.border:SetPoint("BOTTOMRIGHT", row.icon, "BOTTOMRIGHT", 1, -1)
+        local glow = row:CreateTexture(nil, "HIGHLIGHT")
+        glow:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+        glow:SetBlendMode("ADD")
+        glow:SetAllPoints(row.icon)
+        row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        row.name:SetPoint("TOPLEFT", row.bg, "TOPRIGHT", 6, -3)
+        row.name:SetPoint("RIGHT")
+        row.name:SetJustifyH("LEFT")
+        row.name:SetWordWrap(false)
+        row.detail = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        row.detail:SetPoint("BOTTOMLEFT", row.bg, "BOTTOMRIGHT", 6, 3)
+        row.detail:SetPoint("RIGHT")
+        row.detail:SetJustifyH("LEFT")
+        row.detail:SetWordWrap(false)
+        row:SetScript("OnEnter", ItemEnter)
+        row:SetScript("OnLeave", GameTooltip_Hide)
+        row:SetScript("OnClick", ItemClick)
+        slots[usedSlots] = row
+    end
+    local itemID = line.itemID
+    row.itemID, row.tip = itemID, SourceTips(line)
+    row.icon:SetTexture(C_Item.GetItemIconByID(itemID) or QUESTION_MARK)
+    local frames = PROFESSIONS_ITEM_QUALITY_ICON_BORDER_ATLASES
+    local atlas = frames and frames[C_Item.GetItemQualityByID(itemID) or -1]
+    if atlas then row.border:SetAtlas(atlas, false) end
+    row.border:SetShown(atlas ~= nil)
+    row.name:SetText(string.format("%d/%d %s", have, line.need, ItemName(itemID)))
+    row.name:SetTextColor(NameColor(have >= line.need))
+    row.detail:SetText(Sources(line))
+    row:Show()
+    Place(row, SLOT_SIZE, SLOT_GAP)
 end
 
 -- Why the recipe has its grade: the weakest price it relies on and the test that set it.
@@ -419,9 +581,7 @@ end
 -- ---------------------------------------------------------------- an AH flip
 
 local function FlipDetails(r)
-    local itemID = r.recipe.output
-    Add(string.format("%s x%d", ns.Items.Link(itemID), r.units), "GameFontNormal")
-    Add(GREY .. L["Buy on the AH, sell to a vendor."] .. "|r")
+    Header(r.recipe.output, r.units, { GREY .. L["Buy on the AH, sell to a vendor."] .. "|r" })
 
     Heading(L["Buy"])
     local prices = (r.lo and r.hi and r.lo ~= r.hi) and string.format(L["%s to %s"], Money.Compact(r.lo), Money.Compact(r.hi))
@@ -460,25 +620,29 @@ end
 
 local function RecipeDetails(r)
     local recipe = r.recipe
-    Add(string.format("%s x%d", ns.Items.Link(recipe.output), r.units), "GameFontNormal")
-    local about = { string.format("%s (%d/%d)", ns.RecipeIndex.ProfessionName(recipe.profession), recipe.yellow, recipe.grey) }
+    local status = {}
     if r.known then
-        about[#about + 1] = BLUE .. L["you know it"] .. "|r"
+        status[#status + 1] = BLUE .. L["you know it"] .. "|r"
     elseif ns.RecipeIndex.IsKnown(recipe.recipeID, "any") then
-        about[#about + 1] = L["one of your characters knows it"]
+        status[#status + 1] = L["one of your characters knows it"]
     else
-        about[#about + 1] = L["not known"]
+        status[#status + 1] = L["not known"]
     end
     if recipe.new then
-        about[#about + 1] = ns.RecipeIndex.IsConfirmed(recipe.recipeID) and L["new since Classic"]
+        status[#status + 1] = ns.RecipeIndex.IsConfirmed(recipe.recipeID) and L["new since Classic"]
             or (ORANGE .. L["new, unconfirmed"] .. "|r")
     end
-    if r.crafts > 1 then about[#about + 1] = string.format(L["%d crafts"], r.crafts) end
-    Add(table.concat(about, ", "))
-    if r.vendorOnly then Add(GOLD .. L["Made entirely from goods a vendor sells."] .. "|r") end
+    if r.crafts > 1 then status[#status + 1] = Crafts(r.crafts) end
+    local about = {
+        string.format("%s (%d/%d)", ns.RecipeIndex.ProfessionName(recipe.profession), recipe.yellow, recipe.grey),
+        table.concat(status, ", "),
+    }
+    if r.vendorOnly then about[#about + 1] = GOLD .. L["Made entirely from goods a vendor sells."] .. "|r" end
+    Header(recipe.output, r.units, about)
 
     Heading(L["Reagents"])
-    for _, line in ipairs(r.lines) do Add(ReagentLine(line)) end
+    local owned = r.ctx and r.ctx.owned
+    for _, line in ipairs(r.lines) do Slot(line, owned and owned[line.itemID] or line.owned) end
     Row(L["Cost"], r.complete and Money.Compact(r.cogs) or "?", {
         r.view == "vendor" and L["Reagents you own count at what a vendor pays for them; the rest come from a vendor."]
             or L["Reagents you own count at what they'd sell for; the rest come from the cheapest of a vendor, the AH or a recipe you know."],
@@ -496,7 +660,9 @@ function DetailPanel.Refresh()
     if not panel then return end
     for i = 1, usedLines do lines[i]:Hide() end
     for i = 1, usedRows do rows[i]:Hide() end
-    usedLines, usedRows, height, nextGap, last = 0, 0, 0, 0, nil
+    for i = 1, usedSlots do slots[i]:Hide() end
+    if header then header:Hide() end
+    usedLines, usedRows, usedSlots, height, nextGap, last = 0, 0, 0, 0, 0, nil
     local r = current
     panel.Text:SetShown(r == nil)
     scroll:SetShown(r ~= nil)

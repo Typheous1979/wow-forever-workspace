@@ -196,6 +196,7 @@ local function PriceStep(s)
             s.flips[#s.flips + 1] = flip
         elseif unknown then
             s.flipsUnknown = s.flipsUnknown + 1
+            s.unknown[itemID] = listings   -- looked at again once the item's data loads
         end
         s.j = s.j + 1
     end
@@ -211,7 +212,7 @@ local function StartPricing(s)
     s.readMs = math.floor(NowMs() - s.readStarted)
     s.pricingStarted = NowMs()
     s.own, s.ownRemoved = ns.Ledger.OwnLevels(OWN_MAX_AGE), 0
-    s.flips, s.flipsUnknown = {}, 0
+    s.flips, s.flipsUnknown, s.unknown = {}, 0, {}
     state = "pricing"
     s.ids, s.j = {}, 1
     for itemID in pairs(s.acc) do s.ids[#s.ids + 1] = itemID end
@@ -295,6 +296,7 @@ Finish = function(s)
     else
         ns.PriceDB.NoteScan(s.t, s.items, s.rows - s.noItemID)
         ns.PriceDB.NoteFlips(s.t, s.flips)
+        ns.Flips.Recheck(s.t, s.flips, s.unknown, summary)
         SetNotice(nil)
         ns.Print(string.format(L["Scan complete: %s items from %s listings in %.1f s."],
             BreakUpLargeNumbers(s.items), BreakUpLargeNumbers(s.rows - s.noItemID), summary.totalMs / 1000))
@@ -488,11 +490,11 @@ function Scanner.PrintDiag()
         elseif s.aborted then
             out("last scan: stopped while %s", tostring(s.aborted))
         else
-            out("last scan: %d rows, %d items, %d missing info, %d bid-only, %d without itemID; wait %s ms, read %s ms, price %s ms; %s extra updates; %s of your units left out; %s flips (%s items' vendor price unknown)",
+            out("last scan: %d rows, %d items, %d missing info, %d bid-only, %d without itemID; wait %s ms, read %s ms, price %s ms; %s extra updates; %s of your units left out; %s flips (%s items' vendor price unknown; once loaded, %s more flips, %s still unknown)",
                 s.rows or 0, s.items or 0, s.missing or 0, s.bidOnly or 0, s.noItemID or 0,
                 tostring(s.waitMs), tostring(s.readMs), tostring(s.pricingMs), tostring(s.updates or 0),
                 s.ownChecked and tostring(s.ownRemoved or 0) or "none", tostring(s.flips or "-"),
-                tostring(s.flipsUnknown or "-"))
+                tostring(s.flipsUnknown or "-"), tostring(s.lateFlips or "-"), tostring(s.stillUnknown or "-"))
         end
     end
     for _, itemID in ipairs(PROBE_ITEMS) do

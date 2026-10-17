@@ -13,12 +13,18 @@
     pays and the profit.
   - The confidence follows the scan's age (A under 15 min, B under 1 h, C under 6 h), since listings vanish fast.
   - Buying stays your click.
+  - Items whose vendor price the game hadn't loaded during the scan are checked again once it has (1,309 of
+    2,927 items the first time).
+- **Details pane icons, as in the profession window:** the result's round icon with its count and its name in its
+  quality colour; each reagent in a slot with "have/need Name" (grey when you have too few) and where the rest
+  comes from. Hover an icon for the item, Shift-click to link it.
 - The Top pick follows the view. `/bf diag` reports the flips of the last scan.
 - `/bf selftest`: 107 checks (flips, the vendor-only context, the vendor batch, raw materials on the AH; 35
   scenarios from the Python reference).
 - Tested on client 1.60.1.70425, 2026-10-17: selftest 107/107; the three views, the vendor-craft details and a full
   scan's flips work. The tabs then moved from the top of the pane to under the window, where WoW players look
-  for them.
+  for them. Then the details pane icons worked, and a scan found 13 flips, loaded the 1,305 items it couldn't price
+  at first, and found 5 more.
 
 ## 0.6.0 (not released)
 - **Your own auctions aren't the market:** full scans leave out the auctions you have listed (from your auctions

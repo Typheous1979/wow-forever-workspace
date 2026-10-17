@@ -14,8 +14,9 @@ local Flips = {}
 ns.Flips = Flips
 
 local AGES = { { 15 * 60, "A" }, { 3600, "B" }, { 6 * 3600, "C" } }   -- older than the last: D
+local RECHECK_TIMEOUT = 20   -- seconds to wait for the item data after a scan
 
--- What a vendor pays for the item; nil while the item isn't cached (a later scan finds it).
+-- What a vendor pays for the item; nil while the item isn't cached (Flips.Recheck tries again).
 local function VendorSell(itemID)
     local sell = ns.ItemSellPrice and ns.ItemSellPrice[itemID] or select(11, C_Item.GetItemInfo(itemID))
     if type(sell) ~= "number" then return nil end
@@ -30,6 +31,33 @@ function Flips.Find(itemID, listings)
     local qty, cost, value, lo, hi = Econ.Flip(listings, sell)
     if qty == 0 then return nil end
     return string.format("%d:%d:%.0f:%.0f:%.2f:%.2f", itemID, qty, cost, value, lo, hi)
+end
+
+-- After a scan: the items whose vendor price wasn't cached yet (unknown[itemID] = their listings, your
+-- own left out) are loaded, then looked at again. On 70425 that was 1,309 of 2,927 items. The flips
+-- found join the scan's list (list, as stored), unless a newer scan has replaced it. summary is the
+-- scan's diag entry: lateFlips found this way, stillUnknown items still without a price.
+function Flips.Recheck(t, list, unknown, summary)
+    local ids = {}
+    for itemID in pairs(unknown) do ids[#ids + 1] = itemID end
+    if #ids == 0 then return end
+    ns.Items.Load(ids, function()
+        local found, still = 0, 0
+        for _, itemID in ipairs(ids) do
+            local flip, missing = Flips.Find(itemID, unknown[itemID])
+            if flip then
+                list[#list + 1] = flip
+                found = found + 1
+            elseif missing then
+                still = still + 1
+            end
+        end
+        summary.lateFlips, summary.stillUnknown = found, still
+        if found > 0 and ns.PriceDB.Flips() == t then
+            ns.PriceDB.NoteFlips(t, list)
+            ns.Fire("FLIPS_CHANGED")
+        end
+    end, RECHECK_TIMEOUT)
 end
 
 -- The confidence in a flip from the scan's age: A under 15 min, B under 1 h, C under 6 h, else D.

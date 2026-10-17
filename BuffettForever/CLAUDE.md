@@ -74,6 +74,10 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   Tested on 70425: the tabs work and stay on screen. The logged mail tests passed: 2 Light Leather expired and were
   filed once, a mailbox reopened about 4 minutes later filed nothing twice, and a 19c Coarse Thread sale was filed
   with no cut. The first flips scan found 6, but 1,309 of 2,927 items' vendor prices weren't cached yet.
+- 0.7.0 second follow-up (2026-10-17): the details pane shows items as the profession window
+  does: a round result icon with the count and the quality-coloured name, and reagent slots with "have/need Name"
+  (Justin's request). Flips.Recheck loads the items whose vendor price wasn't cached during a scan and looks again.
+  Tested on 70425: the icons work; a scan found 13 flips, then loaded all 1,305 unpriced items and found 5 more.
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). The expiry and mailbox-reopen tests passed on
   70425 (2026-10-17).

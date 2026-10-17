@@ -455,6 +455,6 @@ ns.On("MAIN_SHOWN", function()
     if dirty then ResultsList.Update() end
 end)
 for _, message in ipairs({ "TRAY_CHANGED", "SCAN_DONE", "RECIPES_KNOWN_CHANGED", "LEDGER_CHANGED", "DEPOSITS_CHANGED",
-                           "BAGS_CHANGED", "VENDOR_PRICES_CHANGED" }) do
+                           "BAGS_CHANGED", "VENDOR_PRICES_CHANGED", "FLIPS_CHANGED" }) do
     ns.On(message, Schedule)
 end
