@@ -5,7 +5,9 @@ local addonName, ns = ...
 --   BuffettForeverDB.markets[marketKey] = {
 --     items = { [itemID] = { t = time, mv = market value, min = min buyout, q = quantity,
 --                            n = auctions, ladder = "p:q,p:q,...", h = { [day] = "mv:min:q:n:k" } } },
---     scan = { t, items, n } }                      -- the last full scan of this market
+--     scan = { t, items, n },                       -- the last full scan of this market
+--     flips = { t, list },                          -- its listings below a vendor's price (Pricing/Flips.lua)
+--     ledger = { ... } }                            -- your own auction results (Pricing/Ledger.lua)
 -- Prices are copper per unit, kept to 0.01 copper. A day is floor(serverTime / 86400). In the
 -- day string, mv is the mean of that day's scans, min the lowest, q and n the latest, and k
 -- counts the scans. n (auctions) comes from full scans; it can be missing ("mv:min:q::k") for an
@@ -114,6 +116,21 @@ function PriceDB.Record(itemID, listings, now, keepAuctions)
     end
     row.h[day] = table.concat({ Num(dayMV), Num(dayMin), q, n or "", k }, ":")
     return row
+end
+
+-- The AH flips of the last full scan (Pricing/Flips.lua): { t, list = { "itemID:qty:cost:value:lo:hi" } }.
+function PriceDB.NoteFlips(t, list)
+    if ns.readOnlyDB then return end
+    local market = PriceDB.Market(true)
+    if market then market.flips = { t = t, list = list } end
+end
+
+-- The last scan's flips: its time and the packed list; nil before any.
+function PriceDB.Flips()
+    local market = PriceDB.Market()
+    local flips = market and market.flips
+    if not flips then return nil end
+    return flips.t, flips.list
 end
 
 -- Remember the last full scan of this market (for the status line).

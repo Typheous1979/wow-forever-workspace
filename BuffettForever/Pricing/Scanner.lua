@@ -12,7 +12,8 @@ local addonName, ns = ...
 -- scan timings, rows missing info, the market-key inputs per character, SupportsCopperValues,
 -- and which reagents are commodities. While reading, it names the items of sales waiting in the
 -- ledger for an ID (sales mail gives the item's name only). Pricing leaves out your own auctions
--- (from the auctions list read at this visit, Pricing/Owned.lua; Econ.ExcludeOwn).
+-- (from the auctions list read at this visit, Pricing/Owned.lua; Econ.ExcludeOwn), and notes the
+-- listings priced below what a vendor pays (Pricing/Flips.lua).
 
 local L = ns.L
 local Scanner = {}
@@ -190,6 +191,12 @@ local function PriceStep(s)
             s.ownRemoved = s.ownRemoved + removed
         end
         ns.PriceDB.Record(itemID, listings, s.t)
+        local flip, unknown = ns.Flips.Find(itemID, listings)   -- listings below what a vendor pays
+        if flip then
+            s.flips[#s.flips + 1] = flip
+        elseif unknown then
+            s.flipsUnknown = s.flipsUnknown + 1
+        end
         s.j = s.j + 1
     end
     Progress("pricing", s.j - 1, #ids)
@@ -204,6 +211,7 @@ local function StartPricing(s)
     s.readMs = math.floor(NowMs() - s.readStarted)
     s.pricingStarted = NowMs()
     s.own, s.ownRemoved = ns.Ledger.OwnLevels(OWN_MAX_AGE), 0
+    s.flips, s.flipsUnknown = {}, 0
     state = "pricing"
     s.ids, s.j = {}, 1
     for itemID in pairs(s.acc) do s.ids[#s.ids + 1] = itemID end
@@ -272,6 +280,7 @@ Finish = function(s)
         pricingMs = s.pricingStarted and math.floor(NowMs() - s.pricingStarted) or 0,
         totalMs = math.floor(NowMs() - s.started), late = s.late, updates = s.updates,
         ownRemoved = s.ownRemoved, ownChecked = s.own ~= nil,
+        flips = s.flips and #s.flips or nil, flipsUnknown = s.flipsUnknown,
     }
     if s.items == 0 then summary.empty = true end
     Push(Diag().scans, summary)
@@ -285,6 +294,7 @@ Finish = function(s)
         end
     else
         ns.PriceDB.NoteScan(s.t, s.items, s.rows - s.noItemID)
+        ns.PriceDB.NoteFlips(s.t, s.flips)
         SetNotice(nil)
         ns.Print(string.format(L["Scan complete: %s items from %s listings in %.1f s."],
             BreakUpLargeNumbers(s.items), BreakUpLargeNumbers(s.rows - s.noItemID), summary.totalMs / 1000))
@@ -478,10 +488,11 @@ function Scanner.PrintDiag()
         elseif s.aborted then
             out("last scan: stopped while %s", tostring(s.aborted))
         else
-            out("last scan: %d rows, %d items, %d missing info, %d bid-only, %d without itemID; wait %s ms, read %s ms, price %s ms; %s extra updates; %s of your units left out",
+            out("last scan: %d rows, %d items, %d missing info, %d bid-only, %d without itemID; wait %s ms, read %s ms, price %s ms; %s extra updates; %s of your units left out; %s flips (%s items' vendor price unknown)",
                 s.rows or 0, s.items or 0, s.missing or 0, s.bidOnly or 0, s.noItemID or 0,
                 tostring(s.waitMs), tostring(s.readMs), tostring(s.pricingMs), tostring(s.updates or 0),
-                s.ownChecked and tostring(s.ownRemoved or 0) or "none")
+                s.ownChecked and tostring(s.ownRemoved or 0) or "none", tostring(s.flips or "-"),
+                tostring(s.flipsUnknown or "-"))
         end
     end
     for _, itemID in ipairs(PROBE_ITEMS) do

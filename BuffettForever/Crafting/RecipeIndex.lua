@@ -68,6 +68,18 @@ function RecipeIndex.IsKnown(recipeID, who)
     return false
 end
 
+-- The recipes this character knows that are in the data, sorted.
+function RecipeIndex.Known()
+    local key = ns.CharKey()
+    local set = key and ns.db and ns.db.recipesKnown[key]
+    local out = {}
+    for recipeID in pairs(set or {}) do
+        if ns.Recipes and ns.Recipes[recipeID] then out[#out + 1] = recipeID end
+    end
+    table.sort(out)
+    return out
+end
+
 function RecipeIndex.IsConfirmed(recipeID)
     local r = ns.Recipes and ns.Recipes[recipeID]
     if not r then return false end

@@ -88,8 +88,8 @@ local defaults = {
 local charDefaults = {
     window = {},   -- main window position (per character)
     tray = {},     -- reagent tray: { { itemID, qty }, ... } in slot order (Crafting/Tray.lua)
-    results = {    -- the craftable-items list (UI/ResultsList.lua)
-        sortKey = "rank", sortDesc = true, knownOnly = false, showUnconfirmed = false,
+    results = {    -- the craftable-items list (UI/ResultsList.lua); view: "tray", "vendor" or "flips"
+        sortKey = "rank", sortDesc = true, knownOnly = false, showUnconfirmed = false, view = "tray",
     },
 }
 
@@ -173,6 +173,11 @@ function events:PLAYER_REGEN_ENABLED()
     wipe(combatQueue)
 end
 
+-- What you carry changed (the Vendor crafts view counts it).
+function events:BAG_UPDATE_DELAYED()
+    ns.Fire("BAGS_CHANGED")
+end
+
 -- At an auctioneer: scanning and searching are only possible in between.
 function events:AUCTION_HOUSE_SHOW()
     ns.ahOpen = true
@@ -196,3 +201,4 @@ frame:RegisterEvent("PLAYER_LOGOUT")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("AUCTION_HOUSE_SHOW")
 frame:RegisterEvent("AUCTION_HOUSE_CLOSED")
+frame:RegisterEvent("BAG_UPDATE_DELAYED")

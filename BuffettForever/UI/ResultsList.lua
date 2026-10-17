@@ -1,16 +1,19 @@
 local addonName, ns = ...
 
--- The middle pane: every recipe that uses the tray's reagents, evaluated by
--- Economics/Evaluator.lua, one row each:
--- - the columns: output (with the units made; * = a recipe this character knows), cost, best exit
+-- The middle pane, in three views (tabs where its heading was):
+-- - Tray: every recipe that uses the tray's reagents (Evaluator.ForTray);
+-- - Vendor crafts: recipes you know that profit on vendor prices alone (Evaluator.VendorCrafts);
+-- - AH flips: listings in the last full scan below what a vendor pays (Pricing/Flips.lua).
+-- One row each:
+-- - the columns: the item (with the units; * = a recipe this character knows), cost, best exit
 --   (AH or V = vendor), profit, ROI and confidence grade;
--- - click a heading to sort (the evaluator's ranking by default; again to reverse); click a row
---   for the details pane;
--- - losses are red, recommended rows white, the rest grey;
--- - "Known only" and "Show unconfirmed" filter the list.
+-- - click a heading to sort (the ranking by default; again to reverse); click a row for the details;
+-- - losses are red, recommended rows white, the rest grey; orange: a vendor craft whose materials
+--   would fetch more on the AH;
+-- - "Known only" and "Show unconfirmed" filter the Tray view.
 -- Also fills the Top pick panel. Re-evaluates (debounced) when the tray, the prices, the known
--- recipes, the sales ledger or the deposits change, while the window is open; otherwise on the next
--- open.
+-- recipes, the sales ledger, the deposits, your bags or vendor prices change, while the window is
+-- open; otherwise on the next open.
 
 local L = ns.L
 local UI = ns.UI
@@ -30,7 +33,16 @@ local QUESTION_MARK = 134400
 local GRADE_COLOR = { A = "|cff33ff33", B = "|cffb4ff33", C = "|cffffd100", D = "|cffff5533" }
 local DEBOUNCE = 0.15
 
-local panel, pick, box, countText
+local VIEWS = {
+    { key = "tray", label = "Tray", tip = "Every recipe that uses the reagents in your tray." },
+    { key = "vendor", label = "Vendor crafts",
+      tip = "Recipes you know that profit on vendor prices alone: reagents from a vendor or your bags (counted at what a vendor pays for them), the result sold to a vendor. Certain profit, no Auction House risk." },
+    { key = "flips", label = "AH flips",
+      tip = "Listings in your last full scan priced below what a vendor pays: buy them on the Auction House and sell them to a vendor. Listings vanish fast, so the confidence follows the scan's age." },
+}
+
+local panel, pick, box, countText, knownCheck, unconfirmedCheck
+local tabs = {}
 local results, ranked = {}, {}
 local selected
 local dirty, pending = true, nil
@@ -94,6 +106,7 @@ end
 
 local function Color(r)
     if r.profit and r.profit < 0 then return 1, 0.35, 0.35 end
+    if r.rawBetter then return 1, 0.6, 0.2 end   -- a vendor craft: the materials fetch more on the AH
     if r.recommended then return 1, 1, 1 end
     return 0.6, 0.6, 0.6
 end
@@ -133,7 +146,7 @@ local function InitRow(row, data)
     local r = data.result
     row.recipeID, row.output = r.recipe.recipeID, r.recipe.output
     row.icon:SetTexture(C_Item.GetItemIconByID(r.recipe.output) or QUESTION_MARK)
-    local mark = (r.known and "|cff66ccff*|r " or "") .. (r.vendorOnly and "|cffffd100v|r " or "")
+    local mark = r.view and "" or ((r.known and "|cff66ccff*|r " or "") .. (r.vendorOnly and "|cffffd100v|r " or ""))
     row.left:SetText(string.format("%s%s x%d", mark, Name(r.recipe.output), r.units))
     local cR, cG, cB = Color(r)
     row.left:SetTextColor(cR, cG, cB)
@@ -168,13 +181,16 @@ local function UpdateTopPick()
             if not richest or r.profit > richest.profit then richest = r end
         end
     end
-    local Ev = ns.Evaluator
+    local function Advice(r)
+        local link = ns.Items.Link(r.recipe.output)
+        if r.flip then return ns.Flips.Advice(r, link) end
+        return ns.Evaluator.Advice(r, link)
+    end
     local text
     if top then
-        text = Ev.Advice(top, ns.Items.Link(top.recipe.output))
+        text = Advice(top)
     elseif #ranked > 0 then
-        text = L["Nothing meets your margin of safety yet."] .. "\n\n" ..
-            Ev.Advice(ranked[1], ns.Items.Link(ranked[1].recipe.output))
+        text = L["Nothing meets your margin of safety yet."] .. "\n\n" .. Advice(ranked[1])
     else
         text = L["The best return on investment, and where to sell it, shows here."]
     end
@@ -183,9 +199,9 @@ local function UpdateTopPick()
     pick.MostTitle:SetShown(showMost)
     pick.MostText:SetShown(showMost)
     if showMost then
-        pick.MostText:SetText(string.format(L["%d x %s: +%s (ROI %s, confidence %s)."], richest.crafts,
-            ns.Items.Link(richest.recipe.output), Money.Format(richest.profit),
-            richest.roi and Pct(richest.roi) or L["n/a"], richest.grade))
+        pick.MostText:SetText(string.format(L["%d x %s: +%s (ROI %s, confidence %s)."],
+            richest.flip and richest.units or richest.crafts, ns.Items.Link(richest.recipe.output),
+            Money.Format(richest.profit), richest.roi and Pct(richest.roi) or L["n/a"], richest.grade))
     end
 end
 
@@ -232,26 +248,55 @@ local function ShowRows()
     box:SetDataProvider(dp, ScrollBoxConstants.RetainScrollPosition)
 end
 
+local function View()
+    return Prefs().view or "tray"
+end
+
+-- What the list says when it's empty, by view.
+local function EmptyText(view, entries, scanT)
+    if view == "vendor" then
+        if #ns.RecipeIndex.Known() == 0 then return L["This character knows no recipes yet."] end
+        return L["None of your recipes profits on vendor prices with what you carry and what vendors sell. Visiting vendors that sell reagents can find more."]
+    elseif view == "flips" then
+        if not scanT then return L["Scan at the Auction House to look for listings below what a vendor pays."] end
+        return L["No listing in your last full scan was below what a vendor pays."]
+    end
+    if #entries == 0 then return L["Drop a reagent into the tray to see what it can make, what that costs and what it sells for."] end
+    return L["No recipe uses these reagents with these filters."]
+end
+
 function ResultsList.Update()
     dirty = false
     if not box then return end
-    local entries = ns.Tray.Entries()
-    ranked = ns.Evaluator.ForTray(entries, Filter())   -- recipes from vendor goods list even with an empty tray
+    local view, entries, scanT = View(), ns.Tray.Entries(), nil
+    if view == "vendor" then
+        ranked = ns.Evaluator.VendorCrafts()
+    elseif view == "flips" then
+        ranked, scanT = ns.Flips.Results()
+    else
+        ranked = ns.Evaluator.ForTray(entries, Filter())   -- recipes from vendor goods list even with an empty tray
+    end
     ShowRows()
     local recommended = 0
     for _, r in ipairs(ranked) do
         if r.recommended then recommended = recommended + 1 end
     end
-    countText:SetText(#ranked > 0 and string.format(L["%d recipes, %d recommended"], #ranked, recommended) or "")
+    local count = ""
+    if view == "flips" and scanT then
+        count = string.format(L["%d flips, %d recommended; scanned %s ago"], #ranked, recommended,
+            ns.FormatAge(GetServerTime() - scanT))
+    elseif #ranked > 0 then
+        count = string.format(view == "vendor" and L["%d vendor crafts, %d recommended"] or L["%d recipes, %d recommended"],
+            #ranked, recommended)
+    end
+    countText:SetText(count)
     -- keep the selection when it's still listed, else select the top of the ranking
     local keep
     for _, r in ipairs(ranked) do
         if r.recipe.recipeID == selected then keep = true end
     end
     if not keep then selected = ranked[1] and ranked[1].recipe.recipeID or nil end
-    panel.Empty:SetText(#entries == 0
-        and L["Drop a reagent into the tray to see what it can make, what that costs and what it sells for."]
-        or L["No recipe uses these reagents with these filters."])
+    panel.Empty:SetText(EmptyText(view, entries, scanT))
     ResultsList.Select(selected)
     UpdateTopPick()
     -- names and icons may still be loading: repaint when they're in
@@ -279,6 +324,51 @@ local function Schedule()
 end
 
 -- ---------------------------------------------------------------- build
+
+-- The tabs show the view; the filters apply to the Tray view only.
+local function ShowView()
+    local view = View()
+    for _, tab in ipairs(tabs) do
+        local on = tab.key == view
+        tab:SetNormalFontObject(on and "GameFontNormal" or "GameFontDisable")
+        tab.line:SetShown(on)
+    end
+    if knownCheck then
+        knownCheck:SetShown(view == "tray")
+        unconfirmedCheck:SetShown(view == "tray")
+    end
+end
+
+function ResultsList.SetView(view)
+    if View() == view then return end
+    Prefs().view = view
+    selected = nil
+    ShowView()
+    ResultsList.Update()
+end
+
+local function Tabs()
+    panel.Title:Hide()
+    local prev
+    for _, v in ipairs(VIEWS) do
+        local tab = CreateFrame("Button", nil, panel)
+        tab:SetNormalFontObject("GameFontDisable")
+        tab:SetHighlightFontObject("GameFontHighlight")
+        tab:SetText(L[v.label])
+        tab:SetSize(tab:GetTextWidth() + 12, 18)
+        if prev then tab:SetPoint("LEFT", prev, "RIGHT", 4, 0) else tab:SetPoint("TOPLEFT", 2, -3) end
+        tab.line = tab:CreateTexture(nil, "ARTWORK")
+        tab.line:SetColorTexture(1, 0.82, 0, 0.8)
+        tab.line:SetHeight(1)
+        tab.line:SetPoint("BOTTOMLEFT", 6, 0)
+        tab.line:SetPoint("BOTTOMRIGHT", -6, 0)
+        tab.key = v.key
+        tab:SetScript("OnClick", function() ResultsList.SetView(v.key) end)
+        UI.Tooltip(tab, L[v.label], L[v.tip])
+        tabs[#tabs + 1] = tab
+        prev = tab
+    end
+end
 
 local function Header(parent, text, key, anchorPoint, x, width, justify)
     local b = CreateFrame("Button", nil, parent)
@@ -308,6 +398,7 @@ end
 
 local function Build(frame)
     panel, pick = frame.Results, frame.Pick
+    Tabs()
     local x = -BAR_SPACE - 4
     for i = #COLUMNS, 1, -1 do
         local c = COLUMNS[i]
@@ -323,6 +414,8 @@ local function Build(frame)
             nil, nil, nil, true)
         GameTooltip:AddLine("|cff66ccff*|r " .. L["a recipe this character knows"], 1, 1, 1)
         GameTooltip:AddLine("|cffffd100v|r " .. L["made entirely from goods a vendor sells"], 1, 1, 1)
+        GameTooltip:AddLine("|cffff9933" .. L["orange"] .. "|r " .. L["a vendor craft whose materials would fetch more on the AH"],
+            1, 1, 1)
         GameTooltip:Show()
     end)
 
@@ -335,22 +428,23 @@ local function Build(frame)
     box = UI.ScrollList(holder, view)
 
     local prefs = Prefs()
-    local known = UI.Check(panel, L["Known only"], function(on)
+    knownCheck = UI.Check(panel, L["Known only"], function(on)
         prefs.knownOnly = on
         ResultsList.Update()
     end)
-    known:SetPoint("BOTTOMLEFT", 6, 2)
-    known:SetChecked(prefs.knownOnly)
-    local unconfirmed = UI.Check(panel, L["Show unconfirmed"], function(on)
+    knownCheck:SetPoint("BOTTOMLEFT", 6, 2)
+    knownCheck:SetChecked(prefs.knownOnly)
+    unconfirmedCheck = UI.Check(panel, L["Show unconfirmed"], function(on)
         prefs.showUnconfirmed = on
         ResultsList.Update()
     end)
-    unconfirmed:SetPoint("LEFT", known.Text, "RIGHT", 14, 0)
-    unconfirmed:SetChecked(prefs.showUnconfirmed)
-    UI.Tooltip(unconfirmed, L["Show unconfirmed"],
+    unconfirmedCheck:SetPoint("LEFT", knownCheck.Text, "RIGHT", 14, 0)
+    unconfirmedCheck:SetChecked(prefs.showUnconfirmed)
+    UI.Tooltip(unconfirmedCheck, L["Show unconfirmed"],
         L["Also list recipes added after Classic that nobody has confirmed yet: no character of yours knows them and their result hasn't been seen on the Auction House."])
     countText = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     countText:SetPoint("BOTTOMRIGHT", -8, 10)
+    ShowView()
     ResultsList.Update()
 end
 
@@ -358,6 +452,7 @@ ns.On("MAIN_BUILT", Build)
 ns.On("MAIN_SHOWN", function()
     if dirty then ResultsList.Update() end
 end)
-for _, message in ipairs({ "TRAY_CHANGED", "SCAN_DONE", "RECIPES_KNOWN_CHANGED", "LEDGER_CHANGED", "DEPOSITS_CHANGED" }) do
+for _, message in ipairs({ "TRAY_CHANGED", "SCAN_DONE", "RECIPES_KNOWN_CHANGED", "LEDGER_CHANGED", "DEPOSITS_CHANGED",
+                           "BAGS_CHANGED", "VENDOR_PRICES_CHANGED" }) do
     ns.On(message, Schedule)
 end

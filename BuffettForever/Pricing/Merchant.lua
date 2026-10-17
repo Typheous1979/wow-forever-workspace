@@ -44,6 +44,7 @@ local function Harvest()
         end
     end
     ns.db.diag.merchant = { t = now, items = count, stored = stored, numAvailable = values, samples = samples }
+    if stored > 0 then ns.Fire("VENDOR_PRICES_CHANGED") end
 end
 
 local function Schedule()

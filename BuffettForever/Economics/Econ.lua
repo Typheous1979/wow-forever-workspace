@@ -303,6 +303,22 @@ function Econ.ExcludeOwn(listings, own)
     return kept, removed
 end
 
+-- AH listings below what a vendor pays (strategy-ideas.md "Vendor flip"): buy them, sell them to a
+-- vendor. listings = { unit price, qty, ... }. Returns the units, their cost, their value at the vendor,
+-- and the cheapest and dearest of them; 0 units when a vendor won't buy the item.
+function Econ.Flip(listings, vendorSell)
+    local qty, cost, lo, hi = 0, 0, nil, nil
+    if not vendorSell or vendorSell <= 0 then return 0, 0, 0, nil, nil end
+    for i = 1, #listings, 2 do
+        local price = listings[i]
+        if price < vendorSell then
+            qty, cost = qty + listings[i + 1], cost + price * listings[i + 1]
+            lo, hi = math.min(lo or price, price), math.max(hi or price, price)
+        end
+    end
+    return qty, cost, qty * vendorSell, lo, hi
+end
+
 local GRADES = { "A", "B", "C", "D" }
 Econ.GRADE_RANK = { A = 1, B = 2, C = 3, D = 4 }
 
@@ -456,5 +472,14 @@ function Econ.SelfTest(report)
     local gs, gsWhy = Econ.Grade(3600, 5, 6, 0.10, 200, nil, 3)
     check("GRADE-STALE", gs == "D" and gsWhy == "stale" and Econ.Grade(3600, 5, 6, 0.10, 200, nil, 2) == "A",
         "a sell price walled for 3 days is D")
+
+    -- strategy-ideas.md: FLIP-1..4 (M4 pass 3; computed in econ.py)
+    local fq, fc, fv, flo, fhi = Econ.Flip({ 40, 5, 45, 10, 60, 20 }, 50)
+    check("FLIP-1", fq == 15 and fc == 650 and fv == 750 and flo == 40 and fhi == 45,
+        string.format("15 under a 50c vendor price: cost %s, worth %s", tostring(fc), tostring(fv)))
+    check("FLIP-2", Econ.Flip({ 40, 5 }, 0) == 0, "a vendor won't buy it: no flip")
+    check("FLIP-3", Econ.Flip({ 60, 5, 70, 1 }, 50) == 0, "nothing under the vendor price")
+    local hq, hc, hv = Econ.Flip({ 49.5, 3 }, 50)
+    check("FLIP-4", hq == 3 and close(hc, 148.5) and hv == 150, "half a copper under still counts")
     return passed, failed
 end

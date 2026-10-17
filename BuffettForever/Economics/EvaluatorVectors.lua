@@ -2468,4 +2468,62 @@ ns.EvaluatorVectors = {
             recipeID = 2659,
         },
     },
+    {
+        crafts = 3,
+        ctx = {
+            commodity = {},
+            deposit = {},
+            ladder = {},
+            owned = {
+                [51] = 6,
+            },
+            priceInfo = {},
+            recipeFor = {},
+            saleChance = {},
+            sellPrice = {},
+            settings = {
+                cut = 0.05,
+                margin = 0.2,
+                minGrade = "C",
+                minProfit = 0,
+                ownedPolicy = "opportunity",
+                saleChance = 0.5,
+            },
+            vendorBuy = {
+                [52] = 25,
+            },
+            vendorSell = {
+                [50] = 300,
+                [51] = 40,
+            },
+        },
+        expect = {
+            best = 900,
+            bestSource = "vendor",
+            cogs = 315.0,
+            grade = "A",
+            profit = 585.0,
+            reasons = "",
+            recommended = true,
+            roi = 1.8571428571428572,
+            sources = "-,vendor",
+            valueAdded = 660.0,
+            vendorExit = 900,
+            warnings = "",
+        },
+        name = "VENDOR-CRAFT",
+        recipe = {
+            bop = false,
+            count = 1,
+            output = 50,
+            reagents = { {
+                    count = 2,
+                    itemID = 51,
+                }, {
+                    count = 1,
+                    itemID = 52,
+                } },
+            recipeID = 5,
+        },
+    },
 }

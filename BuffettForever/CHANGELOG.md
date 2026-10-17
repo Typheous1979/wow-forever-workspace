@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.0 (not released)
+- **Three views** in the middle pane: Tray, Vendor crafts and AH flips (tabs where its heading was).
+- **Vendor crafts:** every recipe you know that profits on vendor prices alone.
+  - Its reagents come from a vendor, or from your bags counted at what a vendor pays for them; the result goes to
+    a vendor. Certain profit, no Auction House risk.
+  - The batch is what your bags allow (a vendor's goods don't limit it).
+  - Orange when the reagents you own would fetch more on the AH raw; the details pane shows how much.
+- **AH flips:** every full scan notes the listings priced below what a vendor pays (your own left out).
+  - Buy them on the Auction House, sell them to a vendor: the list shows how many, what they cost, what a vendor
+    pays and the profit.
+  - The confidence follows the scan's age (A under 15 min, B under 1 h, C under 6 h), since listings vanish fast.
+  - Buying stays your click.
+- The Top pick follows the view. `/bf diag` reports the flips of the last scan.
+- `/bf selftest`: 107 checks (flips, the vendor-only context, the vendor batch, raw materials on the AH; 35
+  scenarios from the Python reference).
+- Tested on client 1.60.1.70425, 2026-10-17: selftest 107/107; the three views, the vendor-craft details and a full
+  scan's flips work.
+
 ## 0.6.0 (not released)
 - **Your own auctions aren't the market:** full scans leave out the auctions you have listed (from your auctions
   list read at this visit), and searches leave out yours too, so your own listings don't count as depth, set the

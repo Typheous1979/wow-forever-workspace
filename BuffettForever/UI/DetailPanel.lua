@@ -9,6 +9,8 @@ local addonName, ns = ...
 -- - Result: where to sell, profit, ROI, value added, confidence, and the best batch (the reagents or the
 --   market sets it);
 -- - Mr. Market, when a price is well away from its fair value; then the verdict.
+-- A vendor craft (the Vendor crafts view) counts vendor prices only and shows what your materials would
+-- fetch raw on the AH; an AH flip gets its own layout (buy, sell, result, verdict).
 -- Numbers sit in label/value rows; each row's tooltip says where its number comes from (Justin,
 -- 2026-10-17: data, not paragraphs). The pane scrolls (ScrollFrameTemplate).
 
@@ -247,6 +249,18 @@ local function Yours(itemID)
     Row(L["Yours"], table.concat(parts, ", "), tip)
 end
 
+-- A vendor craft (the Vendor crafts view): what your own reagents would fetch on the AH instead.
+local function RawOnAH(r)
+    if (r.rawAH or 0) <= 0 then return end
+    local bought = 0
+    for _, line in ipairs(r.lines) do bought = bought + line.buyCost end
+    Row(L["Raw on AH"], (r.rawBetter and ORANGE or "") .. Money.Compact(r.rawAH) .. (r.rawBetter and "|r" or ""), {
+        L["What the reagents you own would fetch on the AH, after the cut and the deposits expected to be lost."],
+        string.format(L["Crafting pays %s for them at a vendor."], Money.Format(r.best - bought)),
+        r.rawBetter and (ORANGE .. L["Selling them on the AH pays more, though less surely."] .. "|r") or nil,
+    })
+end
+
 local function Sell(r)
     local recipe = r.recipe
     Heading(L["Sell"])
@@ -254,7 +268,10 @@ local function Sell(r)
         r.vendorExit and string.format(L["What a vendor pays for the batch (%s each): certain and instant."],
             Money.Format(r.vendorExit / r.units)) or L["A vendor won't buy it."],
     })
-    if recipe.bop then
+    if r.view == "vendor" then
+        Row(L["AH"], GREY .. L["not counted"] .. "|r", { L["Vendor crafts count vendor prices only: certain profit, no AH risk."] })
+        RawOnAH(r)
+    elseif recipe.bop then
         Row(L["AH"], GREY .. L["binds on pickup"] .. "|r", { L["It binds when picked up, so it can't be sold on the AH."] })
     elseif r.ahExit then
         local value = r.ahExit > 0 and Money.Compact(r.ahExit) or (ORANGE .. L["none"] .. "|r")
@@ -399,19 +416,50 @@ local function Verdict(r)
     end
 end
 
--- ---------------------------------------------------------------- refresh
+-- ---------------------------------------------------------------- an AH flip
 
-function DetailPanel.Refresh()
-    if not panel then return end
-    for i = 1, usedLines do lines[i]:Hide() end
-    for i = 1, usedRows do rows[i]:Hide() end
-    usedLines, usedRows, height, nextGap, last = 0, 0, 0, 0, nil
-    local r = current
-    panel.Text:SetShown(r == nil)
-    scroll:SetShown(r ~= nil)
-    if not r then return end
+local function FlipDetails(r)
+    local itemID = r.recipe.output
+    Add(string.format("%s x%d", ns.Items.Link(itemID), r.units), "GameFontNormal")
+    Add(GREY .. L["Buy on the AH, sell to a vendor."] .. "|r")
+
+    Heading(L["Buy"])
+    local prices = (r.lo and r.hi and r.lo ~= r.hi) and string.format(L["%s to %s"], Money.Compact(r.lo), Money.Compact(r.hi))
+        or Money.Compact(r.lo or 0)
+    Row(L["Listed"], string.format(L["%d at %s"], r.units, prices), {
+        string.format(L["%d listed below what a vendor pays, at %s each, in your last full scan."], r.units, prices),
+    })
+    Row(L["Cost"], Money.Compact(r.cogs), { L["What buying all of them costs."] })
+
+    Heading(L["Sell"])
+    Row(L["Vendor"], Money.Compact(r.best), {
+        string.format(L["What a vendor pays: %s each, certain and instant."], Money.Format(r.best / r.units)),
+    })
+
+    Heading(L["Result"])
+    Row(L["Profit"], GREEN .. Money.Compact(r.profit) .. "|r", { L["The vendor's price minus what the listings cost."] })
+    Row(L["ROI"], r.roi and Pct(r.roi) or L["n/a"], { L["Profit / cost."] })
+    Row(L["Confidence"], (GRADE_COLOR[r.grade] or "") .. r.grade .. "|r", {
+        string.format(L["Your last full scan is %s old, and listings vanish fast: A under 15 min, B under 1 h, C under 6 h."],
+            ns.FormatAge(r.age)),
+    })
+
+    Heading(L["Verdict"])
+    if r.recommended then
+        Add(GREEN .. string.format(L["Recommended: buy %d (up to %s each), sell to a vendor."], r.units,
+            Money.Compact(r.hi or 0)) .. "|r")
+    else
+        local why = {}
+        for _, key in ipairs(r.reasons) do why[#why + 1] = ns.Evaluator.ReasonText(key) end
+        Add(ORANGE .. L["Not recommended:"] .. "|r " .. table.concat(why, ", ") .. ".")
+    end
+    Add(GREY .. L["Buy them in Blizzard's Auction House: BuffettForever doesn't buy for you."] .. "|r")
+end
+
+-- ---------------------------------------------------------------- a recipe
+
+local function RecipeDetails(r)
     local recipe = r.recipe
-
     Add(string.format("%s x%d", ns.Items.Link(recipe.output), r.units), "GameFontNormal")
     local about = { string.format("%s (%d/%d)", ns.RecipeIndex.ProfessionName(recipe.profession), recipe.yellow, recipe.grey) }
     if r.known then
@@ -432,13 +480,28 @@ function DetailPanel.Refresh()
     Heading(L["Reagents"])
     for _, line in ipairs(r.lines) do Add(ReagentLine(line)) end
     Row(L["Cost"], r.complete and Money.Compact(r.cogs) or "?", {
-        L["Reagents you own count at what they'd sell for; the rest come from the cheapest of a vendor, the AH or a recipe you know."],
+        r.view == "vendor" and L["Reagents you own count at what a vendor pays for them; the rest come from a vendor."]
+            or L["Reagents you own count at what they'd sell for; the rest come from the cheapest of a vendor, the AH or a recipe you know."],
     })
 
     Sell(r)
     Result(r)
     MrMarket(r)
     Verdict(r)
+end
+
+-- ---------------------------------------------------------------- refresh
+
+function DetailPanel.Refresh()
+    if not panel then return end
+    for i = 1, usedLines do lines[i]:Hide() end
+    for i = 1, usedRows do rows[i]:Hide() end
+    usedLines, usedRows, height, nextGap, last = 0, 0, 0, 0, nil
+    local r = current
+    panel.Text:SetShown(r == nil)
+    scroll:SetShown(r ~= nil)
+    if not r then return end
+    if r.flip then FlipDetails(r) else RecipeDetails(r) end
     child:SetHeight(math.max(1, height + 8))
 end
 
