@@ -34,6 +34,9 @@ CUT_MIN_SALES, CUT_MIN_COPPER = 3, 10000   # invoices, and their total, before t
 # Forever's deposit per auction [F-129]: 5% of the vendor price per 2 hours, floored to whole copper, times 1, 4
 # or 12 for 2, 8 or 24 hours, at least 1s.
 DEPOSIT_DIVISOR, DEPOSIT_MULT, DEPOSIT_MIN = 20, (1, 4, 12), 100
+STALE_DAYS, STALE_PRICE = 3, 0.01   # a wall: the cheapest price held (within 1%) this many days, quantity never fell
+MOOD_DAYS, MOOD_Z, MOOD_SHARE = 5, 1.0, 0.10   # Mr. Market: days of history, and how far from fair value is news
+CAP_SHARE, BATCH_LIMIT = 0.25, 200  # sell at most a quarter of what's listed; batch sizes searched
 
 
 # ---------------------------------------------------------------- price math
@@ -159,8 +162,67 @@ def volatility(history, today, window=14):
     return mean, math.sqrt(var) / mean
 
 
-def grade(age, days, observations, cv, listed, need):
-    """Confidence grade (risk-and-recommendation.md): the worst of age, days observed, volatility, depth."""
+def stale_run(days):
+    """days: [(cheapest price, quantity listed), ...] oldest first, one per observed day. Counting back from the
+    latest day: how many days the cheapest price held (within 1%) while the quantity never fell. Returns (days, price)."""
+    if not days:
+        return 0, None
+    price = days[-1][0]
+    run = 1
+    for i in range(len(days) - 2, -1, -1):
+        older, newer = days[i], days[i + 1]
+        if abs(older[0] - price) > price * STALE_PRICE or older[1] > newer[1]:
+            break
+        run += 1
+    return run, price
+
+
+def mr_market(history, today, latest, window=14):
+    """How far today's market value is from the fair value: (z in standard deviations of the daily values, share
+    above or below fair value, fair value), or None under MOOD_DAYS days or with no spread."""
+    vals = [v for day, v in history.items() if 0 <= today - day < window]
+    if len(vals) < MOOD_DAYS:
+        return None
+    mean = sum(vals) / len(vals)
+    sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / len(vals))
+    fair = fair_value(history, today, 3, window)
+    if fair is None or fair <= 0 or sd <= 0:
+        return None
+    return (latest - fair) / sd, latest / fair - 1, fair
+
+
+def mood(z, share):
+    """A Mr. Market hint: "cheap", "dear" or None (|z| under 1 or under 10% from fair value)."""
+    if abs(z) < MOOD_Z or abs(share) < MOOD_SHARE:
+        return None
+    return "cheap" if z < 0 else "dear"
+
+
+def exclude_own(listings, own):
+    """listings and own: flat [unit price, qty, ...]. Your own auctions take their units from the listings at their
+    price (within half a copper). Returns (listings left, units removed)."""
+    out = list(listings)
+    removed = 0
+    for k in range(0, len(own), 2):
+        price, left = own[k], own[k + 1]
+        for i in range(0, len(out), 2):
+            if left <= 0:
+                break
+            if abs(out[i] - price) <= 0.5 and out[i + 1] > 0:
+                take = min(left, out[i + 1])
+                out[i + 1] -= take
+                left -= take
+                removed += take
+    kept = []
+    for i in range(0, len(out), 2):
+        if out[i + 1] > 0:
+            kept += [out[i], out[i + 1]]
+    return kept, removed
+
+
+def grade(age, days, observations, cv, listed, need, stale=None):
+    """Confidence grade (risk-and-recommendation.md): the worst of age, days observed, volatility, depth, and for a
+    sell price, a wall that never shrinks (stale = days, passed only when you haven't sold the item yourself)."""
     if age is None:
         return "D"
     g = 1
@@ -193,16 +255,21 @@ def grade(age, days, observations, cv, listed, need):
             g = max(g, 2)
     elif listed <= 0:
         g = max(g, 4)
+    if stale is not None and stale >= STALE_DAYS:
+        g = max(g, 4)
     return GRADES[g - 1]
 
 
 # ---------------------------------------------------------------- the evaluator
 
-def _grade_for(ctx, item, need):
+def _grade_for(ctx, item, need, exit=False):
+    """exit: grading a price you'd sell at, where a wall that never shrinks counts unless you've sold some."""
     info = ctx["priceInfo"].get(item)
     if info is None:
         return "D"
-    return grade(info.get("age"), info.get("days"), info.get("observations"), info.get("cv"), info.get("listed"), need)
+    stale = info.get("stale") if exit and not info.get("sold") else None
+    return grade(info.get("age"), info.get("days"), info.get("observations"), info.get("cv"), info.get("listed"), need,
+                 stale)
 
 
 def _deposit_unit(ctx, item, qty):
@@ -301,7 +368,7 @@ def evaluate(recipe, crafts, ctx):
     r["underMargin"] = False
     if ah is not None and (vend is None or ah >= vend * (1 + s["margin"])):
         r["best"], r["bestSource"] = ah, "ah"
-        note(_grade_for(ctx, out, None))
+        note(_grade_for(ctx, out, None, exit=True))
     elif vend is not None:
         r["best"], r["bestSource"] = vend, "vendor"
         r["underMargin"] = ah is not None and ah > vend
@@ -337,6 +404,38 @@ def evaluate(recipe, crafts, ctx):
     return r
 
 
+def batch_advice(recipe, crafts, ctx):
+    """Batch size (risk-and-recommendation.md "Liquidity and saturation"), two independent limits:
+    - best: as far as the reagents go, the batch with the most profit (the smallest on a tie), searched from 1 to
+      BATCH_LIMIT crafts and stopping where the reagents can't all be had (searched = the last batch tried);
+    - cap: when the AH is the exit at this batch, a quarter of what's listed, in crafts (at least 1); else None.
+    size is the smaller; limit says which set it: "reagents", "market", or "none" when profit still grows at
+    BATCH_LIMIT and no cap is smaller."""
+    best = best_profit = None
+    searched = 0
+    for n in range(1, BATCH_LIMIT + 1):
+        r = evaluate(recipe, n, ctx)
+        if not r["complete"]:
+            break
+        searched = n
+        if r["profit"] is not None and (best_profit is None or r["profit"] > best_profit + 1e-9):
+            best, best_profit = n, r["profit"]
+    cap = None
+    if evaluate(recipe, crafts, ctx)["bestSource"] == "ah":
+        listed = (ctx["priceInfo"].get(recipe["output"]) or {}).get("listed") or 0
+        if listed > 0:
+            cap = max(1, math.floor(listed * CAP_SHARE / recipe["count"]))
+    if best is None:
+        size = limit = None
+    elif cap is not None and cap < best:
+        size, limit = cap, "market"
+    elif best >= BATCH_LIMIT:
+        size, limit = best, "none"
+    else:
+        size, limit = best, "reagents"
+    return {"best": best, "profit": best_profit, "cap": cap, "size": size, "limit": limit, "searched": searched}
+
+
 def rank_key(r):
     """Sort key matching Evaluator.Rank: recommended first, ROI high to low (nothing spent = infinite,
     unknown profit = last), then profit, then recipe ID."""
@@ -350,8 +449,13 @@ def rank_key(r):
 
 # ---------------------------------------------------------------- branch scenarios -> Lua vectors
 
-def _info(age=3600, days=5, observations=6, cv=0.10, listed=1000):
-    return {"age": age, "days": days, "observations": observations, "cv": cv, "listed": listed}
+def _info(age=3600, days=5, observations=6, cv=0.10, listed=1000, stale=None, sold=None):
+    info = {"age": age, "days": days, "observations": observations, "cv": cv, "listed": listed}
+    if stale is not None:
+        info["stale"] = stale
+    if sold is not None:
+        info["sold"] = sold
+    return info
 
 
 def _ctx(settings=None, **tables):
@@ -445,6 +549,20 @@ def scenarios():
         ("CHEAP-SMALL-POST", _recipe(4, 40, 1, [(41, 1)]), 2,
          _ctx({"minProfit": 0, "duration": 2}, vendorSell={40: 2}, sellPrice={40: 19}, vendorBuy={41: 1},
               priceInfo={40: _info()})),
+        # Market reality (M4 pass 2): bolts walled at one price for 4 days with the quantity never falling get
+        # grade D, unless you've sold some yourself.
+        ("BOLT-STALE-WALL", bolt, 10, bolt_ctx({"minProfit": 500}, priceInfo={LINEN: _info(), BOLT: _info(stale=4)})),
+        ("BOLT-STALE-SOLD", bolt, 10, bolt_ctx({"minProfit": 500},
+                                               priceInfo={LINEN: _info(), BOLT: _info(stale=4, sold=3)})),
+        # Batch size: 20 Linen at 9.50s, then 100 at 20s. Bolts pay while the cheap Linen lasts (10 crafts);
+        # past 60 the ladder runs dry. The reagents set the batch.
+        ("BATCH-LADDER", bolt, 20, bolt_ctx({"minProfit": 500}, ladder={LINEN: [950, 20, 2000, 100]}, owned={})),
+        # Linen cheap and deep (profit grows to the search limit), but only 40 bolts listed: the market sets 10.
+        ("BATCH-CAP", bolt, 20, bolt_ctx({"minProfit": 500}, ladder={LINEN: [950, 1000]}, owned={},
+                                         priceInfo={LINEN: _info(), BOLT: _info(listed=40)})),
+        # Bars from a vendor, bronze to a vendor: every craft adds profit and neither limit applies.
+        ("BATCH-VENDOR", bronze, 1, _ctx({"minProfit": 0}, vendorSell={COPPER: 10, TIN: 35, BRONZE: 50},
+                                         vendorBuy={COPPER: 10, TIN: 35})),
     ]
     return out
 
@@ -501,7 +619,12 @@ def vectors():
     out = []
     for name, recipe, crafts, ctx in scenarios():
         r = evaluate(recipe, crafts, ctx)
-        out.append({"name": name, "crafts": crafts, "recipe": _lua_recipe(recipe), "ctx": ctx, "expect": _expect(r)})
+        expect = _expect(r)
+        if name.startswith("BATCH-"):
+            a = batch_advice(recipe, crafts, ctx)
+            expect["batchBest"], expect["batchCap"], expect["batchSize"], expect["batchLimit"] = (
+                a["best"], a["cap"], a["size"], a["limit"])
+        out.append({"name": name, "crafts": crafts, "recipe": _lua_recipe(recipe), "ctx": ctx, "expect": expect})
     return out
 
 

@@ -80,6 +80,25 @@ class ReferenceVectors(unittest.TestCase):
         self.assertEqual(econ.deposit_per_unit(875, 5, 2, commodity=False), 172)          # gear: per auction
         self.assertEqual(econ.deposit(None, 3, 3), 100)                       # no vendor price: the minimum
 
+    def test_market_reality(self):
+        """WALL-1..3, MOOD-1..3, OWN-1..3 in risk-and-recommendation.md (M4 pass 2)."""
+        self.assertEqual(econ.stale_run([(4400, 90), (4400, 95), (4400, 97)]), (3, 4400))
+        self.assertEqual(econ.stale_run([(4400, 97), (4400, 90), (4400, 95)])[0], 2)    # it fell once
+        self.assertEqual(econ.stale_run([(4500, 90), (4400, 95), (4400, 97)])[0], 2)    # the price moved
+        self.assertEqual(econ.stale_run([(4400, 90), (4430, 90), (4410, 95)])[0], 3)    # within 1%
+        z, share, fair = econ.mr_market({96: 1000, 97: 1100, 98: 900, 99: 1000, 100: 700}, 100, 700)
+        self.assertAlmostEqual(z, -1.516725, places=5)
+        self.assertAlmostEqual(share, -0.227150, places=5)
+        self.assertEqual(econ.mood(z, share), "cheap")
+        z, share, _ = econ.mr_market({96: 1000, 97: 1000, 98: 1010, 99: 990, 100: 1300}, 100, 1300)
+        self.assertEqual(econ.mood(z, share), "dear")
+        self.assertIsNone(econ.mr_market({99: 1000, 100: 700}, 100, 700))              # under 5 days
+        self.assertEqual(econ.exclude_own([2900, 20, 2900, 8, 3100, 5], [2900, 20]), ([2900, 8, 3100, 5], 20))
+        self.assertEqual(econ.exclude_own([2900, 20, 2900, 8, 3100, 5], [2900, 25]), ([2900, 3, 3100, 5], 25))
+        self.assertEqual(econ.exclude_own([2900, 20], [5000, 2]), ([2900, 20], 0))
+        self.assertEqual(econ.grade(3600, 5, 6, 0.10, 200, None, stale=3), "D")
+        self.assertEqual(econ.grade(3600, 5, 6, 0.10, 200, None, stale=2), "A")
+
     def test_measured_cut(self):
         """CUT-1..3 in crafting-economics.md."""
         self.assertAlmostEqual(econ.measured_cut(1500, 30000, 3), 0.05)
@@ -164,6 +183,23 @@ class Branches(unittest.TestCase):
         self.assertAlmostEqual(r["ahExit"], 16900)
         r = scenario("CHEAP-SMALL-POST")       # the minimum outweighs a 19c price: vendor
         self.assertEqual((r["ahExit"], r["bestSource"]), (0, "vendor"))
+
+    def test_walls_and_batches(self):
+        r = scenario("BOLT-STALE-WALL")
+        self.assertEqual((r["grade"], r["reasons"]), ("D", ["thinData"]))
+        self.assertTrue(scenario("BOLT-STALE-SOLD")["recommended"])      # your own sales prove demand
+        for name, recipe, crafts, ctx in econ.scenarios():
+            if not name.startswith("BATCH-"):
+                continue
+            a = econ.batch_advice(recipe, crafts, ctx)
+            if name == "BATCH-LADDER":      # the reagents set it; the ladder runs dry after 60
+                self.assertEqual((a["best"], a["profit"], a["cap"], a["size"], a["limit"], a["searched"]),
+                                 (10, 8550, 250, 10, "reagents", 60))
+                self.assertIn("loss", econ.evaluate(recipe, crafts, ctx)["reasons"])   # all 20 lose money
+            if name == "BATCH-CAP":         # the reagents would go to 200; the market takes 10
+                self.assertEqual((a["best"], a["cap"], a["size"], a["limit"]), (200, 10, 10, "market"))
+            if name == "BATCH-VENDOR":      # vendor goods to a vendor: no limit within the search
+                self.assertEqual((a["best"], a["cap"], a["size"], a["limit"]), (200, None, 200, "none"))
 
     def test_ah_net_floor(self):
         r = scenario("BOLT-UNSOLD")
