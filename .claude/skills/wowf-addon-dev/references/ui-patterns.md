@@ -63,6 +63,16 @@ Addon frames that you create aren't protected. You only need combat-lockdown car
     `child:SetHeight(Σ fs:GetStringHeight() + gaps)`. Example: BuffettForever `UI/DetailPanel.lua`.
 - **Money in narrow columns:** `C_CurrencyInfo.GetCoinTextureString(copper, 10)`, rounded to whole silver above
   1g, so it shows two coins at most.
+- **Show data, not prose.** Justin's rule for every pane: one number per row, with the explanation in the row's
+  tooltip. Example: BuffettForever `UI/DetailPanel.lua`, 0.5.0, tested on 70425.
+  - Each row is a Frame (width × 14) on the scroll child, holding two FontStrings:
+    - a left label in `GameFontNormalSmall`; sub-rows use `GameFontHighlightSmall` and a 10 px indent;
+    - a right-aligned value with `SetWordWrap(false)` and a fixed width, anchored `RIGHT`.
+  - `row:SetMouseMotionEnabled(true)` plus OnEnter/OnLeave shows a `GameTooltip` (`ANCHOR_LEFT`) with the
+    label as the title and the explanation lines wrapped.
+  - Stack rows and text lines with one helper that anchors each region under the previous one and adds up the
+    heights for the scroll child. Pool the rows, and hide them all before a refresh.
+  - Colour only the exceptions: red for a loss, orange for a risk, grey for "not available".
 
 ## Combat lockdown queue
 ```lua
