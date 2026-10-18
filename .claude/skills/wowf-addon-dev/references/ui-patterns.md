@@ -139,6 +139,22 @@ Addon frames that you create aren't protected. You only need combat-lockdown car
   - Hover: `GameTooltip:SetItemByID`. Click: `HandleModifiedItemClick(link)`, so Shift-click links the item as
     on any item button.
   - Example: BuffettForever `UI/DetailPanel.lua` 0.7.0, tested on 70425.
+- **A number box between two buttons**, as the profession window's Create bar ([Create All] [− n +] [Create]).
+  Example: BuffettForever `UI/BuyBar.lua` 1.0.0, tested on 70450.
+  - The box is Blizzard's `NumericInputSpinnerTemplate` (Blizzard_SharedXML `InputBoxTemplates.xml`). It's an EditBox
+    with a − and a + button outside it, 23 px each, the − sitting 6 px off its left edge. A mouse-wheel catcher
+    covers all three (Shift+wheel steps 10).
+  - Leave 30 px between the box and each button beside it, as Blizzard does, so the arrows sit in the gaps.
+  - `SetMinMaxValues(min, max)`, `SetValue(n)`, `SetOnValueChangedCallback(function(box, value) end)`. Set
+    `clampIfInputExceedsRange` and `highlightIfInputExceedsRange` to true, as the profession window does.
+  - **`SetValue` fires the callback** whenever the value changes, and so does `SetMinMaxValues` when it clamps. Set
+    a flag around your own calls so the callback ignores them.
+  - For a tooltip, hook OnEnter and OnLeave on both the box and `box.MouseWheelCatcher`.
+  - The template's box holds 3 digits in 31 px; `SetMaxLetters(4)` with `SetWidth(38)` holds 4.
+  - Add `OnEnterPressed` → `EditBox_ClearFocus` (the template has none) and clear the focus `OnHide`.
+- **A disabled button that says why:** `button:SetMotionScriptsWhileDisabled(true)` keeps its OnEnter tooltip,
+  so the tooltip can say what's missing ("Open the Auction House..."). BuffettForever's Scan button (0.2.0) and
+  Buy button (1.0.0).
 
 ## Combat lockdown queue
 ```lua

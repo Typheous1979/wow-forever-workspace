@@ -400,17 +400,22 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   - Still untested: `PlaceBid` (gear), and a quote refused for a price rise.
 
   [Probe 70450]
-- **[F-133]** **Professions and skill without the window** (BuffettForever's harvest, 2026-10-17):
+- **[F-133]** **Professions and skill without the window** (BuffettForever's harvest, 2026-10-17 and 18):
   - `GetProfessions()` gave slot 1 Leatherworking, slot 2 Skinning, **slot 3 First Aid** and slot 5 Cooking. Slots 4, 6
     and 7 were empty for this character (retail's order would put fishing in slot 4: unconfirmed).
   - `GetProfessionInfo(i)`'s 7th return is the **Classic skill line** (165, 393, 129, 185), not the Forever child line
     [F-126], so it matches recipe data directly. Rank and max rank: 49/75, 163/225, 1/75 and 1/75.
-  - `C_TradeSkillUI.GetRecipeInfo(id).relativeDifficulty` (`Enum.TradeskillRelativeDifficulty`: Optimal 0, Medium 1,
-    Easy 2, Trivial 3) was set for **13 of 13** known recipes. Whether the profession window was open wasn't recorded.
-    - It matched the thresholds' colour on the 11 Classic recipes: orange below yellow, yellow, then green from
-      `floor((yellow + grey) / 2)`, then grey at grey.
-    - It didn't match on 2 Forever-new recipes. Blizzard said optimal for 1229517 (Skinning 163, thresholds 20/25,
-      which say trivial) and for 1229737 (rank 1, thresholds 1/5, which say medium). Prefer Blizzard's value.
+  - **`C_TradeSkillUI.GetRecipeInfo(id).relativeDifficulty` is right only for a profession whose window was opened**
+    (`Enum.TradeskillRelativeDifficulty`: Optimal 0, Medium 1, Easy 2, Trivial 3).
+    - With no profession window opened since the `/reload` (2026-10-18, `ProfessionsFrame` not shown), it read
+      **Optimal for all 13** known recipes. That included Light Leather (2881), which is grey at Leatherworking 49
+      (grey from 40).
+    - The first reading (2026-10-17, window state not recorded) matched the thresholds on all 6 Leatherworking
+      recipes. All 7 of the other professions' recipes read Optimal, including 2 where the thresholds say grey
+      (Skinning 163, thresholds 20/25) and yellow (skill 1, thresholds 1/5). That fits only the Leatherworking
+      window having been opened.
+    - So colour from the thresholds: orange below yellow, yellow, green from `floor((yellow + grey) / 2)`, grey from
+      grey. They matched every valid reading.
   - Justin saw `DIFFICULT_`/`FAIR_`/`EASY_`/`TRIVIAL_DIFFICULTY_COLOR` match the profession window on 3 recipes.
 
   [Probe 70450]

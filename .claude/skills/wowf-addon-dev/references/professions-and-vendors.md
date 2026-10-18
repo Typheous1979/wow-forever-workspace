@@ -34,13 +34,13 @@ known and unknown recipes [F-123, Probe 70425]. Blizzard's objective tracker rel
   (2937–2948 [F-126]), map it with `C_TradeSkillUI.GetProfessionInfoBySkillLineID(line).parentProfessionID`.
 - Re-read on `SKILL_LINES_CHANGED`. It fires for weapon skill-ups too, so compare a signature (line, rank, max rank)
   before redrawing.
-- **The colour of a known recipe:** `C_TradeSkillUI.GetRecipeInfo(id).relativeDifficulty`, mapped through
-  `Enum.TradeskillRelativeDifficulty` (Optimal, Medium, Easy, Trivial). Colour it with the globals
+- **A recipe's colour comes from the rank and its thresholds:** below the yellow threshold orange, below
+  `floor((yellow + grey) / 2)` yellow, below grey green, the rest grey. Colour it with the globals
   `DIFFICULT_DIFFICULTY_COLOR`, `FAIR_`, `EASY_` and `TRIVIAL_DIFFICULTY_COLOR` (ColorMixins:
   `:GenerateHexColorMarkup()`), as the profession window does.
-- **For a recipe you don't know**, use the thresholds. Ranks below the yellow threshold are orange, below
-  `floor((yellow + grey) / 2)` yellow, below grey green, the rest grey. That matched Blizzard on 11 of 13 known
-  recipes; on 2 Forever-new ones Blizzard said orange where the thresholds said grey or yellow.
+- **Don't take `GetRecipeInfo(id).relativeDifficulty` with the window closed.** It reads Optimal for every recipe
+  of a profession whose window hasn't been opened, so after a `/reload` every recipe looks orange [F-133]. Where
+  it was valid, it agreed with the thresholds on every recipe.
 - Working code: BuffettForever `Crafting/Harvest.lua` (`Professions`, `Difficulty`), `Crafting/RecipeIndex.lua`
   (`Difficulty`).
 

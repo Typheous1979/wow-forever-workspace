@@ -124,6 +124,14 @@ end
 Owned stock is applied before calling `Acquire` for the remainder (section 1). Cache results per batch, and
 recompute when prices change.
 
+**When the addon buys the plan, cost it as it will be bought.** `Acquire` applies owned stock at the top level only:
+a sub-recipe's reagents are always priced as bought. That's fine for advice, but wrong for a purchase plan. Once the
+player buys an intermediate's reagents (and the addon records them as owned), the next evaluation would offer them
+again. So in a view that buys for the player, buy reagents as the recipe lists them (no `recipeFor`). Show a recipe
+that makes one for less as a hint: make it, then count it as owned. Players also read "Craft" as a source poorly
+next to a Buy button, where they expect to see where each reagent is bought (BuffettForever 1.0.0, Profession
+profits, 2026-10-18).
+
 ## 5. Worked examples
 **Smelt Bronze, vendor only (real Forever numbers, ItemSparse 70245).** 1 Copper Bar (vendor sell 10c) + 1 Tin Bar
 (35c) → 2 Bronze Bars (50c each). Inputs worth 45c at a vendor become 100c at a vendor: profit 55c, ROI 122%,
