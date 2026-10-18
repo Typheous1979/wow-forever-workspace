@@ -38,6 +38,12 @@ python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" --prune                         #
 - Deploy refuses to replace a real folder (an addon installed from CurseForge). `--replace-copy --yes` first moves it to `Interface\AddOns.wowf-backup\`. Ask Justin before using it.
 - `_forever_` and `_classic_beta_` have separate WTF folders. Settings don't carry over.
 - If deploy warns about **OneDrive online-only files**: right-click the AddOns workspace folder and choose OneDrive → **Always keep on this device**.
+- **A released addon and its dev junction can't share a client.** If the CurseForge app installs or updates an addon in
+  a client where `Interface\AddOns\<Addon>` is a junction into the workspace, it writes through the junction into the
+  source.
+  - To play the released build there, unlink first (`--remove`), then install it.
+  - To develop again, remove the installed copy with the CurseForge app, then deploy.
+  - Tell Justin this after every release; BuffettForever 1.0.0 was the first.
 
 ## Releasing on CurseForge
 Done for MusicForever 0.2.0 and BuffettForever 1.0.0.
@@ -55,7 +61,8 @@ Done for MusicForever 0.2.0 and BuffettForever 1.0.0.
 5. Justin takes the screenshots in game and uploads, because the upload is outward-facing:
    - the zip, the logo and the page text;
    - the game version, WoW Forever;
-   - the release type: Beta until the addon has run on the launch client.
+   - the release type, which is his call. Beta until the addon has run on the launch client is the cautious choice.
+     BuffettForever 1.0.0 went up as a Release.
 6. Before launch, deploy to `_forever_` (`--client forever`) and check it there: `/reload`, the addon's self-test if
    it has one, and a real play session.
 
