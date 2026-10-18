@@ -478,6 +478,8 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     - `OpenRecipe` opened First Aid at the recipe;
     - `CraftRecipe(3275, 1)` started 0.1 s later and succeeded at 3.1 s;
     - `CraftRecipe(3275, 2)` with `StopRecipeRepeat` at 1.1 s made 1.
+  - **Blizzard's own Create fires the same `UNIT_SPELLCAST_SUCCEEDED`** (spellID = the recipe, 2881 Light Leather), so
+    an addon can count crafts made in either window.
 
   [Probe 70450]
 - **[F-136]** **An addon can post a commodity** (BuffettForever's probe, 2026-10-18, typed):
@@ -491,7 +493,12 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     `SupportsCopperValues()` true.
   - `CalculateCommodityDeposit(2318, 1, 1)` = 100, the formula's 1s minimum [F-129].
   - `GetMoney()` hadn't changed yet when `AUCTION_CREATED` fired. Read the deposit from a later money change.
-  - Still untested: `PostItem` (gear), the post warning (`AUCTION_HOUSE_POST_WARNING`) and multisell.
+  - **Gear from a button's click** (BuffettForever's Post, 2026-10-18): `PostItem(location, 1, 1, nil, 200)` posted 1
+    Handstitched Leather Boots at 2s, the cheapest by others.
+    - It returned `needsConfirmation` false, and `AUCTION_HOUSE_AUCTION_CREATED` came 282 ms later.
+    - No multisell events for one item.
+    - The 1s deposit (`CalculateItemDeposit` = the formula's minimum) was taken within 2 s.
+  - Still untested: the post warning (`AUCTION_HOUSE_POST_WARNING`), and multisell (several gear items in one call).
 
   [Probe 70450]
 

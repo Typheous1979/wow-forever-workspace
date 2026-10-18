@@ -176,7 +176,7 @@ What to know:
 - Working code: BuffettForever `Pricing\Buy.lua` (`Buy.StartAuction`, `Buy.Confirm`), the AH flips tab.
 
 ## Posting (from a click)
-Proven on 70450 for a commodity, from a typed command [F-136]. Blizzard's flow is in
+Proven on 70450 for a commodity from a typed command, and for gear from a button's click [F-136]. Blizzard's flow is in
 `Shared\Blizzard_AuctionHouseSellFrame.lua`, `...CommoditiesSellFrame.lua` and `...ItemSellFrame.lua` [Source 70450]:
 1. **The item:** a bag slot as `ItemLocation:CreateFromBagAndSlot(bag, slot)`, then `IsSellItemValid(location,
    false)` and `GetItemCommodityStatus(location)` (2 = commodity, 1 = item). For a commodity,
