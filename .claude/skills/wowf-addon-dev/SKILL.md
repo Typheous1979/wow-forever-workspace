@@ -32,7 +32,7 @@ when_to_use: Forever, Camelot, 16001, WOW_PROJECT_CAMELOT, wow forever addon, ma
 
 ## Workflow for any code change
 
-1. Read the relevant reference below. For any API not already named in these files, **verify it with the `wowf-api` skill** (`python tools/wowf/cli.py api show NAME`). If nothing knows the name, say so and give a safe probe: `/run print(type(C_X and C_X.Fn))`.
+1. Read the relevant reference below. For any API not already named in these files, **verify it with the `wowf-api` skill** (`python tools/wowf/cli.py api show NAME`). It knows Blizzard's XML templates too (`api show SearchBoxTemplate`). If nothing knows the name, say so and give a safe probe: `/run print(type(C_X and C_X.Fn))`.
 2. Emit **whole files**: the TOC plus every Lua file. Name the folder exactly like the TOC.
 3. Lint with `python tools/wowf/cli.py lint <Addon>` (the `wowf-review` skill). Fix errors and explain any remaining warnings.
 4. Deploy with `wowf-deploy`, then test in game with `wowf-debug`. Record which build a behaviour was observed on.

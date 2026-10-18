@@ -1,6 +1,6 @@
 ---
 name: wowf-api
-description: Verify a World of Warcraft Forever API, event, enum or sound kit against Blizzard's forever-branch API docs, FrameXML source and the WowfProbe runtime dump. Answers whether it exists, its exact signature, defaults, nilable returns, whether it is secret, protected, restricted or SecureOnly, which Blizzard UI addons load on Forever, and what changed between builds. Use before writing any API call not already shown in the wowf references, whenever unsure a function exists, when asked does X exist or what does Y return, and to avoid inventing C_ functions.
+description: Verify a World of Warcraft Forever API, event, enum, sound kit or XML template against Blizzard's forever-branch API docs, FrameXML source and the WowfProbe runtime dump. Answers whether it exists, its exact signature, defaults, nilable returns, whether it is secret, protected, restricted or SecureOnly, which Blizzard UI addons load on Forever, where a template such as SearchBoxTemplate is defined and whether it loads, and what changed between builds. Use before writing any API call or CreateFrame template not already shown in the wowf references, whenever unsure a function or template exists, when asked does X exist or what does Y return, and to avoid inventing C_ functions.
 argument-hint: "[show|find|events|soundkit|addon|builds|diff|update] [name-or-regex]"
 allowed-tools: Bash(python "${CLAUDE_SKILL_DIR}/scripts/api.py" *)
 ---
@@ -10,6 +10,7 @@ allowed-tools: Bash(python "${CLAUDE_SKILL_DIR}/scripts/api.py" *)
 The index merges three layers, and every answer says which layers know a name:
 - **doc**: Blizzard's generated API documentation for the Forever client (`Blizzard_APIDocumentationGenerated`, build in the meta line; 70374 at creation).
 - **fx**: globals defined in Blizzard's Forever FrameXML Lua/XML (`Settings`, `MenuUtil`, `StaticPopup_Show`, `SOUNDKIT`, `UIParent`…), plus a curated list of **undocumented C functions** with evidence (`PlayMusic`, `PlaySoundFile`, `StopSound`…).
+  - **tpl**, in the same layer: virtual XML templates (`SearchBoxTemplate`, `PanelTabButtonTemplate`…), with their frame type, addon, file, `inherits` and `mixin`. Each also says whether it loads on Forever and whether its addon is load-on-demand. A template isn't a global, so the lint never accepts one as a variable.
 - **rt**: names actually present in the running client, from the WowfProbe dump (`wowf-debug`). Documented ≠ present.
 
 ## Commands
@@ -23,11 +24,13 @@ python "${CLAUDE_SKILL_DIR}/scripts/api.py" events "ZONE|WEATHER"        # event
 python "${CLAUDE_SKILL_DIR}/scripts/api.py" show Enum.ForeverExperiencePreset
 python "${CLAUDE_SKILL_DIR}/scripts/api.py" soundkit "READY|RAID"
 python "${CLAUDE_SKILL_DIR}/scripts/api.py" addon Blizzard_EncounterJournal   # does that Blizzard UI load on Forever?
+python "${CLAUDE_SKILL_DIR}/scripts/api.py" show SearchBoxTemplate      # a template: where, does it load, how to create it
+python "${CLAUDE_SKILL_DIR}/scripts/api.py" find "ItemButton" --kind tpl
 python "${CLAUDE_SKILL_DIR}/scripts/api.py" builds                     # index vs cache vs client vs version server
 python "${CLAUDE_SKILL_DIR}/scripts/api.py" update                     # fetch latest forever build + rebuild index (slow, network)
 python "${CLAUDE_SKILL_DIR}/scripts/api.py" diff [GITREV]              # what changed in the committed index
 ```
-`--kind` values: fn, method, event, enum, const, struct, callback, ns, pred, fx, rt.
+`--kind` values: fn, method, event, enum, const, struct, callback, ns, pred, fx, tpl, rt.
 
 ## Reading the output
 `C_X.Fn(arg:type=default, opt:type?) -> ret:type`, then tags:
@@ -39,6 +42,10 @@ python "${CLAUDE_SKILL_DIR}/scripts/api.py" diff [GITREV]              # what ch
 - `CRASHES CLIENT`: a known access violation; never call it.
 - `FrameXML ... NOT loaded on Forever`: the Lua exists in the source but isn't loaded for the Camelot game type.
 - `undocumented C global — evidence: ...`: exists per curated evidence; confirm with the runtime layer.
+- `XML template X (EditBox; Blizzard_SharedXML; loads on Forever)`: create it the way the `use:` line shows.
+  - `load on demand`: the template exists only once that addon has loaded (its `ADDON_LOADED`).
+  - The WowfProbe dump has no templates. Its `runtime check:` line is a safe look: `/run print(C_XMLUtil.GetTemplateInfo("X") ~= nil)`.
+  - A missing `...Template` lists the templates whose names end the same way (`ItemButtonTemplate` → `LargeItemButtonTemplate`, …).
 
 ## When the answer is "not in the index"
 1. Check spelling: `find` with a partial regex. The command prints "did you mean".
