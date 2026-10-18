@@ -211,6 +211,26 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
     status line's craft progress, "Everything is in the tray, 3 in your mailbox."; Buy refuses during a craft;
     ResultsList.ClearCrafts after a finished batch.
   - selftest 136 (CRAFT-COUNT, CRAFT-WHY, CRAFT-SPELL, BEST-BAGS, TRAY-DEBIT).
+- 1.0.0 tray, Collect, Craft and Post pass 3 (2026-10-18): Post, and Justin's labels. Tested on 70450: selftest
+  140/140; the labels; Blizzard's Create counted (diag.counted: Light Leather "other", the boots "button"); Post
+  refused Linen Bandage five times, rightly (the cheapest by others 9-10c, a vendor pays 10c); Handstitched Leather
+  Boots posted at 2s, the cheapest by others (PostItem, needsConfirmation false, AUCTION_CREATED 282 ms; the 1s
+  deposit gone 2 s later) [F-136]; the cancel paths; Buy and Post both offered at rest (intended). Justin's
+  finding: an auction he cancelled came back by mail, but Post no longer counted it as made (UseMade at the post).
+  His requests: "Sell on AH n" as the label, and an Options section for selling.
+  - Pricing/Post.lua: one machine for the bar and `/bf posttest` (ready, pricing, planned, warned, posting). Post
+    lists Craft.Made (what you crafted, in your bags) at Post.Price (the search's cheapest by others), refused by
+    Post.Check when a vendor pays at least the sale after the cut, orange under half the market value; the price
+    holds 60 s; Confirm posts (PostCommodity, or PostItem for gear with multisell), Confirm again after a warning
+    (ConfirmPost*), Blizzard's popup left alone; checks: the AH, combat, a purchase, a craft or a scan, BoP, nothing
+    crafted, the item's state, Blizzard's pendingPost, blocked; cancelled by Cancel, another recipe, the AH closing
+    or combat; Craft.UseMade after a post; diag.posts with the money 2 s later.
+  - UI/CraftRow.lua: [Create n] [Post n], 119 px each (Create alone in Vendor crafts); Open Profession, Create n,
+    Stop, Cancel during a post; Post n, Checking..., Confirm, Confirm again, Posting...; the post's tooltip rows
+    (price each, units, total, house cut, if all sell, deposit and duration, a vendor pays, market value).
+  - diag.counted logs every counted craft and which window made it (the button or another); a craft's bags are
+    counted 2 s after it ends. Buy refuses while a post is open.
+  - selftest 140 (POST-PRICE, POST-NET, POST-QTY, POST-GUARD).
   - Core owns PLAYER_REGEN_DISABLED (COMBAT_STARTED, ns.InCombat), ADDON_ACTION_BLOCKED/FORBIDDEN (diag.blocked,
     ACTION_BLOCKED) and AUCTION_HOUSE_SHOW_ERROR (AH_ERROR); Buy listens on the bus. Owned passes
     AUCTION_CREATED(auctionID) on, Harvest TRADESKILL_CHANGED(event), Mail MAILBOX_OPEN/READ/CLOSED.
@@ -422,7 +442,7 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 | `UI/MailButton.lua` | the Collect button under Blizzard's mail window |
 | `UI/ReagentTray.lua`, `UI/ResultsList.lua`, `UI/DetailPanel.lua` | fill the panes the raw window already lays out |
 | `UI/BuyBar.lua` | the Buy bar under the details in Profession profits (Crafts, Best, Buy) and AH flips (Buy); live prices at the AH; in Tray and Vendor crafts, Best and Crafts for a recipe you know |
-| `UI/CraftRow.lua` | the bar's second row: Craft (Open, then Craft n, Stop during a batch) |
+| `UI/CraftRow.lua` | the bar's second row: Create (Open Profession, then Create n, Stop during a batch) and Post (Post n, then Confirm) |
 | `Bags.lua` | Alt+Right-click post-hook on `HandleModifiedItemClick` |
 | `Tooltip.lua` | AH / vendor / fair-value lines via `TooltipDataProcessor` |
 

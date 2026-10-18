@@ -22,7 +22,8 @@ local Craft = {}
 ns.Craft = Craft
 local events = ns.events
 
-local KEEP = 10           -- probes and crafts kept in diag.crafts
+local KEEP = 10           -- probes and crafts kept in diag.crafts, and finished crafts in diag.counted
+local BAGS_CHECK = 2      -- seconds after a craft ends to count the bags (the last result lands after the event)
 local WATCH = 20          -- seconds a probe logs events
 local WINDOW_CHECK = 2    -- seconds after an open, the window's state
 local OPEN_TIMEOUT = 5    -- seconds for the profession window to open
@@ -256,7 +257,7 @@ function Craft.WhyText(why, r, f)
     end
     if why == "requirement" then return string.format(L["Needs %s."], f.requirement) end
     if why == "window" then
-        return string.format(L["Crafting needs your %s window open: Open opens it at this recipe."],
+        return string.format(L["Crafting needs your %s window open: Open Profession opens it at this recipe."],
             ns.RecipeIndex.ProfessionName(recipe.profession))
     end
     if why == "blocked" then return L["Forever blocked crafting from an addon: use Create in the profession window."] end
@@ -314,7 +315,8 @@ local function FinishCraft(outcome)
     StopCraftTimer()
     Log(rec, "outcome " .. outcome)
     craft, state = nil, "ready"
-    rec.outcome, rec.started, rec.bagsAfter = outcome, nil, CountsText(Counts(rec.recipeID))
+    rec.outcome, rec.started = outcome, nil
+    C_Timer.After(BAGS_CHECK, function() rec.bagsAfter = CountsText(Counts(rec.recipeID)) end)
     Keep(rec)
     local recipe = ns.RecipeIndex.Get(rec.recipeID)
     local name = recipe and ns.Items.Link(recipe.output) or tostring(rec.recipeID)
@@ -426,6 +428,15 @@ function events:UNIT_SPELLCAST_SUCCEEDED(_, castGUID, spellID)
         local debits, output, units = Craft.Credits(recipe)
         ns.Tray.Debit(debits)
         CreditMade(output, units)
+        -- Each counted craft, whichever window made it: the bar's button, or another (Blizzard's Create).
+        if ns.db and not ns.readOnlyDB then
+            local list = ns.db.diag.counted or {}
+            ns.db.diag.counted = list
+            local made = MadeLedger() and MadeLedger()[output]
+            table.insert(list, 1, { t = GetServerTime(), recipeID = recipe.recipeID, by = ours and "button" or "other",
+                                    made = made and made.q or 0, tray = #ns.Tray.Entries() })
+            while #list > KEEP do table.remove(list) end
+        end
     end
     if probe and not secret and spellID == probe.recipeID then
         local ok, left = pcall(C_TradeSkillUI.GetRemainingRecasts)

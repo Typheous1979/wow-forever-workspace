@@ -548,7 +548,7 @@ end
 local function CraftsTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetText(L["Crafts"], 1, 1, 1)
-    GameTooltip:AddLine(L["How many to make: the reagents, the cost and the profit follow it, and Craft makes that many."],
+    GameTooltip:AddLine(L["How many to make: the reagents, the cost and the profit follow it, and Create makes that many."],
         nil, nil, nil, true)
     GameTooltip:AddLine(Mode(current) == "vendor" and L["It starts at what your bags allow, and does again when you pick another recipe."]
         or L["It starts at what your tray allows, and does again when you pick another recipe."], nil, nil, nil, true)

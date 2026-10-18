@@ -153,6 +153,7 @@ function Buy.CanStart(itemID, cost, noTray)
     if ns.InCombat() then return false, L["Not in combat."] end
     if state ~= "ready" then return false, L["A purchase is already open."] end
     if ns.Craft.IsBusy() then return false, L["A craft is under way."] end
+    if ns.Post.IsBusy() then return false, L["A post is open."] end
     if BlizzardDialogOpen() then return false, L["Close Blizzard's buy window first: the Auction House quotes one price at a time."] end
     if ns.Scanner.IsBusy() then return false, L["A full scan is running."] end
     if ns.Search.IsBusy() then return false, L["Checking prices at the Auction House..."] end

@@ -26,7 +26,7 @@ local function SelfTest()
     for _, suite in ipairs({ ns.Econ.SelfTest, ns.Evaluator.SelfTest, ns.RecipeIndex.SelfTest, ns.Ledger.SelfTest,
                              ns.Mail.SelfTest, ns.Deposits.SelfTest, ns.Options.SelfTest, ns.ResultsList.SelfTest,
                              ns.Harvest.SelfTest, ns.Buy.SelfTest, ns.Collect.SelfTest, ns.Tray.SelfTest,
-                             ns.Craft.SelfTest }) do
+                             ns.Craft.SelfTest, ns.Post.SelfTest }) do
         local p, f = suite(report)
         passed, failed = passed + p, failed + f
     end
