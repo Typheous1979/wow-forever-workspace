@@ -13,9 +13,10 @@ local addonName, ns = ...
 -- - Mr. Market, when a price is well away from its fair value; then the verdict.
 -- A vendor craft (the Vendor crafts view) counts vendor prices only and shows what your materials would
 -- fetch raw on the AH; an AH flip gets its own layout (buy, sell, result, verdict). In the Profession
--- profits view only the tray's materials count as yours: the slots say "tray", and their tooltips give
--- what the bags and bank hold (not used there). The profession line shows your skill, and a Skill-up row
--- the profession window's colour for the recipe.
+-- profits view only the tray's materials count as yours and the rest is bought as listed: the slots say
+-- "tray", and their tooltips give what the bags and bank hold (not used there) and whether a recipe you
+-- know makes the reagent for less. The profession line shows your skill, and a Skill-up row the profession
+-- window's colour for the recipe. The Buy bar (UI/BuyBar.lua) takes the bottom of the pane there.
 -- Numbers sit in label/value rows; each row's tooltip says where its number comes from (Justin,
 -- 2026-10-17: data, not paragraphs). The pane scrolls (ScrollFrameTemplate).
 
@@ -235,9 +236,19 @@ local function Sources(line, trayOnly)
     return table.concat(parts, ", ")
 end
 
--- The same per unit, for the slot's tooltip. Where only the tray counts, also what the bags and bank hold
--- (not used), in orange when the tray counts more than you carry: you'd be short at the craft.
-local function SourceTips(line, trayOnly)
+-- "12 Ruined Leather Scraps, 4 Salt": a recipe's reagents.
+local function InputsText(inputs)
+    local parts = {}
+    for _, g in ipairs(inputs) do parts[#parts + 1] = string.format("%d %s", g.qty, ItemName(g.itemID)) end
+    return table.concat(parts, ", ")
+end
+
+-- The same per unit, for the slot's tooltip; a crafted line says what it's made from. Where only the tray
+-- counts (ctx.trayOnly), also a recipe of yours that makes the reagent for less (that view buys it as
+-- listed), and what the bags and bank hold (not used), in orange when the tray counts more than you carry:
+-- you'd be short at the craft.
+local function SourceTips(line, ctx)
+    local trayOnly = ctx and ctx.trayOnly
     local tip = {}
     if line.owned > 0 then
         tip[#tip + 1] = string.format(trayOnly and L["%d from your tray: %s each"] or L["%d of yours: %s each"], line.owned,
@@ -246,6 +257,15 @@ local function SourceTips(line, trayOnly)
     if line.rest > 0 then
         tip[#tip + 1] = line.source and string.format(L["%d %s: %s each"], line.rest, L[SOURCE_FROM[line.source]],
             Money.Format(line.buyCost / line.rest)) or string.format(L["%d with no price yet"], line.rest)
+        local made = ctx and ns.Evaluator.MadeFrom(line, ctx)
+        if made then tip[#tip + 1] = string.format(L["Made from %s, with your recipe."], InputsText(made.inputs)) end
+    end
+    local hint = trayOnly and ns.Evaluator.MakeHint(line, ctx)
+    if hint then
+        tip[#tip + 1] = GOLD .. (hint.saves and string.format(L["Cheaper to make: %s from %s (%s less)."], Money.Format(hint.cost),
+            InputsText(hint.inputs), Money.Format(hint.saves)) or string.format(L["Nobody sells it, but your recipe makes it: %s from %s."],
+            Money.Format(hint.cost), InputsText(hint.inputs))) .. "|r"
+        tip[#tip + 1] = GREY .. L["This tab buys reagents as listed. Make it yourself, then put it in the tray."] .. "|r"
     end
     if trayOnly then
         local carried = C_Item.GetItemCount(line.itemID, true)
@@ -269,8 +289,8 @@ end
 
 -- One reagent as the profession window shows it: a slot (Blizzard's slot art and quality frame) and
 -- "have/need Name"; under the name, where the units come from. have: what you carry and bank (what the
--- tray holds where only the tray counts).
-local function Slot(line, have, trayOnly)
+-- tray holds where only the tray counts); ctx: the result's context.
+local function Slot(line, have, ctx)
     usedSlots = usedSlots + 1
     local row = slots[usedSlots]
     if not row then
@@ -306,7 +326,7 @@ local function Slot(line, have, trayOnly)
         slots[usedSlots] = row
     end
     local itemID = line.itemID
-    row.itemID, row.tip = itemID, SourceTips(line, trayOnly)
+    row.itemID, row.tip = itemID, SourceTips(line, ctx)
     row.icon:SetTexture(C_Item.GetItemIconByID(itemID) or QUESTION_MARK)
     local frames = PROFESSIONS_ITEM_QUALITY_ICON_BORDER_ATLASES
     local atlas = frames and frames[C_Item.GetItemQualityByID(itemID) or -1]
@@ -314,7 +334,7 @@ local function Slot(line, have, trayOnly)
     row.border:SetShown(atlas ~= nil)
     row.name:SetText(string.format("%d/%d %s", have, line.need, ItemName(itemID)))
     row.name:SetTextColor(NameColor(have >= line.need))
-    row.detail:SetText(Sources(line, trayOnly))
+    row.detail:SetText(Sources(line, ctx and ctx.trayOnly))
     row:Show()
     Place(row, SLOT_SIZE, SLOT_GAP)
 end
@@ -686,12 +706,12 @@ local function RecipeDetails(r)
     Heading(L["Reagents"])
     local trayOnly = r.ctx and r.ctx.trayOnly
     local owned = r.ctx and r.ctx.owned
-    for _, line in ipairs(r.lines) do Slot(line, owned and owned[line.itemID] or line.owned, trayOnly) end
+    for _, line in ipairs(r.lines) do Slot(line, owned and owned[line.itemID] or line.owned, r.ctx) end
     local costTip
     if r.view == "vendor" then
         costTip = L["Reagents you own count at what a vendor pays for them; the rest come from a vendor."]
     elseif trayOnly then
-        costTip = L["Only the reagents in your tray count as yours here, at what they'd sell for. Everything else is bought from the cheapest of a vendor, the AH or a recipe you know, even what's in your bags or bank."]
+        costTip = L["Only the reagents in your tray count as yours here, at what they'd sell for. Everything else is bought as listed, from a vendor or the AH, even what's in your bags or bank."]
     else
         costTip = L["Reagents you own count at what they'd sell for; the rest come from the cheapest of a vendor, the AH or a recipe you know."]
     end
@@ -727,12 +747,19 @@ local function Key(r)
 end
 
 -- result: an Evaluator result, or nil for the placeholder text. The pane scrolls back to the top only
--- for another recipe or view, not when your bags or the prices change.
+-- for another recipe or view, not when your bags or the prices change. DETAILS_SHOWN(result, changed)
+-- tells the Buy bar.
 function DetailPanel.Show(result)
     local changed = Key(result) ~= Key(current)
     current = result
     DetailPanel.Refresh()
     if changed and scroll then scroll:SetVerticalScroll(0) end
+    ns.Fire("DETAILS_SHOWN", result, changed)
+end
+
+-- The Buy bar's room at the bottom of the pane (0 when it's hidden).
+function DetailPanel.SetBottomInset(px)
+    if scroll then scroll:SetPoint("BOTTOMRIGHT", -26, 8 + px) end
 end
 
 ns.On("MAIN_BUILT", function(frame)

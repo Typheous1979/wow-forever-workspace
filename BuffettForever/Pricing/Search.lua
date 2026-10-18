@@ -11,7 +11,8 @@ local addonName, ns = ...
 --   Search.Request(itemID, itemKey or nil, callback(itemID, result, problem))
 --   result = { mv, min, q, n or prices, full, own } (full = every listing was read; own = your units,
 --   left out of the rest), or nil with a problem. Commodity rows are grouped by unit price [F-121],
---   so a commodity result counts prices, not auctions (n stays nil).
+--   so a commodity result counts prices, not auctions (n stays nil). A stored price fires
+--   PRICES_CHANGED(itemID), so the list re-evaluates.
 
 local L = ns.L
 local Search = {}
@@ -147,6 +148,7 @@ local function Finish(q, problem)
         while #diag.searches > DIAG_KEEP do table.remove(diag.searches, 1) end
     end
     Notify(q.itemID, result, problem)
+    if result then ns.Fire("PRICES_CHANGED", q.itemID) end
     Search.Pump()
 end
 

@@ -39,6 +39,7 @@ UI\Widgets.lua
 UI\MainFrame.lua
 UI\ReagentTray.lua
 UI\DetailPanel.lua
+UI\BuyBar.lua
 UI\ResultsList.lua
 UI\AHButton.lua
 UI\MinimapButton.lua

@@ -388,13 +388,106 @@ end
 -- ---------------------------------------------------------------- Profession profits (1.0.0)
 
 -- The context with only the tray's materials counted as yours (Justin, 2026-10-17): owned = the tray's
--- units per item (qty), so everything else is bought, even what's in the bags or bank. The other tables
--- are shared; trayOnly tells the details pane.
+-- units per item (qty), so everything else is bought, even what's in the bags or bank. Reagents are bought
+-- as the recipe lists them, from a vendor or the AH: no make-or-buy, so the Buy bar buys what the slots
+-- show (Justin found "Craft" confusing there). makeFor keeps the recipes you know for the slots' hint
+-- (Evaluator.MakeHint). The other tables are shared; trayOnly tells the details pane.
 function Evaluator.TrayContext(ctx, qty)
     local out = {}
     for k, v in pairs(ctx) do out[k] = v end
     out.owned, out.trayOnly = qty, true
+    out.recipeFor, out.makeFor = {}, ctx.recipeFor
     return out
+end
+
+-- What crafting qty units through recipe (a recipeFor entry) takes: the crafts, and the recipe's own
+-- reagents for them.
+local function Inputs(recipe, qty)
+    local crafts = math.ceil(qty / recipe.yield)
+    local inputs = {}
+    for i = 1, #recipe.reagents, 2 do
+        inputs[#inputs + 1] = { itemID = recipe.reagents[i], qty = recipe.reagents[i + 1] * crafts }
+    end
+    return crafts, inputs
+end
+
+-- A reagent line made with one of your recipes (source "craft"): { recipeID, crafts, inputs = { { itemID,
+-- qty } } }, or nil.
+function Evaluator.MadeFrom(line, ctx)
+    local recipe = line.source == "craft" and ctx.recipeFor[line.itemID]
+    if not recipe then return nil end
+    local crafts, inputs = Inputs(recipe, line.rest)
+    return { recipeID = recipe.recipeID, crafts = crafts, inputs = inputs }
+end
+
+-- Where reagents are bought as listed (TrayContext): a recipe you know that makes the line's units for less
+-- than buying them, or makes one nobody sells. { cost, recipeID, crafts, inputs, saves } (saves: nil when it
+-- can't be bought), or nil.
+function Evaluator.MakeHint(line, ctx)
+    local recipe = ctx.makeFor and line.rest > 0 and ctx.makeFor[line.itemID]
+    if not recipe then return nil end
+    local cost, source = Econ.Acquire(line.itemID, line.rest,
+        { vendorBuy = ctx.vendorBuy, ladder = ctx.ladder, recipeFor = ctx.makeFor })
+    if source ~= "craft" then return nil end
+    local crafts, inputs = Inputs(recipe, line.rest)
+    return { cost = cost, recipeID = recipe.recipeID, crafts = crafts, inputs = inputs,
+             saves = line.source and line.buyCost - cost or nil }
+end
+
+-- The same recipe at another batch size, on the context it came from, keeping what its view set (the Buy
+-- bar's Crafts box). r: a result with r.ctx.
+function Evaluator.Reevaluate(r, crafts)
+    local out = Evaluator.Evaluate(r.recipe, crafts, r.ctx)
+    out.ctx, out.view, out.known, out.vendorOnly = r.ctx, r.view, r.known, r.vendorOnly
+    return out
+end
+
+-- What a result still needs, line by line (the Buy bar): ah and vendor = { { itemID, qty, cost } } with
+-- their totals ahCost and vendorCost; short = { { itemID, qty, available } } with no source (available:
+-- what's listed when there isn't enough); tray = { { itemID, qty } }, the units the tray covers.
+function Evaluator.ShoppingList(r)
+    local list = { ah = {}, vendor = {}, short = {}, tray = {}, ahCost = 0, vendorCost = 0 }
+    local available = {}
+    for _, w in ipairs(r.warnings) do
+        if w[1] == "cantFill" then available[w[2]] = w[3] end
+    end
+    for _, line in ipairs(r.lines) do
+        if line.owned > 0 then list.tray[#list.tray + 1] = { itemID = line.itemID, qty = line.owned } end
+        if line.rest > 0 then
+            local entry = { itemID = line.itemID, qty = line.rest, cost = line.buyCost }
+            if line.source == "ah" then
+                list.ah[#list.ah + 1] = entry
+                list.ahCost = list.ahCost + line.buyCost
+            elseif line.source == "vendor" then
+                list.vendor[#list.vendor + 1] = entry
+                list.vendorCost = list.vendorCost + line.buyCost
+            elseif not line.source then
+                list.short[#list.short + 1] = { itemID = line.itemID, qty = line.rest, available = available[line.itemID] }
+            end
+        end
+    end
+    return list
+end
+
+-- The Buy bar's Best: the best batch (BatchAdvice: the reagents and the market), lowered to what money can buy
+-- (what's bought, not what the tray holds), at least 1. Returns crafts, and true when money set it; nil when
+-- no batch can be priced.
+function Evaluator.AffordableBatch(r, money)
+    r.batch = r.batch or Evaluator.BatchAdvice(r.recipe, r.crafts, r.ctx)
+    local size = r.batch.size
+    if not size then return nil end
+    local function spend(n)
+        local total = 0
+        for _, line in ipairs(Evaluator.Evaluate(r.recipe, n, r.ctx).lines) do total = total + line.buyCost end
+        return total
+    end
+    if spend(size) <= money then return size, false end
+    local lo, hi = 0, size   -- lo crafts are affordable (0: none), hi aren't
+    while hi - lo > 1 do
+        local mid = math.floor((lo + hi) / 2)
+        if spend(mid) <= money then lo = mid else hi = mid end
+    end
+    return math.max(1, lo), true
 end
 
 -- The Profession profits view: every recipe on the filter's professions (RecipeIndex.InProfessions),
@@ -693,6 +786,53 @@ function Evaluator.SelfTest(report)
     check("TRAY-CRAFTS", T(craft, { [51] = 7, [52] = 1 }, vendorSold) == 3 and T(craft, { [52] = 4 }, vendorSold) == 4
         and T(craft, {}, vendorSold) == 1 and T(craft, { [51] = 1 }, vendorSold) == 1,
         "7 of a 2-a-craft reagent: 3 (the vendor one doesn't cap); vendor goods only: 4; nothing: 1; too few: 1")
+
+    -- Reagents are bought as listed there; a recipe you know that makes one for less is a hint. Item 60: 4 at
+    -- 10 on the AH (40), or made from 3 of item 61 each at a vendor's 2 (24); item 63: nobody sells it, made 2
+    -- at a time from 1 of item 61.
+    local makes = {
+        settings = settings, vendorBuy = { [61] = 2 }, vendorSell = {}, sellPrice = {}, priceInfo = {}, deposit = {},
+        owned = {}, ladder = { [60] = { 10, 100 } },
+        recipeFor = { [60] = { yield = 1, reagents = { 61, 3 }, recipeID = 7 }, [63] = { yield = 2, reagents = { 61, 1 }, recipeID = 9 } },
+    }
+    local kit = { recipeID = 8, output = 62, count = 1, bop = false,
+                  reagents = { { itemID = 60, count = 4 }, { itemID = 63, count = 3 } } }
+    local made = Evaluator.Evaluate(kit, 1, makes)
+    local tctx = Evaluator.TrayContext(makes, {})
+    local bought = Evaluator.Evaluate(kit, 1, tctx)
+    local hint, none = Evaluator.MakeHint(bought.lines[1], tctx), Evaluator.MakeHint(bought.lines[2], tctx)
+    check("TRAY-BUY", made.lines[1].source == "craft" and near(made.cogs, 28) and bought.lines[1].source == "ah"
+        and near(bought.lines[1].buyCost, 40) and bought.lines[2].source == nil and hint ~= nil and near(hint.cost, 24)
+        and near(hint.saves, 16) and hint.inputs[1].itemID == 61 and hint.inputs[1].qty == 12 and none ~= nil
+        and near(none.cost, 4) and none.saves == nil and none.crafts == 2,
+        string.format("bought from the AH for %s, the hint makes them for %s; one nobody sells: made for %s",
+            tostring(bought.lines[1].buyCost), tostring(hint and hint.cost), tostring(none and none.cost)))
+
+    -- The Buy bar: another batch on the same context, what's left to buy, and Best within your gold
+    -- (20 Linen at 950, then 40 at 1000, 100 at 1100: 10 bolts cost 19,000; the best batch is all 80).
+    local one = Evaluator.Evaluate(bolt, 1, Evaluator.TrayContext(live, {}))
+    one.ctx, one.view, one.known = Evaluator.TrayContext(live, {}), "professions", true
+    local five = Evaluator.Reevaluate(one, 5)
+    check("CRAFTS", five.crafts == 5 and five.units == 5 and five.lines[1].need == 10 and near(five.cogs, 9500)
+        and five.ctx == one.ctx and five.view == "professions" and five.known == true,
+        string.format("5 crafts: %s Linen for %s, on the same context", tostring(five.lines[1].need), tostring(five.cogs)))
+    local shop = Evaluator.ShoppingList({
+        lines = {
+            { itemID = 1, need = 4, owned = 2, rest = 2, source = "ah", buyCost = 20 },
+            { itemID = 2, need = 3, owned = 0, rest = 3, source = "vendor", buyCost = 30 },
+            { itemID = 3, need = 5, owned = 0, rest = 5, buyCost = 0 },
+            { itemID = 4, need = 2, owned = 2, rest = 0, buyCost = 0 },
+        },
+        warnings = { { "cantFill", 3, 1, 5 } },
+    })
+    check("SHOP-LIST", #shop.ah == 1 and shop.ah[1].qty == 2 and shop.ahCost == 20 and #shop.vendor == 1
+        and shop.vendorCost == 30 and #shop.short == 1 and shop.short[1].qty == 5 and shop.short[1].available == 1
+        and #shop.tray == 2 and shop.tray[2].itemID == 4,
+        string.format("AH %d line(s), vendor %d, short %d, tray %d", #shop.ah, #shop.vendor, #shop.short, #shop.tray))
+    local all, capped = Evaluator.AffordableBatch(one, 1e9), Evaluator.AffordableBatch(one, 19000)
+    local under, underGold = Evaluator.AffordableBatch(one, 18999)
+    check("BEST-GOLD", all == 80 and capped == 10 and under == 9 and underGold == true,
+        string.format("any gold: %s; 19,000: %s; 18,999: %s", tostring(all), tostring(capped), tostring(under)))
 
     -- Branch scenarios with results from the Python reference (Economics/EvaluatorVectors.lua,
     -- generated by `cli.py econ vectors`): every field must match.

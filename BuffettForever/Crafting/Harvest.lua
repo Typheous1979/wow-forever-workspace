@@ -375,8 +375,9 @@ function Harvest.Professions()
     professionKey = Signature(professions)
     if ns.db and not ns.readOnlyDB then
         local old = HarvestDiag().professions
+        -- window: whether the profession window was open for Blizzard's difficulty readings
         local d = { t = GetServerTime(), build = select(2, GetBuildInfo()), slots = raw, eval = old and old.eval,
-                    difficulty = {} }
+                    difficulty = {}, window = ProfessionsFrame ~= nil and ProfessionsFrame:IsShown() or false }
         for _, recipeID in ipairs(ns.RecipeIndex.Known()) do
             if #d.difficulty >= DIFFICULTY_SAMPLE then break end
             local row = ns.Recipes[recipeID]

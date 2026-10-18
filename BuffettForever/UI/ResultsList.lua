@@ -17,9 +17,10 @@ local addonName, ns = ...
 --   "Show unconfirmed" hides while "Known only" is on (a known recipe is always confirmed);
 -- - the search box right of the heading filters every view by item name as you type (every word, in any
 --   order). It only hides rows, with no re-evaluation; the top pick still advises on the whole view.
--- Also fills the Top pick panel. Re-evaluates (debounced) when the tray, the prices, the known
--- recipes, the sales ledger, the deposits, your bags, vendor prices, the flips or the settings change,
--- while the window is open; otherwise on the next open.
+-- Also fills the Top pick panel. Re-evaluates (debounced) when the tray, the prices (a scan or a search),
+-- the known recipes, the sales ledger, the deposits, your bags, vendor prices, the flips or the settings
+-- change, while the window is open; otherwise on the next open. The Buy bar's Crafts box sets the selected
+-- recipe's batch (ResultsList.SetCrafts) until another recipe or view is picked.
 
 local L = ns.L
 local UI = ns.UI
@@ -62,7 +63,8 @@ local dirty, pending = true, nil
 local words, searchText = {}, ""   -- the search: its lowercased words, and the text as typed (trimmed)
 local scanT                        -- AH flips: when the scan they come from ran
 local viewEmpty = ""               -- what the list says when the view has no rows at all
-local ShowRows                     -- defined below; the group headers call it
+local craftsFor                    -- the Crafts box: { recipeID, n } for the selected recipe
+local ShowRows, Schedule           -- defined below; the group headers and Select call them
 
 local function Prefs()
     return ns.charDB.results
@@ -384,6 +386,10 @@ local function Filter()
 end
 
 function ResultsList.Select(recipeID)
+    if craftsFor and craftsFor.recipeID ~= recipeID then
+        craftsFor = nil
+        Schedule()   -- the recipe it was set on goes back to the batch its view gives it
+    end
     selected = recipeID
     local result
     for _, r in ipairs(results) do
@@ -462,6 +468,27 @@ function ShowRows(fromTop)
     return selected ~= previous
 end
 
+-- The Crafts box's batch on its recipe's result (re-evaluated on the same context).
+local function ApplyCrafts()
+    if not craftsFor then return end
+    for i, r in ipairs(ranked) do
+        if r.recipe.recipeID == craftsFor.recipeID then
+            if r.ctx and not r.flip and r.crafts ~= craftsFor.n then ranked[i] = ns.Evaluator.Reevaluate(r, craftsFor.n) end
+            return
+        end
+    end
+end
+
+-- The Buy bar's Crafts box: the selected recipe at n crafts, in its row, the top pick and the details.
+function ResultsList.SetCrafts(recipeID, n)
+    if not box or recipeID ~= selected then return end
+    craftsFor = { recipeID = recipeID, n = n }
+    ApplyCrafts()
+    ShowRows()
+    ResultsList.Select(selected)
+    UpdateTopPick()
+end
+
 -- The search box, on every keystroke: the rows already ranked, filtered by name.
 local function Search(text)
     searchText = string.match(text or "", "^%s*(.-)%s*$")
@@ -509,6 +536,7 @@ function ResultsList.Update()
     else
         ranked = ns.Evaluator.ForTray(entries, Filter())   -- recipes from vendor goods list even with an empty tray
     end
+    ApplyCrafts()
     viewEmpty = EmptyText(view, entries)
     ShowRows()   -- keeps the selection while it's shown, else selects the top of the ranking
     ResultsList.Select(selected)
@@ -532,7 +560,7 @@ function ResultsList.Update()
     end
 end
 
-local function Schedule()
+function Schedule()
     dirty = true
     if not box or not ns.Main.IsShown() or pending then return end
     pending = C_Timer.NewTimer(DEBOUNCE, function()
@@ -564,7 +592,7 @@ end
 function ResultsList.SetView(view)
     if View() == view then return end
     Prefs().view = view
-    selected = nil
+    selected, craftsFor = nil, nil
     ShowView()
     ResultsList.Update()
 end
@@ -756,8 +784,8 @@ ns.On("MAIN_BUILT", Build)
 ns.On("MAIN_SHOWN", function()
     if dirty then ResultsList.Update() end
 end)
-for _, message in ipairs({ "TRAY_CHANGED", "SCAN_DONE", "RECIPES_KNOWN_CHANGED", "LEDGER_CHANGED", "DEPOSITS_CHANGED",
-                           "BAGS_CHANGED", "VENDOR_PRICES_CHANGED", "FLIPS_CHANGED", "SETTINGS_CHANGED" }) do
+for _, message in ipairs({ "TRAY_CHANGED", "SCAN_DONE", "PRICES_CHANGED", "RECIPES_KNOWN_CHANGED", "LEDGER_CHANGED",
+                           "DEPOSITS_CHANGED", "BAGS_CHANGED", "VENDOR_PRICES_CHANGED", "FLIPS_CHANGED", "SETTINGS_CHANGED" }) do
     ns.On(message, Schedule)
 end
 -- A skill-up changes the group headers and the skill-up colours only: repaint, no re-evaluation.

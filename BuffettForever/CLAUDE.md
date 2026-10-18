@@ -114,9 +114,28 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 
   Tested on 70450: selftest 117/117; the tab, its groups (collapsed state kept over a /reload), the filters and the
   skill-up colours (the profession window's, checked on 3 recipes) work; tray-only slots work. Blizzard's difficulty
-  matched the thresholds' on 11 of 13 known recipes [F-133]. 399 recipes evaluate in 21 ms (42 ms at worst), so no
+  matched the thresholds' on the 6 Leatherworking recipes; the other professions' recipes all read optimal, which
+  pass 2's diagnostics explained [F-133]. 399 recipes evaluate in 21 ms (42 ms at worst), so no
   splitting across frames. `/bf buytest 2589 1` then `confirm` bought 1 Linen Cloth for 19c, delivered by mail
   [F-132]. Justin found the "Craft" source confusing in this tab, where everything not in the tray is bought.
+- 1.0.0 Profession profits pass 2 (2026-10-18):
+  - the "Craft" fix: TrayContext buys reagents as listed (recipeFor empty); Evaluator.MakeHint (from makeFor) tells
+    the slot's tooltip when a recipe you know makes one for less, or makes one nobody sells; MadeFrom names a
+    crafted line's reagents in the other views;
+  - UI/BuyBar.lua: the status line over [Best] [- n +] [Buy], in Profession profits only; ResultsList.SetCrafts
+    with Evaluator.Reevaluate (craftsFor kept until another recipe or view); Best = Evaluator.AffordableBatch;
+    Buy disabled, its tooltip the Evaluator.ShoppingList;
+  - live prices: at the AH (window open), the shown recipe's AH reagents with prices over 60 s old are searched,
+    each at most once a minute; Search.Finish fires PRICES_CHANGED, which re-evaluates the list;
+  - diag.harvest.professions.window (whether the profession window was open for the difficulty readings);
+  - selftest 121 (TRAY-BUY, CRAFTS, SHOP-LIST, BEST-GOLD).
+
+  Tested on 70450: selftest 121/121; buying as listed with the gold "Cheaper to make" hint, Crafts (row and details
+  follow, reset on another recipe), Best, Buy's tooltip away from and at the AH ("Prices from <1 min ago"), and no
+  jump while prices update. The bar searched Light Leather and Ruined Leather Scraps about once a minute while Justin
+  clicked around, 70-211 ms each. The window flag showed the bug in Harvest.Difficulty: with the profession window
+  closed, GetRecipeInfo's relativeDifficulty read optimal for all 13 known recipes, so the * marks were orange until
+  that profession's window opened [F-133]. Fixed in pass 3: the thresholds only.
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). The expiry and mailbox-reopen tests passed on
   70425 (2026-10-17).
@@ -135,7 +154,14 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   - Blizzard's 5% rule (a quote more than 5% over the preview is refused) applies only against a fresh search's
     price; against an older scan, the difference is shown.
 - **The Buy bar** shows on Profession profits and AH flips only. Bought reagents are credited to the tray, because
-  AH purchases most likely arrive by mail: the tray-only plan then never offers them twice.
+  AH purchases arrive by mail [F-132]: the tray-only plan then never offers them twice.
+- **Reagents are bought as listed in this tab** (2026-10-18, after Justin's pass 1 test: "Craft may be confusing, maybe
+  it should be AH? Open to a better idea"). Each reagent comes from the tray, the AH or a vendor; make-or-buy is off,
+  so the Buy bar buys exactly what the slots show. Crafting an intermediate there would mean buying its own reagents,
+  which the tray credit can't track: make-or-buy ignores owned stock below the first level, so they'd be offered
+  again. A recipe you know that makes a reagent for less (Light Leather from Ruined Leather Scraps), or makes one
+  nobody sells, is a hint in the slot's tooltip: make it, then put it in the tray. The Tray and Vendor crafts views
+  keep make-or-buy, and their "Craft" tooltip now names the reagents it's made from.
 - **Extras** (Justin chose all three): skill-up colours on the * known marker in every view (the row's colour still
   shows profit); buying AH flips (commodities by quote and confirm, gear by PlaceBid on an auction shown first);
   buying vendor reagents at a merchant (BuyMerchantItem, one click per line, a confirm at 150g or more).
@@ -266,7 +292,9 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 | `Crafting/RecipeIndex.lua` | reagent → recipes reverse index; filters (profession, known only, skill) |
 | `Economics/Econ.lua` | pure functions from the wowf-economics references (MarketValue, FairValue, CostToBuy, AHNet, Acquire) |
 | `Economics/Evaluator.lua` | per recipe: COGS by source, exits, profit, ROI, value added, grade, recommendation |
+| `Pricing/Buy.lua` | buying at the AH: the `/bf buytest` probe (pass 1); the Buy bar's purchases (pass 3) |
 | `UI/ReagentTray.lua`, `UI/ResultsList.lua`, `UI/DetailPanel.lua` | fill the panes the raw window already lays out |
+| `UI/BuyBar.lua` | the Buy bar under the details in Profession profits: Crafts, Best, Buy, live prices at the AH |
 | `Bags.lua` | Alt+Right-click post-hook on `HandleModifiedItemClick` |
 | `Tooltip.lua` | AH / vendor / fair-value lines via `TooltipDataProcessor` |
 
