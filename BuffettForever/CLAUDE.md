@@ -239,6 +239,13 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   ("1c under" 2s, rounded to the silver; AUCTION_CREATED 240 ms, the 1s deposit taken); cancelled and taken from
   the mailbox, they came back as made (Justin saw the chat line and Sell on AH 1; the saved file predates it). Not
   tested: an expired auction coming back (the 2 Linen Bandages posted at 9c).
+- 1.0.0 tray, Collect, Craft and Post pass 4 (2026-10-18): the release docs.
+  - The README and the CurseForge page describe the tray's markers, Collect, Create and Sell on AH, and the selling
+    options, and say "It never buys or posts without your click: each shows its price first."
+  - The CHANGELOG's 1.0.0 entry has them, selftest 141 and the tests.
+  - dist/BuffettForever-1.0.0.zip rebuilt: 44 files, 221 KB.
+  - Next: Justin reviews the page text, takes the screenshots and uploads it as Beta. Then the release set (the TOC
+    version, CHANGELOG, README, the page) is committed, and the stress-test client is checked.
   - The label "Sell on AH n"; after a refusal (a vendor pays more, nobody lists it) the button stays greyed for that
     item for a minute, with the reason (he had clicked it five times).
   - Options > Selling on the Auction House: Price (settings.postPrice: the cheapest listing, 1c, 1%, 5% or 10% under
