@@ -246,6 +246,14 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   - dist/BuffettForever-1.0.0.zip rebuilt: 44 files, 221 KB.
   - Next: Justin reviews the page text, takes the screenshots and uploads it as Beta. Then the release set (the TOC
     version, CHANGELOG, README, the page) is committed, and the stress-test client is checked.
+- **1.0.0 released** (2026-10-18): Justin approved the page text, took the screenshots (BuffettForever01/02.png) and
+  uploads the zip to CurseForge as Beta.
+  - The release set is committed.
+  - The license is MIT (Justin's choice on the new repo): LICENSE, and `## X-License: MIT`.
+  - The zip has 45 files.
+  - Published to **github.com/Typheous1979/BuffettForever**: its folder's 29 commits (`cli.py publish`). Its first
+    push replaced GitHub's generated commit (an MIT LICENSE, kept word for word, and a two-line README).
+  - Next: check the stress-test client (`_forever_`, from Oct 19), and the tests logged for later.
   - The label "Sell on AH n"; after a refusal (a vendor pays more, nobody lists it) the button stays greyed for that
     item for a minute, with the reason (he had clicked it five times).
   - Options > Selling on the Auction House: Price (settings.postPrice: the cheapest listing, 1c, 1%, 5% or 10% under
@@ -530,6 +538,9 @@ The probe lines are in auction-house.md and professions-and-vendors.md.
 - Tools run from this folder through the skill shims, or directly: `python ../tools/wowf/cli.py lint BuffettForever`,
   `python ../tools/wowf/cli.py package .`, `python ../tools/wowf/cli.py make-icon --design coin`; deploy with the
   wowf-deploy skill (the beta client has a junction to this folder).
+- Publish to the addon's repo after a release is committed (when Justin asks): `python ../tools/wowf/cli.py publish
+  BuffettForever --repo https://github.com/Typheous1979/BuffettForever.git --push`. It's a plain push now; the split
+  is deterministic.
 - `.claude/settings.json` grants `..` as a working directory, so the shared skills and tools are readable and
   editable; edits under `.claude/` still ask first (protected path). If `/permissions` doesn't list `AddOns\`
   as a working directory, put the absolute path in a gitignored `.claude/settings.local.json` instead.
