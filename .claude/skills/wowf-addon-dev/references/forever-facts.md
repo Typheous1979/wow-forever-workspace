@@ -55,7 +55,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   | 70338 | Oct 9–10 | |
   | 70374 | Oct 13 | |
   | 70425 | Oct 16 | beta server and Justin's client; API index rebuilt |
-  | 70450 | Oct 16 (late) | beta server; API index rebuilt (no AH, profession or merchant API changes) |
+  | 70450 | Oct 16 (late) | beta server, and Justin's client from Oct 17; API index rebuilt (no AH, profession or merchant API changes) |
 
   [Source: forever branch commits]
 - **[F-005]** Version server, Oct 14:
@@ -71,7 +71,8 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   - `wowf` (stress test/launch): **`_forever_`** with `Wow.exe`.
 
   Interface, WTF and Cache are **per folder**, so addons and SavedVariables don't carry over. [Official CDN product config]
-- **[F-007]** Justin's beta client was on build 70338 (Oct 12), **70425** on Oct 16. Its install path lives in the gitignored `wowf.local.json`. Per-character data lives under `WTF\Account\<acct>\<region-id>\<Char-Realm>\`; on 70425 the "Char-Realm" folder is `<First>-<Surname>` (the surname takes the realm slot, [F-080]) under region-id `70`. Folders from older builds (`<Realm Name>\<First>`) stay beside it. [Probe, local disk 70425]
+- **[F-007]** Justin's beta client was on build 70338 (Oct 12), 70425 on Oct 16, and **70450** on Oct 17 (BuffettForever's
+  selftest saved that build, and the version server's beta matched). Its install path lives in the gitignored `wowf.local.json`. Per-character data lives under `WTF\Account\<acct>\<region-id>\<Char-Realm>\`; on 70425 the "Char-Realm" folder is `<First>-<Surname>` (the surname takes the realm slot, [F-080]) under region-id `70`. Folders from older builds (`<Realm Name>\<First>`) stay beside it. [Probe, local disk 70425]
 
 ## 2. Detection constants
 - **[F-010]** `WOW_PROJECT_CAMELOT = 18` and `WOW_PROJECT_ID = WOW_PROJECT_CAMELOT` since **70170** (`Blizzard_ProjectConstants/Camelot/ProjectConstants.lua`). Other values: `WOW_PROJECT_MAINLINE = 1`, `WOW_PROJECT_CLASSIC = 2`. On 69913–70124 the ID was 1, the same as Mainline. [Source; Wiki Patch 1.60.1/API changes]

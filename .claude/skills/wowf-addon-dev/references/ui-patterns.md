@@ -54,6 +54,25 @@ Addon frames that you create aren't protected. You only need combat-lockdown car
   - Repaint the rows in place with `box:ForEachFrame(InitRow)`, e.g. after item names load.
   - Column headings are plain Buttons that set the sort key. Give each column a fixed width, and anchor the row cells
     and the headings from the same right-hand offsets so they line up (BuffettForever `UI/ResultsList.lua`).
+- **Search a list as you type**, with Blizzard's search box. Example: BuffettForever `UI/ResultsList.lua` 1.0.0,
+  tested on 70450.
+  - `CreateFrame("EditBox", nil, pane, "SearchBoxTemplate")`, 160 × 20 at the pane's top right, as on the AddOns
+    list. The template (Blizzard_SharedXML) brings the magnifying glass, the grey "Search" and the X. Enter and
+    Escape leave the box, so a second Escape closes a window listed in `UISpecialFrames`.
+  - The template's own OnTextChanged shows the X and the grey hint, so `HookScript("OnTextChanged", fn)`, as the
+    AddOns list does. A `SetScript` must call `SearchBoxTemplate_OnTextChanged(self)` first, as the profession
+    window does.
+  - Filter the rows, not the data: keep the sorted list and rebuild the data provider from the rows that match, on
+    every keystroke. That's instant for hundreds of rows. For a new search, pass
+    `ScrollBoxConstants.DiscardScrollPosition` so the list starts at the top.
+  - Match plain text: `string.find(string.lower(name), word, 1, true)` for every word, in any order. Plain, so a
+    typed "(" or "%" can't break the pattern.
+  - A name that isn't cached yet (`C_Item.GetItemNameByID` returns nil) can't match: filter again when the item
+    data loads.
+  - Keep the selection while its row is shown, else select the first row shown, so a details pane never describes a
+    hidden row. Clearing the search then keeps what was picked.
+  - The text survives hiding the window. BuffettForever also clears the focus in the box's OnHide, so a window
+    closed while typing can't keep the keyboard.
 - **Scrolling text** (a details pane):
   - `CreateFrame("ScrollFrame", nil, parent, "ScrollFrameTemplate")`; the template loads on Forever, from
     `Blizzard_SharedXML\SecureUIPanelTemplates.xml`. Its `OnLoad` attaches `self.ScrollBar`, and
