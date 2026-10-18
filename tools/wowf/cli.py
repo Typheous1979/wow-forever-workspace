@@ -22,6 +22,7 @@ Commands:
   econ vectors|check            BuffettForever's evaluator: generated test vectors, replay /bf eval (see econ.py)
   make-icon [--out PATH] [--preview PNG]  draw MusicForever's icon (Media/Icon.tga)
   package ADDON                 lint, then zip to dist/<Addon>-<Version>.zip for CurseForge
+  toc-stage ADDON [--dry-run]   stage the TOC's file list, keeping its ## header as committed (see toc_stage.py)
   doctor                        environment check
 """
 import argparse
@@ -236,6 +237,9 @@ def main(argv=None):
     if cmd == "package":
         import package
         return package.main(rest)
+    if cmd == "toc-stage":
+        import toc_stage
+        return toc_stage.main(rest)
     if cmd == "doctor":
         import doctor
         return doctor.main(rest)
