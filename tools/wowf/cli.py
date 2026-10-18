@@ -3,8 +3,9 @@
 Commands:
   api update [--no-live]        refresh Blizzard forever-branch cache and rebuild the index
   api build  [--no-live]        rebuild the index from the existing cache
-  api show NAME                 full record(s) for an exact name (C_X.Fn, Global, EVENT, Enum.X, SOUNDKIT.X)
-  api find REGEX [--kind K]     search names (kinds: fn method event enum const struct ns pred fx rt)
+  api show NAME                 full record(s) for an exact name (C_X.Fn, Global, EVENT, Enum.X, SOUNDKIT.X,
+                                an XML template such as SearchBoxTemplate)
+  api find REGEX [--kind K]     search names (kinds: fn method event enum const struct ns pred fx tpl rt)
   api events REGEX              search events
   api soundkit REGEX            search SOUNDKIT constants
   api addon NAME                does a Blizzard UI addon load on Forever?
@@ -72,16 +73,26 @@ def cmd_api(argv):
         return 2
     if a.action == "show":
         recs = I.lookup(a.query)
+        template_probe = f'/run print(C_XMLUtil.GetTemplateInfo("{a.query}") ~= nil)'   # templates aren't globals
         if not recs:
-            _out(f"{a.query}: not in the index. Evidence: {I.evidence(a.query)}")
+            if a.query.endswith("Template"):
+                _out(f"{a.query}: no XML template or global by that name in the forever branch")
+            else:
+                _out(f"{a.query}: not in the index. Evidence: {I.evidence(a.query)}")
             near = I.find(r"(^|[.:])" + _re_escape(a.query.split('.')[-1]) + "$", limit=10)
+            if not near and a.query.endswith("Template"):   # ItemButtonTemplate -> LargeItemButtonTemplate, ...
+                near = [r for r in I.find(_re_escape(a.query) + "$", {"tpl"}, limit=1000) if r.get("forever") is not False]
+                near = sorted(near, key=lambda r: (len(r["id"]), r["id"]))[:10]   # the closest names first
             if near:
                 _out("did you mean: " + ", ".join(r["id"] for r in near))
-            _out(f"safe probe: /run print(type({_probe_expr(a.query)}))")
+            _out("safe probe: " + (template_probe if a.query.endswith("Template")
+                                   else f"/run print(type({_probe_expr(a.query)}))"))
             return 1
         for r in recs:
             _out(idx.format_record(r))
-        if I.rt_meta:
+        if all(r.get("k") == "tpl" and r.get("type") not in idx.FONT_TYPES for r in recs):
+            _out("runtime check: " + template_probe)
+        elif I.rt_meta:
             _out(f"evidence: {I.evidence(a.query)}")
         return 0
     if a.action == "addon":

@@ -2,7 +2,8 @@
 
 Files (committed, sorted JSONL, one meta line first):
   .claude/skills/wowf-api/data/api-index.jsonl      docs layer (k: ns, fn, method, event, enum, const, struct, pred)
-  .claude/skills/wowf-api/data/framexml.jsonl       FrameXML layer (k: fx, soundkit, addon)
+  .claude/skills/wowf-api/data/framexml.jsonl       FrameXML layer (k: fx, tpl, soundkit, addon)
+                                                    (tpl: virtual XML templates, which are not globals)
   .claude/skills/wowf-api/data/runtime-surface.jsonl runtime names from WowfProbe (optional)
 """
 import glob
@@ -277,6 +278,11 @@ def _tokens(s):
     return {x.strip().lower() for x in re.split(r"[,\s]+", s) if x.strip()}
 
 
+def _read(path):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
 def on_forever(allow, exclude):
     if exclude & {"camelot", "forever"}:
         return False
@@ -286,13 +292,13 @@ def on_forever(allow, exclude):
 
 
 def scan_tocs(base):
-    """Return {addon: {"allow":set,"exclude":set,"files":{relpath_lower:(allow,exclude)}}}."""
+    """Return {addon: {"allow":set,"exclude":set,"lod":bool,"files":{relpath_lower:(allow,exclude)}}}."""
     out = {}
     for toc in glob.glob(os.path.join(base, "Interface", "AddOns", "*", "*.toc")):
         addon = os.path.basename(os.path.dirname(toc))
-        info = out.setdefault(addon, {"allow": set(), "exclude": set(), "files": {}, "tocs": []})
+        info = out.setdefault(addon, {"allow": set(), "exclude": set(), "lod": False, "files": {}, "tocs": []})
         info["tocs"].append(os.path.basename(toc))
-        for line in open(toc, encoding="utf-8", errors="replace"):
+        for line in _read(toc).splitlines():
             line = line.strip()
             m = _TOC_DIRECTIVE.match(line)
             if m:
@@ -301,6 +307,8 @@ def scan_tocs(base):
                     info["allow"] |= _tokens(val)
                 elif key == "excludeloadgametype":
                     info["exclude"] |= _tokens(val)
+                elif key == "loadondemand":
+                    info["lod"] = info["lod"] or val.strip() == "1"
                 continue
             if not line or line.startswith("#"):
                 continue
@@ -313,6 +321,27 @@ def scan_tocs(base):
     return out
 
 
+_XML_ATTR = re.compile(r'\b(inherits|mixin)\s*=\s*"([^"]*)"', re.I)
+
+
+def template_record(element, name, attrs, addon, rel, info, addon_forever):
+    """A virtual XML element: what it is, where it's defined, and whether its file loads on Forever (the addon's
+    game types, the file's own TOC conditions, and Classic/Standard/WowLabs folders only when the TOC lists the
+    file, as for Lua files)."""
+    inner = "\\".join(rel.split(os.sep)[1:]).lower()
+    fa, fe = info["files"].get(inner, (set(), set()))
+    forever = addon_forever and on_forever(fa, fe)
+    low = rel.replace("/", "\\").lower()
+    if "\\classic\\" in low or "\\standard\\" in low or "\\wowlabs\\" in low:
+        forever = forever and inner in info["files"]
+    rec = {"k": "tpl", "id": name, "type": element, "a": addon, "file": rel.replace(os.sep, "/"), "forever": forever}
+    for key, value in _XML_ATTR.findall(attrs):
+        rec[key.lower()] = value.strip()
+    if info.get("lod"):
+        rec["lod"] = True
+    return rec
+
+
 def build_framexml(log=print):
     base = config.UPSTREAM_DIR
     tocs = scan_tocs(base)
@@ -320,14 +349,15 @@ def build_framexml(log=print):
     for addon, info in sorted(tocs.items()):
         recs.append({"k": "addon", "id": addon, "forever": on_forever(info["allow"], info["exclude"]),
                      **({"allow": sorted(info["allow"])} if info["allow"] else {}),
-                     **({"exclude": sorted(info["exclude"])} if info["exclude"] else {})})
+                     **({"exclude": sorted(info["exclude"])} if info["exclude"] else {}),
+                     **({"lod": True} if info.get("lod") else {})})
     seen = {}
     lua_files = glob.glob(os.path.join(base, "Interface", "AddOns", "**", "*.lua"), recursive=True)
     # pass 1: top-level global tables, so indented `function Owner.Member(` inside do-blocks can be trusted
     top_tables = set()
     for path in lua_files:
         try:
-            for line in open(path, encoding="utf-8", errors="replace"):
+            for line in _read(path).splitlines():
                 m = re.match(r"^([A-Za-z_]\w*)\s*=\s*(\{|CreateFromMixins|Mixin)", line)
                 if m:
                     top_tables.add(m.group(1))
@@ -347,7 +377,7 @@ def build_framexml(log=print):
         deprecated = "deprecated" in low
         is_soundkit = os.path.basename(path).lower() == "soundkitconstants.lua"
         try:
-            text = open(path, encoding="utf-8", errors="replace").read()
+            text = _read(path)
         except OSError:
             continue
         for line in text.splitlines():
@@ -394,8 +424,10 @@ def build_framexml(log=print):
                 seen[name] = rec  # prefer a definition that loads on Forever
             elif forever and prev.get("deprecated") and not deprecated:
                 seen[name] = rec
-    # Named, non-virtual XML frames/regions become globals (UIParent, GameTooltip, ChatFrame1, ...)
+    # Named, non-virtual XML frames/regions become globals (UIParent, GameTooltip, ChatFrame1, ...).
+    # Virtual ones are templates (k "tpl", not globals): CreateFrame("EditBox", nil, parent, "SearchBoxTemplate").
     xml_rx = re.compile(r"<([A-Za-z]+)\b([^>]*?)\bname\s*=\s*\"([A-Za-z_]\w*)\"([^>]*)>", re.S)
+    templates = {}
     for path in glob.glob(os.path.join(base, "Interface", "AddOns", "**", "*.xml"), recursive=True):
         rel = os.path.relpath(path, os.path.join(base, "Interface", "AddOns"))
         parts = rel.split(os.sep)
@@ -403,17 +435,27 @@ def build_framexml(log=print):
         info = tocs.get(addon, {"allow": set(), "exclude": set(), "files": {}})
         forever = on_forever(info["allow"], info["exclude"])
         try:
-            text = open(path, encoding="utf-8", errors="replace").read()
+            text = _read(path)
         except OSError:
             continue
         for m in xml_rx.finditer(text):
             attrs = m.group(2) + m.group(4)
-            if re.search(r'virtual\s*=\s*"true"', attrs, re.I):
-                continue
             name = m.group(3)
+            if re.search(r'virtual\s*=\s*"true"', attrs, re.I):
+                rec = template_record(m.group(1), name, attrs, addon, rel, info, forever)
+                prev = templates.get(name)
+                if prev is None or (rec["forever"] and not prev["forever"]):
+                    templates[name] = rec
+                continue
             if name in seen and (seen[name]["forever"] or not forever):
                 continue
             seen[name] = {"k": "fx", "id": name, "type": "xml-" + m.group(1).lower(), "a": addon, "forever": forever}
+    for r in templates.values():
+        if r["forever"]:
+            del r["forever"]
+        else:
+            r["forever"] = False
+        recs.append(r)
     for name, note in UNDOCUMENTED_C.items():
         if name not in seen:
             seen[name] = {"k": "fx", "id": name, "type": "c-global", "a": "(curated)", "note": note, "forever": True}
@@ -466,6 +508,7 @@ class Index:
         self.meta = {}
         self.docs = {}
         self.fx = {}
+        self.templates = {}   # virtual XML templates: not globals, so the lint never sees them
         self.soundkit = {}
         self.addons = {}
         self.rt = set()
@@ -497,6 +540,8 @@ class Index:
             self.soundkit[r["id"]] = r["v"]
         elif r["k"] == "addon":
             self.addons[r["id"]] = r
+        elif r["k"] == "tpl":
+            self.templates[r["id"]] = r
         else:
             self.fx[r["id"]] = r
 
@@ -515,6 +560,8 @@ class Index:
         out = [r for (k, i), r in self.docs.items() if i == name]
         if name in self.fx:
             out.append(self.fx[name])
+        if name in self.templates:
+            out.append(self.templates[name])
         if name in self.soundkit:
             out.append({"k": "soundkit", "id": name, "v": self.soundkit[name]})
         return out
@@ -543,6 +590,10 @@ class Index:
             for i, r in self.fx.items():
                 if rx.search(i):
                     out.append(r)
+        if kinds is None or "tpl" in kinds:
+            for i, r in self.templates.items():
+                if rx.search(i):
+                    out.append(r)
         if kinds is None or "rt" in kinds:
             for i in self.rt:
                 if rx.search(i) and not any(x["id"] == i for x in out):
@@ -560,6 +611,25 @@ class Index:
         if self.rt_meta:
             parts.append(("present" if "rt" in src else "NOT seen") + f" at runtime (probe {self.rt_meta.get('build', '?')})")
         return ", ".join(parts) or "unknown"
+
+
+# How each kind of template is used; anything else is a frame type for CreateFrame.
+FONT_TYPES = ("Font", "FontFamily")
+_TEMPLATE_USE = {
+    "Texture": 'frame:CreateTexture(nil, "ARTWORK", "{id}")',
+    "Line": 'frame:CreateLine(nil, "ARTWORK", "{id}")',
+    "FontString": 'frame:CreateFontString(nil, "OVERLAY", "{id}")',
+    "AnimationGroup": 'region:CreateAnimationGroup(nil, "{id}")',
+    "Actor": 'modelScene:CreateActor(nil, "{id}")',
+    "Animation": 'inherits="{id}" in XML',
+}
+
+
+def template_use(r):
+    if r.get("type") in FONT_TYPES:
+        return f"fontString:SetFontObject({r['id']}); a font object is also a global"
+    use = _TEMPLATE_USE.get(r.get("type"), 'CreateFrame("{type}", nil, parent, "{id}")')
+    return use.format(id=r["id"], type=r.get("type")) + "; a template is not a global"
 
 
 def format_record(r):
@@ -602,6 +672,17 @@ def format_record(r):
         lines.append(f"FrameXML {r['type']} {r['id']}  ({r.get('a')}; {'NOT loaded on Forever' if r.get('forever') is False else 'loads on Forever'}{', deprecated shim' if r.get('deprecated') else ''})")
         if r.get("note"):
             lines.append("  undocumented C global — evidence: " + r["note"])
+    elif k == "tpl":
+        where = r.get("a", "?") + (", load on demand" if r.get("lod") else "")
+        lines.append(f"XML template {r['id']}  ({r.get('type')}; {where}; "
+                     f"{'NOT loaded on Forever' if r.get('forever') is False else 'loads on Forever'})")
+        related = [f"{key} {r[key]}" for key in ("inherits", "mixin") if r.get(key)]
+        if related:
+            lines.append("  " + "; ".join(related))
+        lines.append(f"  source: {r.get('file')}")
+        lines.append("  use: " + template_use(r))
+        if r.get("lod"):
+            lines.append(f"  exists once {r.get('a')} has loaded (its ADDON_LOADED, or C_AddOns.LoadAddOn)")
     elif k == "soundkit":
         lines.append(f"{r['id']} = {r['v']}")
     elif k == "rt":
