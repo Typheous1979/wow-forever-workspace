@@ -49,4 +49,6 @@ If the folder already exists but is empty, scaffolding into it is fine.
 1. Lint with `wowf-review`. It must be clean.
 2. Offer to deploy with `wowf-deploy`. A new folder needs a client restart and the addon enabled in the AddOns list.
 3. Fill in the CHANGELOG "Tested on build:" line after the first in-game test.
-4. Commit in the workspace repo. A shipped addon later moves to its own repo via `git subtree split`.
+4. Commit in the workspace repo. A shipped addon is published to its own repo with `cli.py publish` (`git subtree
+   split`; wowf-deploy, "Publishing to the addon's own repo"). Development stays here. Ask Justin which license
+   the addon ships under (BuffettForever: MIT, in its LICENSE and `## X-License`).

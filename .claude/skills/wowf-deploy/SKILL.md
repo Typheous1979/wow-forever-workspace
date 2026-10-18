@@ -63,3 +63,36 @@ While the release files wait for Justin's review, code still gets committed. Lea
 page and `## Version` out of those commits. New Lua files still need their TOC lines, so stage the TOC with
 `python tools/wowf/cli.py toc-stage <Addon>`. It stages the working copy's file list under the committed `##`
 header, and lists the header lines it kept back (`--dry-run` shows the result first). Used for BuffettForever 1.0.0.
+
+## Publishing to the addon's own repo
+Done for BuffettForever 1.0.0 (github.com/Typheous1979/BuffettForever, 2026-10-18). Development stays in this
+workspace, with the shared tools and skills. The addon's repo gets only its folder's history, for players and for
+CurseForge's source link. Justin creates the repo; pushing to it is outward-facing, so do it when he asks.
+```
+python tools/wowf/cli.py publish <Addon>                                  # split + privacy scan; pushes nothing
+python tools/wowf/cli.py publish <Addon> --repo <url> --push              # then a plain push to its main
+```
+1. **Commit everything first.** The split takes committed history only, and refuses while the folder has changes.
+   `Screenshots/` stays out (gitignored).
+2. **The split** is `publish/<addon>`, from `git subtree split --prefix=<Addon>`. The same commits get the same IDs
+   every time, so each later publish is a fast-forward push.
+3. **The privacy scan** reads the split's whole history. It checks:
+   - this machine's paths and WTF account names (wowf.local.json and the clients' `WTF\Account` folders);
+   - user paths and AppData;
+   - account-ID shapes;
+   - email addresses other than noreply ones and the committer's own.
+
+   It prints counts only, and any hit stops the publish.
+4. **The first push to a repo GitHub created with a README or LICENSE** is refused as not a fast-forward.
+   1. Look at what's there (`git fetch <url> main:refs/remotes/<addon>/main`, then `git ls-tree` and `git show`).
+   2. Keep its LICENSE: copy it into the addon folder word for word, add `## X-License: <name>` to the TOC
+      (`package` ships it), commit, and publish again.
+   3. Push once with the lease the tool prints: `git push --force-with-lease=main:<its commit> <url>
+      publish/<addon>:main`. It fails if anything new arrived. Its README is replaced by the addon's.
+   4. If the repo holds anything else, ask Justin first.
+
+   BuffettForever's repo had GitHub's MIT LICENSE and a two-line README.
+5. Push the workspace too (`git push` to wow-forever-workspace). It's the dev home and public as well, so scan
+   what's unpushed first: `python tools/wowf/cli.py publish --scan origin/main..HEAD`. Its email check skips
+   noreply addresses, reserved example domains and the committer's own; a decorator after a diff's `+` isn't an
+   address.

@@ -26,8 +26,9 @@ silent protected-call failures). Stress test Oct 19 2026, launch Nov 4 2026.
 - Never delete a deployed addon folder by hand (`Remove-Item -Recurse`/`rmdir /s` through a junction
   deletes the source). Use `deploy.py --remove`.
 - Machine paths and WTF account names live in gitignored `wowf.local.json`; this repo is public.
-- Start sessions at `AddOns\` or below so skills load. MusicForever publishes to its own repo later
-  via `git subtree split`.
+- Start sessions at `AddOns\` or below so skills load. Shipped addons publish to their own repos with
+  `python tools/wowf/cli.py publish <Addon>` (`git subtree split` + a privacy scan; wowf-deploy): BuffettForever →
+  github.com/Typheous1979/BuffettForever. MusicForever's comes later. Development stays in this workspace.
 - Python tooling is stdlib-only (Python 3.12+). Run tests: `python -m unittest discover -s tools/wowf/tests`.
   After editing a skill: `python tools/wowf/validate_skills.py` (also run by the tests).
 

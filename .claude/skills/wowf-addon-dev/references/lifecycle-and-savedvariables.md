@@ -88,6 +88,18 @@ frame:RegisterEvent("ADDON_LOADED")
 ```
 - Lint PAT001 flags any SV touched at file scope.
 - Bind Settings controls to `MyAddonDB` keys **inside** `ADDON_LOADED` (see ui-patterns.md).
+- **One handler per event across files.** With one shared `events` table (`ns.events`), a second
+  `function events:X()` in another file silently replaces the first: no error, and the first module goes deaf.
+  - Give each WoW event one owning module, and have it re-fire a bus message for the others
+    (`ns.Fire("NAME", ...)` to `ns.On("NAME", fn)`).
+  - Before adding a handler, grep `function events:<EVENT>`.
+  - BuffettForever 1.0.0 had to move several handlers when new modules needed the same events:
+    - Core owns `PLAYER_REGEN_DISABLED/ENABLED` (COMBAT_STARTED/ENDED), `ADDON_ACTION_BLOCKED/FORBIDDEN`
+      (ACTION_BLOCKED) and `AUCTION_HOUSE_SHOW_ERROR` (AH_ERROR);
+    - Mail.lua owns `MAIL_*` (MAILBOX_OPEN/READ/CLOSED);
+    - Harvest owns `TRADE_SKILL_*` (TRADESKILL_CHANGED).
+- Register unit events for one unit with `frame:RegisterUnitEvent(event, "player")` on the same frame. Its payload's
+  unit can be a secret, so don't compare it.
 
 ## Debouncing writes
 State lives in memory; the file is only written at reload or logout. To limit expensive work after rapid changes (slider drags):

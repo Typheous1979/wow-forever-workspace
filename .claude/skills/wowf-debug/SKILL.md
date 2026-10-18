@@ -66,6 +66,23 @@ Give Justin these to paste. They only *look*, never call unknown functions [F-06
 /run print(GetCVar("Sound_EnableMusic"), GetCVar("Sound_MusicVolume"))
 ```
 
+**A call no addon has made on Forever yet: probe it first.** Do this before building UI on a call such as a
+purchase, a craft, a post or taking mail. It's how BuffettForever proved buying, taking mail, crafting and posting
+([F-132], [F-134] to [F-136]).
+- Ship a hidden typed command in the addon (`/<addon> <x>test`, left out of the help). Typing it is a key press, as a
+  click is.
+- It logs the facts first: every read-only answer (readiness, counts, requirements, the window's state). Then it
+  makes the one call inside the key press.
+- For about 20 s it logs every related event, with its timing and whether it was a secret, into a `diag` table in
+  SavedVariables (the last 10).
+- Give Justin numbered steps, including the variations: the window closed and open, `stop` mid-batch, a second
+  `confirm` after a warning. Read the diag with `savedvars.py` after his `/reload`.
+- Keep the probe in the real module as it grows into the feature, so later builds can be re-checked.
+- The SavedVariables reader's `==` header lines carry the WTF account ID. Never copy them into a file, a commit or a
+  report; mask the ID when the file's write time is needed.
+- Compare the file's write time with the probe's timestamps: a test done after the last `/reload` isn't in the file
+  yet.
+
 **In-game tools:**
 - `/fstack` (frame under the mouse), `/etrace` (event trace; shows secret states), `/tinspect <table>`, `/dump expr`, `/reload`.
 - Simulate restrictions out of combat with `/console addonCombatRestrictionsForced 1` (also Encounter, ChallengeMode, PvPMatch, Map, Chat; not persisted).

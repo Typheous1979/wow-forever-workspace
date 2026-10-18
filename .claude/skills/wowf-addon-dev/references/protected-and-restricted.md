@@ -3,6 +3,19 @@
 ## Taint in one paragraph
 All addon code and its SavedVariables are **tainted**. Taint spreads to any value or table that tainted code writes, and lasts until reload. **Protected** functions and frame operations fail when the call path is tainted: in combat, from insecure code, or on secure frames. Blizzard code becomes tainted if you overwrite Blizzard globals or fields (lint flags writes to read-only globals as LCW121).
 
+**Don't drive Blizzard's frames from addon code; read them.** Reading a Blizzard frame's fields and state is fine:
+`AuctionHouseFrame.BuyDialog:IsShown()`, the sell frames' `pendingPost`, `InboxFrame.OpenAllMail:IsEnabled()`,
+`StaticPopup_Visible(name)`. Running Blizzard's code paths from tainted code taints what they write, and a later
+protected action through them can fail:
+- calling a frame method that sets its state (`AuctionHouseFrame:SetPostItem`);
+- hiding or showing Blizzard's dialogs (`StaticPopup_Hide` on the shared popup frames);
+- loading a Blizzard LoadOnDemand UI yourself (`Blizzard_Professions`). An event like `TRADE_SKILL_SHOW` makes
+  Blizzard's own code load it.
+
+If Blizzard's own popup answers an event your call caused, leave it and explain in your UI: on the AH, its post
+warning can't confirm an addon's post (auction-house.md, "Posting"). Put your buttons beside Blizzard's windows, as
+children with no hooks (ui-patterns.md, "A button on a Blizzard window").
+
 ## Silent failures on Forever [F-050]
 These produce **no Lua error**, and `pcall` doesn't help. The only symptoms are "Interface action failed because of an AddOn" and a counter in the AddOns panel that clears only on a **full client restart**.
 
