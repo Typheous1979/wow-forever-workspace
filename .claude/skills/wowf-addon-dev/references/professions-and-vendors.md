@@ -30,7 +30,7 @@ opened in the session, `GetRecipeInfo(id).learned` reads false, `GetCraftableCou
 [F-123, Probe 70450]: read "known" from the spellbook (below), and counts from the bags.
 
 ### Crafting from an addon [F-135]
-Proven on 70450 from a typed command (a key press):
+Proven on 70450 from a typed command and from a button's click:
 1. **The window must be open on that profession.** `C_TradeSkillUI.CraftRecipe(recipeID, n)` with it closed does
    nothing at all: no event, no error, no block.
    - It's ready when `IsTradeSkillReady()` is true and `GetBaseProfessionInfo().professionID` is the recipe's skill
@@ -62,7 +62,11 @@ Proven on 70450 from a typed command (a key press):
 6. **Count finished crafts** on `UNIT_SPELLCAST_SUCCEEDED` (`RegisterUnitEvent(..., "player")`): one per craft, from
    any window, never for a failed one. The recipe's reagents come from your data by spell ID. Guard the spellID
    with `issecretvalue` (it wasn't secret on 70450).
-- Working code: BuffettForever `Crafting/Craft.lua` (`/bf crafttest`, logged in `diag.crafts`).
+- **A craft button's two clicks:** while the window isn't ready on that profession, the button reads "Open
+  Profession" and calls `OpenRecipe`. Then it reads "Create n", Blizzard's verb, and calls `CraftRecipe`. During a
+  batch it's Stop.
+- Working code: BuffettForever `Crafting/Craft.lua` (`Craft.Plan`, `/bf crafttest`, logged in `diag.crafts`) and
+  `UI/CraftRow.lua`.
 
 ### The character's professions and skill-up colours [F-133]
 - **Professions without the window:** `GetProfessions()` returns 7 slot indexes, any of which may be nil. Pass each

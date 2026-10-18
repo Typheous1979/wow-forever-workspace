@@ -474,6 +474,10 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   - `GetRecipeRequirements(2538)` with the window closed returned "Cooking Fire" (type 0, SpellFocus), not met.
     `IsNearProfessionSpellFocus(5)` (Cooking) read false.
   - The recipe data needs the window to have been opened once in the session: see [F-123] and [F-133].
+  - **From a button's click** (BuffettForever's Craft row, 2026-10-18), the same calls worked:
+    - `OpenRecipe` opened First Aid at the recipe;
+    - `CraftRecipe(3275, 1)` started 0.1 s later and succeeded at 3.1 s;
+    - `CraftRecipe(3275, 2)` with `StopRecipeRepeat` at 1.1 s made 1.
 
   [Probe 70450]
 - **[F-136]** **An addon can post a commodity** (BuffettForever's probe, 2026-10-18, typed):
