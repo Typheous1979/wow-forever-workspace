@@ -15,6 +15,7 @@ local WIDTH, HEIGHT = 1040, 600   -- fits a 1366 x 768 UIParent (1080p at UI sca
 local FRAME_NAME = "BuffettForeverFrame"
 local TRAY_SLOTS, TRAY_COLUMNS = 25, 5   -- Crafting/Tray.lua holds Tray.SIZE (25)
 local SLOT_SIZE, SLOT_GAP = 36, 8
+local MAIL_HEIGHT = 12   -- a slot's envelope: units still in the mailbox (UI/ReagentTray.lua)
 local LEFT_WIDTH, RIGHT_WIDTH, PICK_HEIGHT = 232, 260, 180
 local EMPTY_SLOT = "Interface\\Buttons\\UI-EmptySlot-Disabled"     -- Blizzard's empty-slot art
 local LOGO = "Interface\\AddOns\\BuffettForever\\Media\\Icon"       -- the coin, also the TOC's IconTexture
@@ -40,6 +41,7 @@ local function BuildTray(content)
     panel:SetPoint("BOTTOMLEFT", 0, PICK_HEIGHT + 6)
     panel:SetWidth(LEFT_WIDTH)
     panel.slots = {}
+    local mailWidth = UI.MailIconWidth(MAIL_HEIGHT)
     for i = 1, TRAY_SLOTS do
         local slot = CreateFrame("Button", nil, panel)
         slot:SetSize(SLOT_SIZE, SLOT_SIZE)
@@ -54,6 +56,13 @@ local function BuildTray(content)
         slot.icon:SetAllPoints()
         slot.count = slot:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
         slot.count:SetPoint("BOTTOMRIGHT", -2, 2)
+        slot.mail = slot:CreateTexture(nil, "OVERLAY")
+        slot.mail:SetAtlas(UI.MAIL_ATLAS)
+        slot.mail:SetSize(mailWidth, MAIL_HEIGHT)
+        slot.mail:SetPoint("TOPLEFT", 1, -1)
+        slot.mail:Hide()
+        slot.mailCount = slot:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+        slot.mailCount:SetPoint("LEFT", slot.mail, "RIGHT", 1, 0)
         slot:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
         slot.index = i
         panel.slots[i] = slot   -- behaviour: UI/ReagentTray.lua
@@ -68,6 +77,16 @@ local function BuildTray(content)
     local hint = Note(panel, string.format(L["Drop up to %d reagents to see every recipe that uses them."], TRAY_SLOTS),
         LEFT_WIDTH - 20)
     hint:SetPoint("TOPLEFT", 10, buttonsY - 28)
+    panel.Hint = hint
+    -- In the hint's place while anything in the tray is still in the mailbox (its tooltip lists them).
+    local mail = CreateFrame("Button", nil, panel)
+    mail:SetSize(LEFT_WIDTH - 20, 16)
+    mail:SetPoint("TOPLEFT", 10, buttonsY - 26)
+    mail.Text = mail:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    mail.Text:SetPoint("LEFT")
+    mail.Text:SetJustifyH("LEFT")
+    mail:Hide()
+    panel.Mail = mail
     return panel
 end
 

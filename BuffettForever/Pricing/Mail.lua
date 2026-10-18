@@ -19,8 +19,12 @@ local addonName, ns = ...
 --   them doesn't make the mail look new.
 -- The inbox is read on MAIL_SHOW and every MAIL_INBOX_UPDATE while the mailbox is open, so "Open All"
 -- can't take a mail unseen.
+-- Each read also counts the units of each item in won-auction mail (Mail.Won) and hands them to
+-- Pricing/Collect.lua with the read before it in this visit: a drop there is what BuffettForever bought
+-- leaving the mailbox. That part runs even when the account file is read-only (it's per character).
+-- Bus: MAILBOX_OPEN, MAILBOX_READ (after each read) and MAILBOX_CLOSED.
 -- diag.mail answers the open probes: do the subject strings exist, who sends AH mail, how precise is
--- "days left", does reading an unread invoice mark it read.
+-- "days left", does reading an unread invoice mark it read, and (fresh) is the list new at an open.
 
 local Mail = {}
 ns.Mail = Mail
@@ -41,8 +45,11 @@ local SUBJECTS = {           -- Blizzard's subject formats, by kind
 local SUBJECT_ORDER = { "expired", "cancelled", "outbid", "sold", "won" }
 local COUNTED = { sold = true, expired = true, returned = true, cancelled = true, bought = true }
 
+local FRESH_KEEP = 5         -- mailbox opens kept in diag.mail.fresh
+
 local mailOpen = false
 local patterns               -- kind = Lua pattern, built on first use
+local lastWon                -- this visit's previous count of units in won-auction mail; nil at an open
 
 -- "Auction expired: %s" -> "^Auction expired: (.+)$"; nil unless fmt has exactly one %s.
 function Mail.SubjectPattern(fmt)
@@ -233,8 +240,50 @@ local function Sample(d, m)
     }
 end
 
-local function ReadInbox()
-    if not mailOpen or not ns.db or ns.readOnlyDB then return end
+-- Mail i's attachments into out when it's won-auction mail: a buyer invoice, or the AUCTION_WON subject on
+-- system mail (not a reply, not returned, not from a GM; the mail's COD and GM flags are kept anyway, so
+-- Collect can refuse them).
+local function WonAttachments(i, out)
+    local _, _, _, subject, _, cod, _, itemCount, _, wasReturned, _, canReply, isGM = GetInboxHeaderInfo(i)
+    if Secret(subject, cod, itemCount, isGM) or (itemCount or 0) == 0 then return end
+    local invoiceType = GetInboxInvoiceInfo(i)
+    local won = not ns.IsSecret(invoiceType) and invoiceType == "buyer"
+    if not won and type(subject) == "string" and not canReply and not wasReturned and not isGM then
+        local p = Patterns()
+        won = p.won ~= nil and string.match(subject, p.won) ~= nil
+    end
+    if not won then return end
+    for a = 1, ATTACHMENTS do
+        local _, itemID, _, count = GetInboxItem(i, a)
+        if itemID and not ns.IsSecret(itemID) and not ns.IsSecret(count) then
+            out[#out + 1] = { index = i, attachment = a, itemID = itemID, units = count or 1, cod = cod or 0,
+                              gm = isGM == true, won = true }
+        end
+    end
+end
+
+-- Every attachment of every won-auction mail in the open mailbox:
+-- { { index, attachment, itemID, units, cod, gm, won = true } } (Pricing/Collect.lua takes from these).
+function Mail.Won()
+    local out = {}
+    if not mailOpen then return out end
+    for i = 1, GetInboxNumItems() or 0 do pcall(WonAttachments, i, out) end
+    return out
+end
+
+function Mail.IsOpen()
+    return mailOpen
+end
+
+-- { [itemID] = units } over won-auction mail.
+local function WonUnits(list)
+    local units = {}
+    for _, m in ipairs(list) do units[m.itemID] = (units[m.itemID] or 0) + m.units end
+    return units
+end
+
+-- The sales ledger's part of a read (the account file).
+local function FileLedger()
     local book = ns.Ledger.Book(true)
     if not book then return end
     local now = GetServerTime()
@@ -263,9 +312,40 @@ local function ReadInbox()
     if #new > 0 then ns.Fire("LEDGER_CHANGED") end
 end
 
-function events:MAIL_SHOW()
-    mailOpen = true
+local function ReadInbox()
+    if not mailOpen then return end
+    if ns.charDB then
+        local won = WonUnits(Mail.Won())
+        ns.Collect.MailRead(lastWon, won)
+        lastWon = won
+    end
+    if ns.db and not ns.readOnlyDB then FileLedger() end
+    ns.Fire("MAILBOX_READ")
+end
+
+-- Read again now (Collect, after a take).
+function Mail.ReadNow()
     ReadInbox()
+end
+
+-- At an open: is the list already new (HasNewMail, CanCheckInbox, the counts)? For a later "the mail is gone"
+-- rule; today the first read of a visit is never taken as the mail being gone.
+local function Fresh()
+    if not ns.db or ns.readOnlyDB then return end
+    local d = Diag()
+    local can, wait = C_Mail.CanCheckInbox()
+    local shown, total = GetInboxNumItems()
+    d.fresh = d.fresh or {}
+    table.insert(d.fresh, 1, { t = GetServerTime(), hasNew = HasNewMail() and true or false, canCheck = can, wait = wait,
+                               shown = shown, total = total })
+    while #d.fresh > FRESH_KEEP do table.remove(d.fresh) end
+end
+
+function events:MAIL_SHOW()
+    mailOpen, lastWon = true, nil
+    Fresh()
+    ReadInbox()
+    ns.Fire("MAILBOX_OPEN")
 end
 
 function events:MAIL_INBOX_UPDATE()
@@ -273,7 +353,9 @@ function events:MAIL_INBOX_UPDATE()
 end
 
 function events:MAIL_CLOSED()
-    mailOpen = false
+    if not mailOpen then return end
+    mailOpen, lastWon = false, nil
+    ns.Fire("MAILBOX_CLOSED")
 end
 
 local function Counts(t)

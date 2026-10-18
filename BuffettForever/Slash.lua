@@ -25,7 +25,7 @@ local function SelfTest()
     local passed, failed = 0, 0
     for _, suite in ipairs({ ns.Econ.SelfTest, ns.Evaluator.SelfTest, ns.RecipeIndex.SelfTest, ns.Ledger.SelfTest,
                              ns.Mail.SelfTest, ns.Deposits.SelfTest, ns.Options.SelfTest, ns.ResultsList.SelfTest,
-                             ns.Harvest.SelfTest, ns.Buy.SelfTest }) do
+                             ns.Harvest.SelfTest, ns.Buy.SelfTest, ns.Collect.SelfTest, ns.Tray.SelfTest }) do
         local p, f = suite(report)
         passed, failed = passed + p, failed + f
     end
@@ -68,8 +68,17 @@ SlashCmdList["BUFFETTFOREVER"] = function(msg)
         ns.Deposits.PrintDiag()
         ns.Owned.PrintDiag()
         ns.Buy.PrintDiag()
-    elseif cmd == "buytest" then   -- the purchase probe (Pricing/Buy.lua); not in the help
+        ns.Collect.PrintDiag()
+        ns.Craft.PrintDiag()
+        ns.Post.PrintDiag()
+    elseif cmd == "buytest" then   -- the purchase probe (Pricing/Buy.lua); the probes aren't in the help
         ns.Buy.Probe(msg)
+    elseif cmd == "mailtest" then  -- what Collect would take (Pricing/Collect.lua)
+        ns.Collect.Probe(msg)
+    elseif cmd == "crafttest" then -- crafting from an addon (Crafting/Craft.lua)
+        ns.Craft.Probe(msg)
+    elseif cmd == "posttest" then  -- posting from an addon (Pricing/Post.lua)
+        ns.Post.Probe(msg)
     elseif cmd == "ledger" then
         ns.Ledger.PrintSummary()
     elseif cmd == "selftest" then

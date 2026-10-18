@@ -17,12 +17,14 @@ local addonName, ns = ...
 -- /bf buytest), never from a timer, a queue or an event. The quote events don't name the item, so they count
 -- only in this module's own states; Blizzard's buy dialog shares the one quote, so nothing starts while it's
 -- open, and an open quote gives way to it.
--- AH purchases arrive by mail [F-132]. A reagent goes into the tray at once (Tray.Credit), so the Profession
--- profits plan never offers it twice, and charDB.bought remembers it until your bags and bank hold it
--- (Buy.InMail). Flips aren't credited: they're for a vendor. If Forever blocks a purchase, or nothing answers
--- twice, AH buying moves to Blizzard's search box for the session (Buy.Fallback, Buy.SearchInAH). Every step
--- goes to diag.purchases (the last 20). /bf buytest <itemID> <quantity> | confirm | cancel probes a commodity
--- purchase with no recipe (nothing credited). BUY_CHANGED tells the Buy bar.
+-- AH purchases arrive by mail [F-132]. Every one is remembered as in the mailbox until it's taken from there
+-- (Pricing/Collect.lua), and a reagent also goes into the tray at once (Tray.Credit), so the Profession
+-- profits plan never offers it twice. Flips aren't credited: they're for a vendor. If Forever blocks a
+-- purchase, or nothing answers twice, AH buying moves to Blizzard's search box for the session
+-- (Buy.Fallback, Buy.SearchInAH). Every step goes to diag.purchases (the last 20). /bf buytest <itemID>
+-- <quantity> | confirm | cancel probes a commodity purchase with no recipe (nothing credited or remembered).
+-- Combat, a blocked call and the AH's errors come from Core (COMBAT_STARTED, ACTION_BLOCKED, AH_ERROR).
+-- BUY_CHANGED tells the Buy bar.
 
 local L = ns.L
 local Money = ns.Money
@@ -37,7 +39,6 @@ local VENDOR_TIMEOUT = 5    -- seconds for a vendor purchase to reach the bags
 local TICK = 0.2            -- seconds between quote checks (time left, Blizzard's dialog)
 local MAX_RISE = 1.05       -- Blizzard's MAXIMUM_PREVIEW_PRICE_DIFFERENTIAL
 local HIGH_PRICE = 1500000  -- Blizzard's MERCHANT_HIGH_PRICE_COST: 150g and up is confirmed first
-local MAIL_DAYS = 30        -- AH mail lasts 30 days [F-130]
 local NO_ANSWERS = 2        -- quotes in a row with no answer before falling back to the search box
 
 local state = "ready"
@@ -45,7 +46,6 @@ local purchase           -- the open purchase
 local timer, ticker
 local fallback           -- why AH buying moved to Blizzard's search box this session
 local noAnswers = 0
-local inCombat = false   -- from PLAYER_REGEN_DISABLED until COMBAT_ENDED (InCombatLockdown lags the event)
 local skipped = {}       -- [itemID] = why its last purchase failed, this visit
 
 local function Changed()
@@ -123,35 +123,6 @@ function Buy.ProfitAt(profit, estimate, quote)
     return profit + estimate - quote
 end
 
--- Units of a purchase not in your bags or bank yet: entry = { q bought, base = the count then }.
-function Buy.Pending(entry, count)
-    return math.max(0, math.min(entry.q, entry.base + entry.q - count))
-end
-
--- ---------------------------------------------------------------- the mail ledger
-
-local function Ledger()
-    return ns.charDB and ns.charDB.bought
-end
-
--- Units of itemID bought and still on their way (in the mailbox).
-function Buy.InMail(itemID)
-    local entry = Ledger() and Ledger()[itemID]
-    if not entry then return 0 end
-    return Buy.Pending(entry, C_Item.GetItemCount(itemID, true))
-end
-
-local function Remember(itemID, n)
-    local ledger = Ledger()
-    if not ledger then return end
-    local count, entry = C_Item.GetItemCount(itemID, true), ledger[itemID]
-    if entry and Buy.Pending(entry, count) > 0 then
-        entry.q, entry.t = entry.q + n, GetServerTime()
-    else
-        ledger[itemID] = { q = n, base = count, t = GetServerTime() }
-    end
-end
-
 -- ---------------------------------------------------------------- the purchase
 
 function Buy.State()
@@ -179,7 +150,7 @@ end
 -- cost: the estimate (0 when unknown); noTray: a flip or a probe, which the tray doesn't take.
 function Buy.CanStart(itemID, cost, noTray)
     if not ns.ahOpen then return false, L["Open the Auction House (talk to an auctioneer) to buy what's missing."] end
-    if inCombat or InCombatLockdown() then return false, L["Not in combat."] end
+    if ns.InCombat() then return false, L["Not in combat."] end
     if state ~= "ready" then return false, L["A purchase is already open."] end
     if BlizzardDialogOpen() then return false, L["Close Blizzard's buy window first: the Auction House quotes one price at a time."] end
     if ns.Scanner.IsBusy() then return false, L["A full scan is running."] end
@@ -194,7 +165,7 @@ end
 -- The same at the open merchant.
 function Buy.CanVendor(itemID, cost)
     if not ns.Merchant.IsOpen() then return false, L["Talk to a vendor that sells it."] end
-    if inCombat or InCombatLockdown() then return false, L["Not in combat."] end
+    if ns.InCombat() then return false, L["Not in combat."] end
     if state ~= "ready" then return false, L["A purchase is already open."] end
     local ok, why = Afford(cost)
     if not ok then return false, why end
@@ -466,11 +437,12 @@ function events:COMMODITY_PURCHASED(itemID, quantity)
     if itemID == purchase.itemID then purchase.purchased = quantity end
 end
 
--- An AH purchase went through: a reagent is credited to the tray and remembered as in the mail.
+-- An AH purchase went through: it's remembered as in the mailbox (first, so the tray's envelope shows with
+-- the credit), and a reagent is credited to the tray.
 local function Bought(rec, n)
+    if not rec.probe then ns.Collect.Remember(rec.itemID, n, rec.kind) end
     if rec.kind == "ah" and not rec.probe then
         rec.credited = ns.Tray.Credit(rec.itemID, n) ~= nil
-        Remember(rec.itemID, n)
     end
     Finish("bought")
     local text = string.format(L["Bought %d %s for %s: it comes by mail."], n, Link(rec.itemID), Money.Format(rec.quoteTotal or 0))
@@ -506,7 +478,7 @@ function events:AUCTION_HOUSE_PURCHASE_COMPLETED(auctionID)
     Bought(purchase, purchase.qty)
 end
 
-function events:AUCTION_HOUSE_SHOW_ERROR(err)
+ns.On("AH_ERROR", function(err)
     if state == "ready" or not purchase or purchase.kind == "vendor" then return end
     Step("AUCTION_HOUSE_SHOW_ERROR " .. tostring(err))
     if state == "buying" then
@@ -518,32 +490,23 @@ function events:AUCTION_HOUSE_SHOW_ERROR(err)
     else
         Buy.Cancel(L["the Auction House reported an error"])
     end
-end
+end)
 
--- Blizzard blocked a call: the payload names the addon and the function. During an AH purchase, AH buying
--- moves to the search box for the session.
-local function Blocked(event, who, fn)
-    if who ~= addonName then return end
-    if ns.db and not ns.readOnlyDB then ns.db.diag.blocked = { t = GetServerTime(), event = event, fn = tostring(fn) } end
+-- Blizzard blocked one of our calls (Core keeps it in diag.blocked). During an AH purchase, AH buying moves to
+-- the search box for the session.
+ns.On("ACTION_BLOCKED", function(event, fn)
     if not purchase then return end
     if purchase.kind ~= "vendor" then fallback = string.format(L["Forever blocked %s"], tostring(fn)) end
     Step(string.format("%s %s", event, tostring(fn)))
     Finish("blocked")
-end
+end)
 
-function events:ADDON_ACTION_BLOCKED(who, fn) Blocked("ADDON_ACTION_BLOCKED", who, fn) end
-function events:ADDON_ACTION_FORBIDDEN(who, fn) Blocked("ADDON_ACTION_FORBIDDEN", who, fn) end
-
-function events:PLAYER_REGEN_DISABLED()
-    inCombat = true
+ns.On("COMBAT_STARTED", function()
     Buy.Cancel(L["combat"])
     Changed()
-end
-
-ns.On("COMBAT_ENDED", function()
-    inCombat = false
-    Changed()
 end)
+
+ns.On("COMBAT_ENDED", Changed)
 
 ns.On("AH_CLOSED", function()
     if purchase and purchase.kind ~= "vendor" then
@@ -559,7 +522,7 @@ ns.On("MERCHANT_CLOSED", function()
 end)
 
 -- A vendor purchase reaches the bags: their rise is credited (whole stacks may bring more than the plan
--- asked). Then the mail ledger forgets what has arrived, and anything older than the mail it came in.
+-- asked).
 ns.On("BAGS_CHANGED", function()
     local p = purchase
     if state == "buying" and p and p.kind == "vendor" then
@@ -571,14 +534,6 @@ ns.On("BAGS_CHANGED", function()
             Finish("bought")
             ns.Print(string.format(L["Bought %d %s for %s at the vendor."], rise, Link(p.itemID), Money.Format(p.quoteTotal)))
             ns.ResultsList.Update()
-        end
-    end
-    local ledger = Ledger()
-    if not ledger then return end
-    local now = GetServerTime()
-    for itemID, entry in pairs(ledger) do
-        if Buy.Pending(entry, C_Item.GetItemCount(itemID, true)) == 0 or now - entry.t > MAIL_DAYS * 86400 then
-            ledger[itemID] = nil
         end
     end
 end)
@@ -652,10 +607,6 @@ function Buy.SelfTest(report)
     check("TRAY-CREDIT", same == 1 and entries[1].qty == 15 and new == 2 and entries[2].qty == 5
         and ns.Tray.CreditEntries(full, 999, 1) == nil and ns.Tray.CreditEntries(full, 101, 1) == 1 and full[1].qty == 2,
         "a purchase adds to its slot, or takes a free one; a full tray takes only what it holds")
-    local entry = { q = 12, base = 3 }
-    local P = Buy.Pending
-    check("IN-MAIL", P(entry, 3) == 12 and P(entry, 10) == 5 and P(entry, 15) == 0 and P(entry, 1) == 12,
-        "12 bought with 3 in the bags: 12 in the mail; 10 in the bags: 5; 15: none; 1 (3 used): still 12")
     local V = ns.Merchant.BuyQty
     check("VENDOR-QTY", V(3, 5, 100, -1) == 5 and V(12, 1, 20, -1) == 12 and V(30, 1, 20, -1) == 20 and V(7, 5, 20, -1) == 10
         and V(30, 5, 20, -1) == 20 and V(3, 1, 20, 2) == 2 and V(3, 5, 20, 4) == 0,
@@ -664,7 +615,6 @@ function Buy.SelfTest(report)
 end
 
 for _, event in ipairs({ "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", "COMMODITY_PURCHASED",
-    "COMMODITY_PURCHASE_SUCCEEDED", "COMMODITY_PURCHASE_FAILED", "AUCTION_HOUSE_PURCHASE_COMPLETED", "AUCTION_HOUSE_SHOW_ERROR",
-    "ADDON_ACTION_BLOCKED", "ADDON_ACTION_FORBIDDEN", "PLAYER_REGEN_DISABLED" }) do
+    "COMMODITY_PURCHASE_SUCCEEDED", "COMMODITY_PURCHASE_FAILED", "AUCTION_HOUSE_PURCHASE_COMPLETED" }) do
     ns.eventFrame:RegisterEvent(event)
 end

@@ -421,7 +421,7 @@ local function BuyTooltip(self)
     if #list.tray > 0 then
         Section(L["From your tray"])
         for _, e in ipairs(list.tray) do
-            local mail = ns.Buy.InMail(e.itemID)
+            local mail = ns.Collect.InMail(e.itemID)
             if mail > 0 then
                 GameTooltip:AddDoubleLine(Line(e), string.format(L["%d in the mailbox"], mail), 1, 1, 1, 0.6, 0.6, 0.6)
             else

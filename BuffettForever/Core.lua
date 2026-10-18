@@ -92,7 +92,8 @@ ns.DEFAULT_SETTINGS = defaults.settings   -- the settings panel's Defaults butto
 local charDefaults = {
     window = {},   -- main window position (per character)
     tray = {},     -- reagent tray: { { itemID, qty }, ... } in slot order (Crafting/Tray.lua)
-    bought = {},   -- [itemID] = { q bought, base = bags and bank then, t }: on its way by mail (Pricing/Buy.lua)
+    bought = {},   -- [itemID] = { q still in the mailbox, t last purchase, k kind }: what BuffettForever bought
+                   -- that hasn't been collected yet (Pricing/Collect.lua)
     results = {    -- the craftable-items list (UI/ResultsList.lua); view: "tray", "vendor", "flips" or "professions"
         sortKey = "rank", sortDesc = true, knownOnly = false, showUnconfirmed = false, view = "tray",
         -- the Profession profits view's own filters, and its collapsed groups ([skillLine] = true)
@@ -175,10 +176,39 @@ function events:PLAYER_LOGOUT()
     ns.Fire("LOGOUT")
 end
 
+-- Combat, for every module that stops in it (Buy, Collect, Craft, Post): ns.inCombat is set by the event,
+-- since InCombatLockdown lags it.
+function ns.InCombat()
+    return ns.inCombat == true or InCombatLockdown()
+end
+
+function events:PLAYER_REGEN_DISABLED()
+    ns.inCombat = true
+    ns.Fire("COMBAT_STARTED")
+end
+
 function events:PLAYER_REGEN_ENABLED()
+    ns.inCombat = false
     for i = 1, #combatQueue do combatQueue[i]() end
     wipe(combatQueue)
     ns.Fire("COMBAT_ENDED")
+end
+
+-- Blizzard blocked one of our calls: the payload names the addon and the function. Kept in diag.blocked;
+-- ACTION_BLOCKED(event, fn) tells whichever action was open (a purchase, a take, a craft or a post).
+local function Blocked(event, who, fn)
+    if who ~= addonName then return end
+    if ns.db and not ns.readOnlyDB then ns.db.diag.blocked = { t = GetServerTime(), event = event, fn = tostring(fn) } end
+    ns.Fire("ACTION_BLOCKED", event, fn)
+end
+
+function events:ADDON_ACTION_BLOCKED(who, fn) Blocked("ADDON_ACTION_BLOCKED", who, fn) end
+function events:ADDON_ACTION_FORBIDDEN(who, fn) Blocked("ADDON_ACTION_FORBIDDEN", who, fn) end
+
+-- The Auction House's error doesn't name the action it refused: only one of a purchase or a post is open
+-- at a time, and that one takes it.
+function events:AUCTION_HOUSE_SHOW_ERROR(err)
+    ns.Fire("AH_ERROR", err)
 end
 
 -- What you carry changed (the Vendor crafts view counts it).
@@ -206,7 +236,11 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("SAVED_VARIABLES_TOO_LARGE")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_LOGOUT")
+frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+frame:RegisterEvent("ADDON_ACTION_BLOCKED")
+frame:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+frame:RegisterEvent("AUCTION_HOUSE_SHOW_ERROR")
 frame:RegisterEvent("AUCTION_HOUSE_SHOW")
 frame:RegisterEvent("AUCTION_HOUSE_CLOSED")
 frame:RegisterEvent("BAG_UPDATE_DELAYED")

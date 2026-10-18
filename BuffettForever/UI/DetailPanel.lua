@@ -247,7 +247,7 @@ end
 -- The same per unit, for the slot's tooltip; a crafted line says what it's made from. Where only the tray
 -- counts (ctx.trayOnly), also a recipe of yours that makes the reagent for less (that view buys it as
 -- listed), and what the bags and bank hold (not used): what you bought there is in the mailbox until
--- you collect it (Buy.InMail), and orange means the tray counts more than you carry or have coming, so
+-- you collect it (Collect.InMail), and orange means the tray counts more than you carry or have coming, so
 -- you'd be short at the craft.
 local function SourceTips(line, ctx)
     local trayOnly = ctx and ctx.trayOnly
@@ -270,7 +270,7 @@ local function SourceTips(line, ctx)
         tip[#tip + 1] = GREY .. L["This tab buys reagents as listed. Make it yourself, then put it in the tray."] .. "|r"
     end
     if trayOnly then
-        local carried, mail = C_Item.GetItemCount(line.itemID, true), ns.Buy.InMail(line.itemID)
+        local carried, mail = C_Item.GetItemCount(line.itemID, true), ns.Collect.InMail(line.itemID)
         if line.owned > carried + mail then
             tip[#tip + 1] = ORANGE .. string.format(L["The tray counts %d, but your bags and bank hold %d: you'd be short when you craft."],
                 line.owned, carried) .. "|r"

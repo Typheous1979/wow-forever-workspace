@@ -206,16 +206,21 @@ local function Schedule()
     if not pending then pending = C_Timer.NewTimer(DEBOUNCE, Run) end
 end
 
+-- Each of these also goes out as TRADESKILL_CHANGED(event), for crafting (Crafting/Craft.lua), which mustn't
+-- take the events from here.
 function events:TRADE_SKILL_SHOW()
     Schedule()
+    ns.Fire("TRADESKILL_CHANGED", "TRADE_SKILL_SHOW")
 end
 
 function events:TRADE_SKILL_LIST_UPDATE()
     Schedule()
+    ns.Fire("TRADESKILL_CHANGED", "TRADE_SKILL_LIST_UPDATE")
 end
 
 function events:TRADE_SKILL_DATA_SOURCE_CHANGED()
     Schedule()
+    ns.Fire("TRADESKILL_CHANGED", "TRADE_SKILL_DATA_SOURCE_CHANGED")
 end
 
 function events:NEW_RECIPE_LEARNED(recipeID)
@@ -234,6 +239,7 @@ function events:TRADE_SKILL_CLOSE()
         pending:Cancel()
         pending = nil
     end
+    ns.Fire("TRADESKILL_CHANGED", "TRADE_SKILL_CLOSE")
     if not probeKnown or not ns.db or ns.readOnlyDB then return end
     C_Timer.After(CLOSED_PROBE_DELAY, function()
         local key = ns.CharKey()

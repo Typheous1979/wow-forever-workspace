@@ -32,9 +32,12 @@ Pricing\Deposits.lua
 Pricing\Owned.lua
 Pricing\Flips.lua
 Pricing\Buy.lua
+Pricing\Collect.lua
+Pricing\Post.lua
 Crafting\RecipeIndex.lua
 Crafting\Harvest.lua
 Crafting\Tray.lua
+Crafting\Craft.lua
 UI\Widgets.lua
 UI\MainFrame.lua
 UI\ReagentTray.lua
@@ -42,6 +45,7 @@ UI\DetailPanel.lua
 UI\BuyBar.lua
 UI\ResultsList.lua
 UI\AHButton.lua
+UI\MailButton.lua
 UI\MinimapButton.lua
 Bags.lua
 Tooltip.lua

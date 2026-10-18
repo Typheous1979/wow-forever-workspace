@@ -13,6 +13,19 @@ UI.ROW_HEIGHT = 20
 UI.SLIDER_LABEL_SPACE = 48   -- room for a slider's "100%" label
 UI.HIGHLIGHT = "Interface\\QuestFrame\\UI-QuestTitleHighlight"
 UI.BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
+UI.MAIL_ATLAS = "ui-hud-minimap-mail-icon"   -- Forever's own minimap mail icon (Blizzard_Minimap\Camelot)
+
+-- The mail icon's width at height h, in the atlas's own shape (4:3 if the atlas can't be read).
+function UI.MailIconWidth(h)
+    local info = C_Texture.GetAtlasInfo(UI.MAIL_ATLAS)
+    if info and info.width and info.height and info.height > 0 then return math.floor(h * info.width / info.height + 0.5) end
+    return math.floor(h * 4 / 3 + 0.5)
+end
+
+-- The mail icon inside a text, h high.
+function UI.MailIconText(h)
+    return string.format("|A:%s:%d:%d|a", UI.MAIL_ATLAS, h, UI.MailIconWidth(h))
+end
 
 function UI.Button(parent, text, width, onClick, height)
     local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")

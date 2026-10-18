@@ -175,12 +175,76 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
     by quote with Buy.FlipCheck (refused once the units cost what a vendor pays); gear by Buy.StartAuction, then
     Confirm → PlaceBid → AUCTION_HOUSE_PURCHASE_COMPLETED; the item searched again after each purchase;
   - selftest 126 (FLIP-CHECK, VENDOR-QTY).
+- 1.0.0 Profession profits pass 5 (2026-10-18): the release docs. The README and the CurseForge page describe the
+  tab and the Buy bar, and say "It never buys without your click: each purchase shows its price first. It never
+  posts." The CHANGELOG's 1.0.0 entry is complete, with the tests. dist/BuffettForever-1.0.0.zip rebuilt (39 files,
+  184 KB). Then Justin asked for a tune-up and one more feature before the upload (below), so the release set
+  (TOC version, CHANGELOG, README, the page) waits for those passes.
+- 1.0.0 tray, Collect, Craft and Post pass 1 (2026-10-18): the tray tells the truth, Collect, and the probes (the
+  plan is in the decisions below). Tested on 70450:
+  - selftest 131/131; the envelope, grey icon and mailbox line; Load from bags kept what's in the mail;
+  - `/bf mailtest`: the 3 Light Leather bought in one purchase were one mail, one attachment;
+  - Collect took it with TakeInboxItem from the click (MAIL_SUCCESS with no item ID 0.2 s later), then the Linen Cloth
+    bought for the test, and the envelopes went [F-134];
+  - the craft probe: with the window closed CraftRecipe did nothing (3 tries, no event, no error), and before First
+    Aid had been opened that session the game said the recipe wasn't learned and 0 craftable; with it open, 1 Linen
+    Bandage. OpenRecipe opened the window at the recipe, and StopRecipeRepeat stopped a batch of 2 after 1.
+    ReagentsFromBankAllowed is false. Charred Wolf Meat: Cooking Fire not met [F-135];
+  - the post probe: PostCommodity posted 1 Light Leather at 74c (the cheapest by others) for a 1s 2-hour deposit,
+    needsConfirmation false, AUCTION_CREATED 303 ms later, no warning or popup [F-136].
+  So Craft opens the window first (OpenRecipe), then crafts, and Post ships in 1.0.0. Not tested: a gear post, a
+  same-item mail bought outside BuffettForever, and taking our mail with Blizzard's own click.
+  - Core owns PLAYER_REGEN_DISABLED (COMBAT_STARTED, ns.InCombat), ADDON_ACTION_BLOCKED/FORBIDDEN (diag.blocked,
+    ACTION_BLOCKED) and AUCTION_HOUSE_SHOW_ERROR (AH_ERROR); Buy listens on the bus. Owned passes
+    AUCTION_CREATED(auctionID) on, Harvest TRADESKILL_CHANGED(event), Mail MAILBOX_OPEN/READ/CLOSED.
+  - Pricing/Collect.lua: charDB.bought = { q still in the mailbox, t, k } for every AH purchase (ah, flip, auction),
+    recorded before the tray credit; the drop rule (Collect.MailDrop) over Mail.Won's units per item; the old
+    `{q, base, t}` entries converted once; Collect.Plan/Pick; the take (TakeInboxItem inside the click, done on
+    MAIL_SUCCESS or the bags' rise); `/bf mailtest`; diag.collect.
+  - Mail.lua: Mail.Won (won-auction attachments), IsOpen, ReadNow; the units read even with a read-only account
+    file; diag.mail.fresh at each open.
+  - Tray: BankUsable/UsableCount (Blizzard's reagent rule), BankCount, SlotState, LoadCandidates (Load from bags keeps
+    what's in the mail), Add's default counts the mail. UI: the slot's envelope (atlas ui-hud-minimap-mail-icon),
+    grey icon and orange count, the four tooltip rows, the mailbox line in the hint's place; UI/MailButton.lua.
+  - Probes: Crafting/Craft.lua `/bf crafttest` (facts, CraftRecipe, open, openline, stop; diag.crafts) and
+    Pricing/Post.lua `/bf posttest` (facts, the price from a search, confirm, a second confirm after a warning;
+    diag.posts).
+  - selftest 131 (COLLECT-REMEMBER, MAIL-DROP, MAIL-LEGACY replaces IN-MAIL, COLLECT-PICK, TRAY-SLOT, TRAY-LOAD-MAIL).
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). From pass 3 (2026-10-18): Buy greyed out with "Not
   enough gold" when Crafts makes the cost more than your gold, and a quote left to run out (the last 10 s counted
   down, then dropped). From pass 4: a stackable flip bought by quote, and a vendor reagent sold in stacks (Mild
-  Spices, 5 a purchase) bought for a recipe. The expiry and mailbox-reopen tests passed on
+  Spices, 5 a purchase) bought for a recipe. From the tray pass 1 (2026-10-18): a gear post, a same-item mail you
+  bought yourself (Collect leaves it when it's larger than ours), and our mail taken with Blizzard's own click (the
+  envelope should still go). The expiry and mailbox-reopen tests passed on
   70425 (2026-10-17).
+
+## Decisions (2026-10-18, the tray's mailbox, Collect, Craft and Post; Justin's answers, then the approved plan)
+- **Justin's questions:** can an AH purchase go straight into the bags, so the tray's units are really there? Can a
+  button in the details craft a known recipe from the tray's materials? Can it post at the AH? All go into 1.0.0.
+- **The bags: no.** Forever mails every AH purchase [F-132]. Instead the tray shows where its units are (an envelope
+  with the units in the mailbox, a grey icon when crafting can't use any, an orange count when you're short) and a
+  **Collect button** under Blizzard's mail window takes the mail of what BuffettForever bought, one attachment per
+  click, inside the click (Justin chose it over taking mail by itself at the mailbox). Open All still works.
+- **The mailbox count** is read from the mailbox: q drops only when an item's units in won-auction mail drop during
+  one visit (any way of taking mail counts); the first read of a visit never clears anything (a cached inbox can
+  miss new mail [F-130]). The 30-day expiry stays. Gear and flips are recorded too (Collect takes them); the
+  Cross Daggers bought before this aren't.
+- **Craft and Post get a second row** in the bar under the details (Justin chose it over one button that changes
+  with the step): [Best] [- n +] [Buy] over [Craft n] [Post n]. Each button does one thing, greyed with the reason.
+- **Craft** (pass 2): in every recipe view, for known recipes, from the bags (and the bank only if
+  ReagentsFromBankAllowed). Every finished craft of a recipe in the data (UNIT_SPELLCAST_SUCCEEDED, from either
+  window) takes its reagents off the tray and adds the output to charDB.made. The probe decides whether the
+  profession window must be open (then the first click opens it with OpenRecipe).
+- **Post** (pass 3): at the AH, **at the cheapest listing by others** from a search just before, no undercut
+  (Justin's choice; Blizzard's default). Only what you crafted (charDB.made) that's in your bags. Refused when a
+  vendor pays more after the cut; a price under half the market value shows in orange. A post the AH asks to
+  confirm takes a third click; Blizzard's own warning popup is left alone (hiding it from addon code would taint
+  the shared popups), and `AuctionHouseFrame:SetPostItem` is never called. If the probe shows posting is blocked,
+  1.0.0 ships without Post and keeps "It never posts".
+- **Rules:** one action per click, inside the click; Buy, Craft and Post exclude each other (AUCTION_HOUSE_SHOW_ERROR
+  doesn't say which one failed); never drive Blizzard's frames.
+- **Passes:** 1. the tray, Collect and the probes; 2. Craft; 3. Post; 4. the release docs.
 
 ## Decisions (2026-10-17, the Profession profits tab; Justin's answers, then the approved plan)
 - **The tab:** "Profession profits", between AH flips and Options. Every recipe in this character's professions, in
@@ -335,6 +399,10 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 | `Economics/Econ.lua` | pure functions from the wowf-economics references (MarketValue, FairValue, CostToBuy, AHNet, Acquire) |
 | `Economics/Evaluator.lua` | per recipe: COGS by source, exits, profit, ROI, value added, grade, recommendation |
 | `Pricing/Buy.lua` | the Buy bar's purchases, one per click: AH reagents and stackable flips by quote, gear by PlaceBid, vendor reagents by BuyMerchantItem; the `/bf buytest` probe |
+| `Pricing/Collect.lua` | what BuffettForever bought that's still in the mailbox (charDB.bought, the drop rule) and taking it (Collect, one attachment per click); `/bf mailtest` |
+| `Pricing/Post.lua` | posting the crafted items at the AH; the `/bf posttest` probe |
+| `Crafting/Craft.lua` | crafting a known recipe from the bags and the tray's debit; the `/bf crafttest` probe |
+| `UI/MailButton.lua` | the Collect button under Blizzard's mail window |
 | `UI/ReagentTray.lua`, `UI/ResultsList.lua`, `UI/DetailPanel.lua` | fill the panes the raw window already lays out |
 | `UI/BuyBar.lua` | the Buy bar under the details in Profession profits (Crafts, Best, Buy) and AH flips (Buy); live prices at the AH |
 | `Bags.lua` | Alt+Right-click post-hook on `HandleModifiedItemClick` |
@@ -345,7 +413,8 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   `markets[marketKey].ledger = { items[itemID] = { s, e, c, bid, cut, b, paid, t }, s, e, c, cut = { bid, cut, n }, names, pending, seen, listed, listedAt }`,
   `vendor[itemID] = { p = unitCopper, t, lim }`, `deposits[itemID] = { d1, d2, d3, s = vendor price, t }`,
   `recipesKnown[charKey][recipeID] = true`, `settings`, `minimap`, `diag`.
-- `BuffettForeverCharDB` (character): `window`, tray contents, last selection.
+- `BuffettForeverCharDB` (character): `window`, tray contents, last selection,
+  `bought[itemID] = { q still in the mailbox, t last purchase, k kind }` (Pricing/Collect.lua).
 - `marketKey`: one function. Start with realm + faction (+ ":HC" when `C_GameRules.IsHardcoreActive()`); change it
   once the probes show which characters share an AH (the AH is per ruleset [F-081]).
 - `charKey`: full "First Surname" name (never name-realm [F-080]).

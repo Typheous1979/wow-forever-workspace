@@ -4,8 +4,9 @@ local addonName, ns = ...
 -- (through the search throttle, Search.WhenReady), then OWNED_AUCTIONS_UPDATED -> GetOwnedAuctions().
 -- It tells the ledger what you have listed (units, auctions and unit prices per item, so a full scan
 -- can leave your own auctions out of the market) and the names your sales mail will use (an item
--- link's name -> its itemID). Posting (AUCTION_HOUSE_AUCTION_CREATED) and
--- cancelling (AUCTION_CANCELED) ask again. Sold auctions (waiting for their mail) aren't listed.
+-- link's name -> its itemID). Posting (AUCTION_HOUSE_AUCTION_CREATED, also passed on as
+-- AUCTION_CREATED(auctionID) for Pricing/Post.lua) and cancelling (AUCTION_CANCELED) ask again. Sold
+-- auctions (waiting for their mail) aren't listed.
 -- diag.owned keeps the raw fields of the first auctions it sees: is buyoutAmount per unit or per
 -- auction?
 
@@ -94,8 +95,9 @@ function events:OWNED_AUCTIONS_UPDATED()
     Read()
 end
 
-function events:AUCTION_HOUSE_AUCTION_CREATED()
+function events:AUCTION_HOUSE_AUCTION_CREATED(auctionID)
     if ns.ahOpen then Schedule() end
+    ns.Fire("AUCTION_CREATED", auctionID)
 end
 
 function events:AUCTION_CANCELED()
