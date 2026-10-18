@@ -189,6 +189,8 @@ Proven on 70450 for a commodity from a typed command, and for gear from a button
    that's `GetCommoditySearchResultInfo(itemID, 1).unitPrice`; for items, the cheapest buyout at the same item level.
    With no listings it uses 1.5 × the vendor price, rounded up to a silver. Search first, and leave your own
    listings out.
+   - **On Forever, gear takes whole silver only**, despite `SupportsCopperValues()` true: a gear buyout with copper
+     fails with `DatabaseError` (10) [F-136]. Commodities take copper.
 4. **Post:** `PostCommodity(location, d, qty, unitPrice)` or `PostItem(location, d, qty, bid, buyout)`. Both return
    `needsConfirmation`. When it's true, `AUCTION_HOUSE_POST_WARNING` follows, and a second click sends the same
    arguments to `ConfirmPostCommodity` or `ConfirmPostItem`.

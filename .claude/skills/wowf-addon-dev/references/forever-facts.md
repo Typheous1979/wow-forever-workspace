@@ -498,6 +498,14 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     - It returned `needsConfirmation` false, and `AUCTION_HOUSE_AUCTION_CREATED` came 282 ms later.
     - No multisell events for one item.
     - The 1s deposit (`CalculateItemDeposit` = the formula's minimum) was taken within 2 s.
+  - **Gear is priced in whole silver; commodities take copper.** `PostItem` at 199c (1c under 2s) was refused at
+    once with `AUCTION_HOUSE_SHOW_ERROR(10)`, `Enum.AuctionHouseError.DatabaseError`, while the same boots had posted
+    at 200c.
+    - In the scan data, all 330 gear price levels were whole silver, against 286 commodity levels with copper.
+    - `C_AuctionHouse.SupportsCopperValues()` reads true. That holds for commodities only (Light Leather posted at
+      74c, Linen Bandage at 9c).
+    - So round a gear buyout down to the silver: an undercut on gear is at least 1s, the step Blizzard's own
+      undercut tip uses (`searchResultPrice - COPPER_PER_SILVER`).
   - Still untested: the post warning (`AUCTION_HOUSE_POST_WARNING`), and multisell (several gear items in one call).
 
   [Probe 70450]
