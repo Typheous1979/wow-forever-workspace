@@ -17,6 +17,10 @@ local addonName, ns = ...
 -- pricing, planned, warned, posting; Buy, Craft and Post exclude each other.
 -- /bf posttest <itemID> [qty] [price] | confirm | cancel runs the same steps on any item in your bags. Every
 -- step goes to diag.posts (the last 10).
+-- Options > Selling on the Auction House (Justin, 2026-10-18): the price (the cheapest listing, or 1c, 1%, 5% or
+-- 10% under it), the auction length, and whether a price a vendor beats is refused. What the bar posted is
+-- remembered (charDB.posted), and counts as made again when it comes back by mail, expired or cancelled, and is
+-- taken out (Mail.Returns, the same drop rule as Collect's).
 
 local L = ns.L
 local Money = ns.Money
@@ -29,7 +33,15 @@ local ANSWER_TIMEOUT = 15    -- seconds for a post's outcome
 local POPUP_CHECK = 0.1      -- seconds after a warning: is Blizzard's popup up?
 local HOLD = 60              -- seconds a price holds before it's looked at again
 local LOW_SHARE = 0.5        -- under half the market value: shown in orange
-local WHY_KEEP = 60          -- seconds a refusal stays in Post's tooltip
+local WHY_KEEP = 60          -- seconds a refusal greys Post out for its item
+local POSTED_DAYS = 31       -- a 24-hour auction and its 30-day mail
+local SILVER = 100           -- copper in a silver: gear is priced in whole silver [F-136]
+Post.PRICES = { "match", "1c", "1pct", "5pct", "10pct" }   -- the Options' price rules (settings.postPrice)
+local UNDER = { ["1pct"] = 0.01, ["5pct"] = 0.05, ["10pct"] = 0.10 }
+local RULE_TEXT = {
+    match = "the cheapest listing", ["1c"] = "1c under the cheapest listing", ["1pct"] = "1% under the cheapest listing",
+    ["5pct"] = "5% under the cheapest listing", ["10pct"] = "10% under the cheapest listing",
+}
 
 local state = "ready"        -- ready, pricing, planned, warned, posting
 local post                   -- the open post
@@ -61,13 +73,34 @@ local function Cut()
     return (ns.Ledger.Cut())
 end
 
+local function Prefs()
+    return ns.db and ns.db.settings or ns.DEFAULT_SETTINGS
+end
+
+-- The Options' price rule, and its words ("1c under the cheapest listing").
+function Post.Rule()
+    local rule = Prefs().postPrice
+    if not RULE_TEXT[rule] then rule = "match" end
+    return rule, L[RULE_TEXT[rule]]
+end
+
 -- ---------------------------------------------------------------- pure helpers (the self-test runs them)
 
 -- The price to post at from a search result: the cheapest unit price by others (the search leaves your own out),
--- in whole copper; nil when nobody else lists it.
-function Post.Price(result)
+-- in whole copper, then the rule: "match" it, "1c" under it, or "1pct", "5pct", "10pct" under it (rounded
+-- down), at least 1c. silverOnly (gear, whose buyouts Forever takes only in whole silver [F-136]): rounded down
+-- to the silver, at least 1s, so an undercut there is at least 1s. nil when nobody else lists it.
+function Post.Price(result, rule, silverOnly)
     if type(result) ~= "table" or type(result.min) ~= "number" or result.min < 1 then return nil end
-    return math.floor(result.min)
+    local price = math.floor(result.min)
+    if rule == "1c" then
+        price = price - 1
+    elseif UNDER[rule] then
+        price = math.floor(price * (1 - UNDER[rule]))
+    end
+    price = math.max(1, price)
+    if silverOnly then price = math.max(SILVER, math.floor(price / SILVER) * SILVER) end
+    return price
 end
 
 -- What qty units at price bring if all sell: the cut is taken in whole copper, rounded down (a 19c sale paid
@@ -82,12 +115,32 @@ function Post.Quantity(made, bags)
     return math.max(0, math.min(made or 0, bags or 0))
 end
 
--- "refuse" when a vendor pays at least what one sells for after the cut, "low" under half the market value
--- (a troll price?), else "ok".
+-- "vendor" when a vendor pays at least what one sells for after the cut (refused while the Options say so),
+-- "low" under half the market value (a troll price?), else "ok".
 function Post.Check(price, cut, vendorSell, marketValue)
-    if (vendorSell or 0) > 0 and Post.Net(price, 1, cut) <= vendorSell then return "refuse" end
+    if (vendorSell or 0) > 0 and Post.Net(price, 1, cut) <= vendorSell then return "vendor" end
     if marketValue and marketValue > 0 and price < marketValue * LOW_SHARE then return "low" end
     return "ok"
+end
+
+-- What came back: posted = { [itemID] = { q } } (what the bar posted), before and now = { [itemID] = units in
+-- expired and cancelled auction mail } at two reads in one visit (before nil at its first). A drop was taken
+-- out, so it counts as made again, at most what was posted. Returns { [itemID] = units back }; posted shrinks.
+function Post.ReturnDrop(posted, before, now)
+    local back = {}
+    if not before then return back end
+    for itemID, was in pairs(before) do
+        local left, entry = now[itemID] or 0, posted[itemID]
+        if entry and left < was then
+            local n = math.min(was - left, entry.q)
+            if n > 0 then
+                back[itemID] = n
+                entry.q = entry.q - n
+                if entry.q <= 0 then posted[itemID] = nil end
+            end
+        end
+    end
+    return back
 end
 
 -- ---------------------------------------------------------------- the post
@@ -122,7 +175,15 @@ local function Finish(outcome)
     end
     local posted = rec.posted or 0
     if posted > 0 then
-        if rec.kind == "bar" then ns.Craft.UseMade(rec.itemID, posted) end
+        if rec.kind == "bar" then
+            ns.Craft.UseMade(rec.itemID, posted)
+            local ledger = ns.charDB and ns.charDB.posted
+            if ledger then
+                local entry = ledger[rec.itemID] or { q = 0 }
+                entry.q, entry.t = entry.q + posted, GetServerTime()
+                ledger[rec.itemID] = entry
+            end
+        end
         ns.Print(string.format(L["Posted %d %s at %s each, for a %s deposit."], posted, ns.Items.Link(rec.itemID),
             Money.Format(rec.price), Money.Format(rec.deposit or 0)))
     elseif rec.kind == "probe" then
@@ -204,7 +265,7 @@ local function Planned(rec)
     holdTimer = C_Timer.NewTimer(HOLD, function()
         holdTimer = nil
         if post ~= rec or state ~= "planned" then return end
-        ns.Print(L["The price is over a minute old: Post looks it up again."])
+        ns.Print(L["The price is over a minute old: Sell on AH looks it up again."])
         Finish("the price is over a minute old")
     end)
     if rec.kind == "probe" then
@@ -214,10 +275,13 @@ local function Planned(rec)
     Changed()
 end
 
--- The search's answer: the price, and for the bar the check against what a vendor pays.
+-- The search's answer: the price by the Options' rule, and for the bar the check against what a vendor pays.
 local function Priced(rec, result, problem)
     if post ~= rec or state ~= "pricing" then return end
-    local price = Post.Price(result)
+    local rule = Post.Rule()
+    local okCopper, copper = pcall(C_AuctionHouse.SupportsCopperValues)
+    local silverOnly = not rec.commodity or not (okCopper and copper)
+    local price = Post.Price(result, rec.kind == "bar" and rule or "match", silverOnly)
     if not price then
         Step("search: " .. tostring(problem))
         Refuse(rec.itemID, string.format(L["Nobody else lists %s (%s): set a price in the Sell tab."], Name(rec.itemID),
@@ -225,12 +289,13 @@ local function Priced(rec, result, problem)
         Finish("no price")
         return
     end
-    rec.price, rec.mv, rec.own, rec.searchedAt = price, result.mv, result.own, GetTime()
-    Step(string.format("search: cheapest by others %s, market value %s, own %s", tostring(result.min), tostring(result.mv),
-        tostring(result.own)))
+    rec.price, rec.cheapest, rec.mv, rec.own, rec.searchedAt = price, math.floor(result.min), result.mv, result.own, GetTime()
+    rec.rule = rec.kind == "bar" and rule or "match"
+    Step(string.format("search: cheapest by others %s, market value %s, own %s; %s: %d", tostring(result.min), tostring(result.mv),
+        tostring(result.own), rec.rule, price))
     if not rec.typed then
         rec.check = Post.Check(price, Cut(), rec.vendorSell, result.mv)
-        if rec.check == "refuse" and rec.kind == "bar" then
+        if rec.check == "vendor" and rec.kind == "bar" and Prefs().postVendorGuard ~= false then
             Refuse(rec.itemID, string.format(L["A vendor pays more for %s: %s each, against %s after the cut."], Name(rec.itemID),
                 Money.Format(rec.vendorSell), Money.Format(Post.Net(price, 1, Cut()))))
             Finish("refused: a vendor pays more")
@@ -281,6 +346,8 @@ function Post.CanStart(r)
     if recipe.bop then return false, L["It binds when picked up: it can't be sold."], n end
     local location = n > 0 and Find(recipe.output)
     if not location then return false, L["Nothing you crafted is in your bags: Create first."], 0 end
+    local refused = Post.LastWhy(recipe.output)   -- the same answer for a minute: no clicking it again and again
+    if refused then return false, refused, n end
     local okValid, valid = pcall(C_AuctionHouse.IsSellItemValid, location, false)
     if okValid and valid == false then return false, L["The Auction House won't take it."], n end
     local okLocked, locked = pcall(C_Item.IsLocked, location)
@@ -315,7 +382,7 @@ end
 -- Confirm (and Confirm again after a warning), inside the click.
 function Post.Confirm()
     if not post or (state ~= "planned" and state ~= "warned") then
-        if post == nil then ns.Print(L["Nothing to confirm: Post first."]) end
+        if post == nil then ns.Print(L["Nothing to confirm: Sell on AH first."]) end
         return
     end
     local p = post
@@ -409,9 +476,35 @@ function Post.StatusText()
     if state == "warned" then return ORANGE .. L["The Auction House asks to confirm: Confirm again posts it."] .. "|r" end
     local text = string.format(L["%d at %s: deposit %s, %s if all sell"], p.qty, Money.Compact(p.price), Money.Compact(p.deposit),
         Money.Compact(Post.Net(p.price, p.qty, Cut())))
+    if p.check == "vendor" then return icon .. "|cffff5533" .. text .. " " .. L["(a vendor pays more)"] .. "|r" end
     if p.check == "low" then return icon .. ORANGE .. text .. " " .. L["(under half its market value)"] .. "|r" end
     return icon .. text
 end
+
+-- ---------------------------------------------------------------- what comes back
+
+-- After each mailbox read (Pricing/Mail.lua): expired and cancelled auctions of what the bar posted that were
+-- taken out of the mail count as made again, so Sell on AH lists them (Justin, 2026-10-18).
+function Post.ReturnsRead(before, now)
+    local ledger = ns.charDB and ns.charDB.posted
+    if not ledger then return end
+    local back = Post.ReturnDrop(ledger, before, now)
+    for itemID, n in pairs(back) do
+        ns.Craft.CreditMade(itemID, n)
+        ns.Print(string.format(L["%d %s came back from the Auction House: Sell on AH can list them again."], n, ns.Items.Link(itemID)))
+    end
+    if next(back) then Changed() end
+end
+
+-- What was posted more than a month ago has sold, or come back and been taken already.
+ns.On("LOGIN", function()
+    local ledger = ns.charDB and ns.charDB.posted
+    if not ledger then return end
+    local now = GetServerTime()
+    for itemID, entry in pairs(ledger) do
+        if now - (entry.t or 0) > POSTED_DAYS * 86400 then ledger[itemID] = nil end
+    end
+end)
 
 -- ---------------------------------------------------------------- /bf posttest
 
@@ -508,11 +601,21 @@ ns.On("AUCTION_CREATED", function(auctionID)
     end
 end)
 
+-- Enum.AuctionHouseError's name for a code ("DatabaseError" for 10), or the code.
+local function ErrorName(err)
+    if ns.IsSecret(err) then return "secret" end
+    for name, value in pairs(Enum.AuctionHouseError or {}) do
+        if value == err then return name end
+    end
+    return tostring(err)
+end
+
 ns.On("AH_ERROR", function(err)
     if not post or (state ~= "posting" and state ~= "warned") then return end
-    Step("AUCTION_HOUSE_SHOW_ERROR " .. Show(err))
-    ns.Print(string.format(L["The Auction House refused the post (error %s): nothing was listed."], Show(err)))
-    Finish("error " .. Show(err))
+    local name = ErrorName(err)
+    Step("AUCTION_HOUSE_SHOW_ERROR " .. Show(err) .. " " .. name)
+    ns.Print(string.format(L["The Auction House refused the post (%s): nothing was listed."], name))
+    Finish("error " .. name)
 end)
 
 ns.On("ACTION_BLOCKED", function(event, fn)
@@ -535,6 +638,12 @@ end)
 
 ns.On("COMBAT_STARTED", function()
     if post and state ~= "posting" then Post.Cancel(L["combat"]) end
+end)
+
+-- The Options changed (the price rule, the vendor guard): a refusal under the old ones no longer stands.
+ns.On("SETTINGS_CHANGED", function()
+    lastWhy = nil
+    Changed()
 end)
 
 -- Another recipe or view while a price is shown: it was for the one before.
@@ -563,8 +672,12 @@ function Post.SelfTest(report)
         report(name, ok, detail)
     end
     local P = Post.Price
-    check("POST-PRICE", P({ min = 74 }) == 74 and P({ min = 1234.6 }) == 1234 and P({}) == nil and P(nil) == nil,
-        "the cheapest by others, in whole copper (74, 1234.6 -> 1234); nobody else: no price")
+    check("POST-PRICE", P({ min = 74 }, "match") == 74 and P({ min = 1234.6 }, "match") == 1234 and P({ min = 74 }, "1c") == 73
+        and P({ min = 200 }, "5pct") == 190 and P({ min = 10 }, "1pct") == 9 and P({ min = 1 }, "1c") == 1 and P({}, "match") == nil
+        and P(nil, "match") == nil and P({ min = 200 }, "match", true) == 200 and P({ min = 200 }, "1c", true) == 100
+        and P({ min = 500000 }, "5pct", true) == 475000 and P({ min = 50 }, "match", true) == 100,
+        "the cheapest by others in whole copper (74; 1234.6: 1234), 1c under (73), 5% under 2s (1s 90c), 1% under 10c (9c), "
+            .. "never under 1c; gear in whole silver (1c under 2s: 1s; 5% under 50g: 47g 50s; at least 1s); nobody else: no price")
     local N = Post.Net
     check("POST-NET", N(19, 1, 0.05) == 19 and N(74, 10, 0.05) == 703 and N(100, 3, 0.05) == 285,
         "the cut in whole copper, rounded down: 19c keeps 19c; 10 at 74c: 703c; 3 at 1s: 2s 85c")
@@ -572,9 +685,15 @@ function Post.SelfTest(report)
     check("POST-QTY", Q(5, 3) == 3 and Q(2, 9) == 2 and Q(0, 4) == 0 and Q(nil, 4) == 0,
         "what you crafted, at most what's in your bags (5 made, 3 left: 3; 2 of 9: 2; none made: 0)")
     local C = Post.Check
-    check("POST-GUARD", C(74, 0.05, 15, 76) == "ok" and C(15, 0.05, 15, 76) == "refuse" and C(16, 0.05, 15, 76) == "low"
+    check("POST-GUARD", C(74, 0.05, 15, 76) == "ok" and C(15, 0.05, 15, 76) == "vendor" and C(16, 0.05, 15, 76) == "low"
         and C(30, 0.05, 0, 100) == "low" and C(100, 0.05, 0, nil) == "ok",
-        "refused when a vendor pays at least the sale after the cut; under half the market value: low")
+        "a vendor pays at least the sale after the cut: vendor (refused while the Options say so); under half the market value: low")
+    local posted = { [1] = { q = 1 }, [2] = { q = 5 } }
+    local first = Post.ReturnDrop(posted, nil, {})
+    local back = Post.ReturnDrop(posted, { [1] = 1, [2] = 3, [3] = 2 }, { [2] = 1 })
+    check("POST-RETURN", next(first) == nil and back[1] == 1 and posted[1] == nil and back[2] == 2 and posted[2].q == 3
+        and back[3] == nil,
+        "a cancelled one taken out counts as made again; 2 of 3 expired taken: 2; nothing at a visit's first read or for an item not posted")
     return passed, failed
 end
 

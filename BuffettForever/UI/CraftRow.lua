@@ -6,9 +6,10 @@ local addonName, ns = ...
 --   open [F-135], so until it is the button reads Open Profession, and that click opens the window at the recipe;
 --   then Create n (Justin's labels), inside the click, n being the Crafts box within what your bags make. During
 --   a batch it's Stop (the cast under way finishes); during a post, Cancel.
--- - Post lists what you crafted that's still in your bags at the cheapest listing by others (Pricing/Post.lua):
---   Post looks the price up, Confirm posts it, Confirm again answers the Auction House's warning. Not in Vendor
---   crafts (those sell to a vendor), where Create takes the whole row.
+-- - Sell on AH n (Justin's label) lists what you crafted that's still in your bags at the price the Options set,
+--   the cheapest listing by others by default (Pricing/Post.lua): it looks the price up, Confirm posts it,
+--   Confirm again answers the Auction House's warning. Not in Vendor crafts (those sell to a vendor), where
+--   Create takes the whole row.
 -- In every recipe view for recipes you know, and in Profession profits for the rest too, greyed. The tooltips
 -- give the numbers as rows and say why a button is greyed.
 
@@ -129,6 +130,7 @@ local function PostTooltip(self)
         GameTooltip:SetText(state == "planned" and L["Confirm the post"] or state == "warned" and L["Confirm again"] or L["Posting..."],
             1, 1, 1)
         Row(L["Price each"], Money.Format(p.price))
+        if p.cheapest and p.cheapest ~= p.price then Row(L["The cheapest listing"], Money.Format(p.cheapest)) end
         Row(L["Units"], tostring(p.qty))
         Row(L["Total"], Money.Format(p.price * p.qty))
         Row(L["House cut"], ns.Ledger.CutText(cut))
@@ -137,8 +139,10 @@ local function PostTooltip(self)
         if (p.vendorSell or 0) > 0 then Row(L["A vendor pays"], Money.Format(p.vendorSell * p.qty)) end
         if p.mv then Row(L["Market value"], Money.Format(p.mv)) end
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(L["The cheapest listing by others, from a search just now. The deposit comes back if it sells and is lost if it expires."],
-            0.6, 0.6, 0.6, true)
+        local _, ruleText = ns.Post.Rule()
+        GameTooltip:AddLine(string.format(L["The price is %s by others, from a search just now (Options set it). The deposit comes back if it sells and is lost if it expires."],
+            p.kind == "bar" and ruleText or L["the cheapest listing"]), 0.6, 0.6, 0.6, true)
+        if p.check == "vendor" then GameTooltip:AddLine(L["A vendor pays more than this brings after the cut."], 1, 0.33, 0.2, true) end
         if p.check == "low" then GameTooltip:AddLine(L["That's under half its market value: someone may be listing it cheap."], 1, 0.6, 0.2, true) end
         if state == "warned" then
             local warning = _G["CONFIRM_AUCTION_POSTING_TEXT"]
@@ -148,8 +152,9 @@ local function PostTooltip(self)
         GameTooltip:Show()
         return
     end
-    GameTooltip:SetText(L["Post"], 1, 1, 1)
-    GameTooltip:AddLine(L["Lists what you crafted at the cheapest price others list it for: Post looks the price up, Confirm posts it."],
+    GameTooltip:SetText(L["Sell on AH"], 1, 1, 1)
+    local _, ruleText = ns.Post.Rule()
+    GameTooltip:AddLine(string.format(L["Lists what you crafted at %s by others: it looks the price up, then Confirm posts it."], ruleText),
         nil, nil, nil, true)
     if r then
         local ok, why, n = ns.Post.CanStart(r)
@@ -211,7 +216,7 @@ local function RefreshPost(r)
         row.Post:SetEnabled(false)
     else
         local ok, _, n = ns.Post.CanStart(r)
-        row.Post:SetText(n > 0 and string.format(L["Post %d"], n) or L["Post"])
+        row.Post:SetText(n > 0 and string.format(L["Sell on AH %d"], n) or L["Sell on AH"])
         row.Post:SetEnabled(ok)
     end
 end
@@ -265,7 +270,7 @@ local function Build()
     row.Create:SetScript("OnEnter", CreateTooltip)
     row.Create:SetScript("OnLeave", GameTooltip_Hide)
     row.Create:Hide()
-    row.Post = UI.Button(bar, L["Post"], 120, OnPost)
+    row.Post = UI.Button(bar, L["Sell on AH"], 120, OnPost)
     row.Post:SetPoint("TOPLEFT", bar, "TOP", GAP / 2, ROW_TOP)
     row.Post:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, ROW_TOP)
     row.Post:SetMotionScriptsWhileDisabled(true)

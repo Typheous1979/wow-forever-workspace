@@ -31,6 +31,13 @@ local POLICY_TEXT = {
     free = { "Nothing", "Only the gold you spend counts, so the profit includes what your materials are worth." },
     replacement = { "What replacing them costs", "What buying them again would cost, on the AH or from a vendor." },
 }
+local PRICE_TEXT = {   -- Sell on AH's price rules (Pricing/Post.lua)
+    match = { "The cheapest listing", "The same price as the cheapest listing by others, as Blizzard's Sell tab does." },
+    ["1c"] = { "1c under the cheapest", "One copper under the cheapest listing by others, so yours sells first at that price." },
+    ["1pct"] = { "1% under the cheapest", "1% under the cheapest listing by others, at least 1c." },
+    ["5pct"] = { "5% under the cheapest", "5% under the cheapest listing by others." },
+    ["10pct"] = { "10% under the cheapest", "10% under the cheapest listing by others." },
+}
 
 local function Pct(v)
     return string.format("%d%%", math.floor(v * 100 + 0.5))
@@ -117,10 +124,21 @@ function ns.BuildOptions(db)
         L["Once 3 of your sales worth 1g in all have come by mail, use the cut they show instead of the figure above."])
     Slider("saleChance", L["Sale chance"], Pct,
         L["The chance a listing sells before it expires, until your own sales and expiries say otherwise. A listing that doesn't sell loses its deposit."])
+
+    Header(L["Selling on the Auction House"])
+    local prices = {}
+    for _, rule in ipairs(ns.Post.PRICES) do
+        local text = PRICE_TEXT[rule]
+        prices[#prices + 1] = { rule, L[text[1]], L[text[2]] }
+    end
+    Dropdown("postPrice", VarType.String, L["Price"], prices,
+        L["What Sell on AH posts what you crafted at, from a search just before it. Gear is priced in whole silver on Forever, so an undercut on gear is at least 1s."])
     local durations = { { 0, L["As the Auction House remembers"] } }
     for d = 1, 3 do durations[#durations + 1] = { d, ns.Deposits.DurationName(d) } end
     Dropdown("depositDuration", VarType.Number, L["Auction length"], durations,
-        L["Deposits are figured for this length: 5% of the vendor price per 2 hours (8 Hours x4, 24 Hours x12), at least 1s per auction. The Auction House remembers the length you last posted for."])
+        L["Sell on AH posts for this length, and deposits are figured for it: 5% of the vendor price per 2 hours (8 Hours x4, 24 Hours x12), at least 1s per auction. The Auction House remembers the length you last posted for."])
+    Settings.CreateCheckbox(category, Register("postVendorGuard", VarType.Boolean, L["Never below what a vendor pays"]),
+        L["Sell on AH refuses a price that brings less after the house cut than a vendor pays for it. Off, it shows such a price in red and lets you post it."])
 
     Header(L["Price data"])
     Slider("historyDays", L["Price history"], function(v) return string.format(L["%d days"], math.floor(v + 0.5)) end,
@@ -162,6 +180,8 @@ function Options.SelfTest(report)
     if not Among(Options.POLICIES, d.ownedPolicy) then off[#off + 1] = "ownedPolicy" end
     if not Among({ 0, 1, 2, 3 }, d.depositDuration) then off[#off + 1] = "depositDuration" end
     if type(d.measuredCut) ~= "boolean" then off[#off + 1] = "measuredCut" end
+    if not Among(ns.Post.PRICES, d.postPrice) then off[#off + 1] = "postPrice" end
+    if type(d.postVendorGuard) ~= "boolean" then off[#off + 1] = "postVendorGuard" end
     table.sort(off)
     local ok = #off == 0
     report("OPTIONS-DEFAULTS", ok, ok and "every default is a choice the settings panel offers"

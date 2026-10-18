@@ -114,9 +114,10 @@ local function MadeLedger()
     return ns.charDB and ns.charDB.made
 end
 
-local function CreditMade(itemID, units)
+-- units more of itemID made by you: a finished craft, or what you posted coming back by mail (Pricing/Post.lua).
+function Craft.CreditMade(itemID, units)
     local made = MadeLedger()
-    if not made then return end
+    if not made or (units or 0) <= 0 then return end
     local entry = made[itemID]
     if entry then
         entry.q, entry.t = entry.q + units, GetServerTime()
@@ -427,7 +428,7 @@ function events:UNIT_SPELLCAST_SUCCEEDED(_, castGUID, spellID)
     if recipe then
         local debits, output, units = Craft.Credits(recipe)
         ns.Tray.Debit(debits)
-        CreditMade(output, units)
+        Craft.CreditMade(output, units)
         -- Each counted craft, whichever window made it: the bar's button, or another (Blizzard's Create).
         if ns.db and not ns.readOnlyDB then
             local list = ns.db.diag.counted or {}

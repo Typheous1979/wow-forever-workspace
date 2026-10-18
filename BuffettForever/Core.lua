@@ -79,6 +79,9 @@ local defaults = {
         minProfit = 1000,       -- copper per craft (10s while leveling; the reference's 1g suits level 60)
         minGrade = "C",         -- weakest confidence grade a recommendation may rest on
         ownedPolicy = "opportunity",  -- owned materials at what they'd sell for ("free", "replacement")
+        -- Selling on the AH (Pricing/Post.lua; Justin, 2026-10-18):
+        postPrice = "match",          -- the cheapest listing by others ("1c", "1pct", "5pct", "10pct" under it)
+        postVendorGuard = true,       -- refuse a price that nets less after the cut than a vendor pays
     },
     markets = {},   -- [marketKey] = { items = { [itemID] = price row }, scan = last full scan (Pricing/PriceDB.lua),
                     --                 ledger = your sales, returns and auctions (Pricing/Ledger.lua) }
@@ -95,6 +98,8 @@ local charDefaults = {
     bought = {},   -- [itemID] = { q still in the mailbox, t last purchase, k kind }: what BuffettForever bought
                    -- that hasn't been collected yet (Pricing/Collect.lua)
     made = {},     -- [itemID] = { q, t }: what you crafted, still yours to post (Crafting/Craft.lua)
+    posted = {},   -- [itemID] = { q, t }: what the bar posted, which counts as made again if it comes back by
+                   -- mail, expired or cancelled (Pricing/Post.lua)
     results = {    -- the craftable-items list (UI/ResultsList.lua); view: "tray", "vendor", "flips" or "professions"
         sortKey = "rank", sortDesc = true, knownOnly = false, showUnconfirmed = false, view = "tray",
         -- the Profession profits view's own filters, and its collapsed groups ([skillLine] = true)

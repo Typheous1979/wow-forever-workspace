@@ -231,6 +231,24 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   - diag.counted logs every counted craft and which window made it (the button or another); a craft's bags are
     counted 2 s after it ends. Buy refuses while a post is open.
   - selftest 140 (POST-PRICE, POST-NET, POST-QTY, POST-GUARD).
+- 1.0.0 pass 3 follow-up (2026-10-18): Justin's requests after pass 3. Tested on 70450: selftest 141/141; the label,
+  the Options section; the refusal greys the button; with the guard off Linen Bandage posted 2 at 9c (his choice).
+  Failed: the boots at "1c under" (1s 99c) were refused, AUCTION_HOUSE_SHOW_ERROR 10 (DatabaseError): gear takes
+  whole silver only on Forever (every gear level in the scan was whole silver) [F-136]. Fixed: Post.Price rounds gear
+  down to the silver (at least 1s), and errors are named. Retested on 70450: selftest 141/141; the boots posted at 1s
+  ("1c under" 2s, rounded to the silver; AUCTION_CREATED 240 ms, the 1s deposit taken); cancelled and taken from
+  the mailbox, they came back as made (Justin saw the chat line and Sell on AH 1; the saved file predates it). Not
+  tested: an expired auction coming back (the 2 Linen Bandages posted at 9c).
+  - The label "Sell on AH n"; after a refusal (a vendor pays more, nobody lists it) the button stays greyed for that
+    item for a minute, with the reason (he had clicked it five times).
+  - Options > Selling on the Auction House: Price (settings.postPrice: the cheapest listing, 1c, 1%, 5% or 10% under
+    it; Post.Price applies it, at least 1c), Auction length (depositDuration, moved here: it was already Post's), and
+    "Never below what a vendor pays" (settings.postVendorGuard, default on; off, such a price shows in red and can
+    be posted).
+  - Returned auctions: what the bar posted is remembered (charDB.posted, 31 days), and an expired or cancelled one
+    taken out of the mail counts as made again (Mail.Returns, Post.ReturnDrop: the drop rule; a chat line says so).
+    The boots Justin cancelled before this aren't in the ledger.
+  - selftest 141 (POST-RETURN; POST-PRICE with the rules, POST-GUARD's "vendor").
   - Core owns PLAYER_REGEN_DISABLED (COMBAT_STARTED, ns.InCombat), ADDON_ACTION_BLOCKED/FORBIDDEN (diag.blocked,
     ACTION_BLOCKED) and AUCTION_HOUSE_SHOW_ERROR (AH_ERROR); Buy listens on the bus. Owned passes
     AUCTION_CREATED(auctionID) on, Harvest TRADESKILL_CHANGED(event), Mail MAILBOX_OPEN/READ/CLOSED.
@@ -452,7 +470,9 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   `vendor[itemID] = { p = unitCopper, t, lim }`, `deposits[itemID] = { d1, d2, d3, s = vendor price, t }`,
   `recipesKnown[charKey][recipeID] = true`, `settings`, `minimap`, `diag`.
 - `BuffettForeverCharDB` (character): `window`, tray contents, last selection,
-  `bought[itemID] = { q still in the mailbox, t last purchase, k kind }` (Pricing/Collect.lua).
+  `bought[itemID] = { q still in the mailbox, t last purchase, k kind }` (Pricing/Collect.lua),
+  `made[itemID] = { q, t }` (what you crafted, yours to post; Crafting/Craft.lua) and
+  `posted[itemID] = { q, t }` (what the bar posted, made again when it comes back; Pricing/Post.lua).
 - `marketKey`: one function. Start with realm + faction (+ ":HC" when `C_GameRules.IsHardcoreActive()`); change it
   once the probes show which characters share an AH (the AH is per ruleset [F-081]).
 - `charKey`: full "First Surname" name (never name-realm [F-080]).

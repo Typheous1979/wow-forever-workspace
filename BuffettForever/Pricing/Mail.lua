@@ -50,6 +50,7 @@ local FRESH_KEEP = 5         -- mailbox opens kept in diag.mail.fresh
 local mailOpen = false
 local patterns               -- kind = Lua pattern, built on first use
 local lastWon                -- this visit's previous count of units in won-auction mail; nil at an open
+local lastReturns            -- the same for expired and cancelled auctions coming back
 
 -- "Auction expired: %s" -> "^Auction expired: (.+)$"; nil unless fmt has exactly one %s.
 function Mail.SubjectPattern(fmt)
@@ -240,43 +241,60 @@ local function Sample(d, m)
     }
 end
 
--- Mail i's attachments into out when it's won-auction mail: a buyer invoice, or the AUCTION_WON subject on
--- system mail (not a reply, not returned, not from a GM; the mail's COD and GM flags are kept anyway, so
--- Collect can refuse them).
-local function WonAttachments(i, out)
+-- Which Auction House mail with items mail i is: "won" (a buyer invoice, or the AUCTION_WON subject on system
+-- mail), "expired" or "cancelled" (their subjects on system mail: not a reply, not returned, not from a GM), or
+-- nil. Also its COD and GM flags, kept so Collect can refuse them.
+local function ItemKind(i)
     local _, _, _, subject, _, cod, _, itemCount, _, wasReturned, _, canReply, isGM = GetInboxHeaderInfo(i)
-    if Secret(subject, cod, itemCount, isGM) or (itemCount or 0) == 0 then return end
+    if Secret(subject, cod, itemCount, isGM) or (itemCount or 0) == 0 then return nil end
     local invoiceType = GetInboxInvoiceInfo(i)
-    local won = not ns.IsSecret(invoiceType) and invoiceType == "buyer"
-    if not won and type(subject) == "string" and not canReply and not wasReturned and not isGM then
-        local p = Patterns()
-        won = p.won ~= nil and string.match(subject, p.won) ~= nil
+    if not ns.IsSecret(invoiceType) and invoiceType == "buyer" then return "won", cod, isGM end
+    if type(subject) ~= "string" or canReply or wasReturned or isGM then return nil end
+    local p = Patterns()
+    for _, kind in ipairs({ "won", "expired", "cancelled" }) do
+        if p[kind] and string.match(subject, p[kind]) then return kind, cod, isGM end
     end
-    if not won then return end
+    return nil
+end
+
+-- Mail i's attachments into out when its kind is in kinds.
+local function KindAttachments(i, kinds, out)
+    local kind, cod, isGM = ItemKind(i)
+    if not kind or not kinds[kind] then return end
     for a = 1, ATTACHMENTS do
         local _, itemID, _, count = GetInboxItem(i, a)
         if itemID and not ns.IsSecret(itemID) and not ns.IsSecret(count) then
             out[#out + 1] = { index = i, attachment = a, itemID = itemID, units = count or 1, cod = cod or 0,
-                              gm = isGM == true, won = true }
+                              gm = isGM == true, won = kind == "won", kind = kind }
         end
     end
 end
 
--- Every attachment of every won-auction mail in the open mailbox:
--- { { index, attachment, itemID, units, cod, gm, won = true } } (Pricing/Collect.lua takes from these).
-function Mail.Won()
+local function Scan(kinds)
     local out = {}
     if not mailOpen then return out end
-    for i = 1, GetInboxNumItems() or 0 do pcall(WonAttachments, i, out) end
+    for i = 1, GetInboxNumItems() or 0 do pcall(KindAttachments, i, kinds, out) end
     return out
+end
+
+-- Every attachment of every won-auction mail in the open mailbox:
+-- { { index, attachment, itemID, units, cod, gm, won = true, kind } } (Pricing/Collect.lua takes from these).
+function Mail.Won()
+    return Scan({ won = true })
+end
+
+-- The same for your expired and cancelled auctions coming back (Pricing/Post.lua counts what it posted as made
+-- again once it's taken out).
+function Mail.Returns()
+    return Scan({ expired = true, cancelled = true })
 end
 
 function Mail.IsOpen()
     return mailOpen
 end
 
--- { [itemID] = units } over won-auction mail.
-local function WonUnits(list)
+-- { [itemID] = units } over a list of attachments.
+local function Units(list)
     local units = {}
     for _, m in ipairs(list) do units[m.itemID] = (units[m.itemID] or 0) + m.units end
     return units
@@ -315,9 +333,12 @@ end
 local function ReadInbox()
     if not mailOpen then return end
     if ns.charDB then
-        local won = WonUnits(Mail.Won())
+        local won = Units(Mail.Won())
         ns.Collect.MailRead(lastWon, won)
         lastWon = won
+        local returns = Units(Mail.Returns())
+        ns.Post.ReturnsRead(lastReturns, returns)
+        lastReturns = returns
     end
     if ns.db and not ns.readOnlyDB then FileLedger() end
     ns.Fire("MAILBOX_READ")
@@ -342,7 +363,7 @@ local function Fresh()
 end
 
 function events:MAIL_SHOW()
-    mailOpen, lastWon = true, nil
+    mailOpen, lastWon, lastReturns = true, nil, nil
     Fresh()
     ReadInbox()
     ns.Fire("MAILBOX_OPEN")
@@ -354,7 +375,7 @@ end
 
 function events:MAIL_CLOSED()
     if not mailOpen then return end
-    mailOpen, lastWon = false, nil
+    mailOpen, lastWon, lastReturns = false, nil, nil
     ns.Fire("MAILBOX_CLOSED")
 end
 
