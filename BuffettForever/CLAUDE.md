@@ -136,8 +136,32 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   clicked around, 70-211 ms each. The window flag showed the bug in Harvest.Difficulty: with the profession window
   closed, GetRecipeInfo's relativeDifficulty read optimal for all 13 known recipes, so the * marks were orange until
   that profession's window opened [F-133]. Fixed in pass 3: the thresholds only.
+- 1.0.0 Profession profits pass 3 (2026-10-18): buying the AH reagents. Tested on 70450: selftest 124/124; the
+  colours right with no profession window opened; Linen Bandage's Linen Cloth bought (18c), credited, "in your
+  mailbox" until collected; Cancel and closing the AH dropped the price with nothing spent; the Camp Chair's two AH
+  reagents (Light Leather, Simple Wood) took four clicks. The log has no quote that ran out by itself, and the
+  too-little-gold check is still to do (Justin: later). 3 Light Leather quoted 2s 13c cost 1s 50c: 118 were listed
+  at 48c by the next search, so the server charged the cheaper listings [F-132]. Simple Wood cost 1s 20c each on the
+  AH; a trade-goods vendor sells it in Classic for about 38c, but the vendor data has no evidence for it yet.
+  - Pricing/Buy.lua replaces the probe with the purchase states (ready, quoting, confirm, buying): Buy.Start and
+    Buy.Confirm run inside the clicks; QuoteCheck (Blizzard's 5% rule against a search under 2 minutes old, else the
+    rise shown); ProfitAt (profit + estimate - quote; the plan had the sign the wrong way round); a 10 s no-answer
+    timer; a 0.2 s ticker for the time left and Blizzard's buy dialog taking over; cancel on another recipe or view,
+    AH_CLOSED and combat (PLAYER_REGEN_DISABLED, COMBAT_ENDED from Core); skipped lines re-searched; the search-box
+    fallback (blocked during a purchase, two quotes unanswered, or not a commodity). `/bf buytest` still probes.
+  - Tray.Credit / CreditEntries / HasRoom; charDB.bought with Buy.InMail (until the bags and bank hold it, 30 days at
+    most), shown in the slot and Buy tooltips.
+  - UI/BuyBar.lua: Buy, then Confirm (Best is Cancel meanwhile); the status line shows the next line, the quote with
+    its rise, a loss in red and the last 10 s; ResultsList.Update straight after a purchase, so the next line comes
+    up at once; Buy waits for the re-evaluation after a search ("eval" pending).
+  - Search: IsBusy, waits while a purchase is open, AH_THROTTLE_READY and SEARCH_DONE.
+  - Harvest.Difficulty from the thresholds only; the window harvest compares Blizzard's colours with ours while the
+    window is open (colourAgree, colourDisagree, colourSample in diag.harvest[profession]).
+  - selftest 124 (QUOTE-CHECK, TRAY-CREDIT, IN-MAIL).
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
-  all have come by mail (`/bf ledger` shows the measured cut). The expiry and mailbox-reopen tests passed on
+  all have come by mail (`/bf ledger` shows the measured cut). From pass 3 (2026-10-18): Buy greyed out with "Not
+  enough gold" when Crafts makes the cost more than your gold, and a quote left to run out (the last 10 s counted
+  down, then dropped). The expiry and mailbox-reopen tests passed on
   70425 (2026-10-17).
 
 ## Decisions (2026-10-17, the Profession profits tab; Justin's answers, then the approved plan)

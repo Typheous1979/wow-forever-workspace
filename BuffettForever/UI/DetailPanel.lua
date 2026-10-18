@@ -245,7 +245,8 @@ end
 
 -- The same per unit, for the slot's tooltip; a crafted line says what it's made from. Where only the tray
 -- counts (ctx.trayOnly), also a recipe of yours that makes the reagent for less (that view buys it as
--- listed), and what the bags and bank hold (not used), in orange when the tray counts more than you carry:
+-- listed), and what the bags and bank hold (not used): what you bought there is in the mailbox until
+-- you collect it (Buy.InMail), and orange means the tray counts more than you carry or have coming, so
 -- you'd be short at the craft.
 local function SourceTips(line, ctx)
     local trayOnly = ctx and ctx.trayOnly
@@ -268,10 +269,14 @@ local function SourceTips(line, ctx)
         tip[#tip + 1] = GREY .. L["This tab buys reagents as listed. Make it yourself, then put it in the tray."] .. "|r"
     end
     if trayOnly then
-        local carried = C_Item.GetItemCount(line.itemID, true)
-        if line.owned > carried then
+        local carried, mail = C_Item.GetItemCount(line.itemID, true), ns.Buy.InMail(line.itemID)
+        if line.owned > carried + mail then
             tip[#tip + 1] = ORANGE .. string.format(L["The tray counts %d, but your bags and bank hold %d: you'd be short when you craft."],
                 line.owned, carried) .. "|r"
+            if mail > 0 then tip[#tip + 1] = GREY .. string.format(L["%d more are in your mailbox."], mail) .. "|r" end
+        elseif line.owned > carried then
+            tip[#tip + 1] = GREY .. string.format(L["%d bought, in your mailbox: collect them before you craft."], line.owned - carried)
+                .. "|r"
         else
             tip[#tip + 1] = GREY .. string.format(L["Bags and bank: %d (only the tray counts in this tab)"], carried) .. "|r"
         end
@@ -661,8 +666,8 @@ end
 
 -- ---------------------------------------------------------------- a recipe
 
--- The profession window's colour for this recipe at your skill: Blizzard's own for a recipe you know,
--- the thresholds' for one you'd learn; nothing when your skill in it is unknown.
+-- The profession window's colour for this recipe at your skill, from its thresholds (Harvest.Difficulty for
+-- a recipe you know, cached); nothing when your skill in it is unknown.
 local function SkillUpRow(r)
     local recipe = r.recipe
     local rank = ns.Harvest.Rank(recipe.profession)

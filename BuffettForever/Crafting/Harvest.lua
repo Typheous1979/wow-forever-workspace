@@ -12,15 +12,17 @@ local addonName, ns = ...
 --   - which call lists the recipes and how many;
 --   - learned recipes missing from the data;
 --   - GetRecipeSchematic yields and reagents against the data;
---   - IsSpellKnown against "learned".
+--   - IsSpellKnown against "learned";
+--   - Blizzard's skill-up colour (relativeDifficulty, right only while that profession's window is open
+--     [F-133]) against the thresholds' (RecipeIndex.Difficulty).
 --   diag.harvest.closed probes the window-closed calls; diag.harvest.login describes the login read.
 --   Being listed by the window isn't evidence a recipe exists on Forever: GetAllRecipeIDs lists the
 --   whole skill line, Season-of-Discovery recipes included.
 -- Also this character's professions and skill (Harvest.Professions, for the Profession profits view):
 -- GetProfessions' slots read through GetProfessionInfo with no window open, as Forever's own professions
 -- book does (undocumented, present at runtime [F-123]), plus the profession of any known recipe no slot
--- showed; and each known recipe's skill-up colour (Harvest.Difficulty). diag.harvest.professions keeps
--- the raw slots, Blizzard's difficulty against ours, and the view's evaluation time.
+-- showed; and each known recipe's skill-up colour (Harvest.Difficulty, from the thresholds).
+-- diag.harvest.professions keeps the raw slots and the view's evaluation time.
 
 local L = ns.L
 local Harvest = {}
@@ -34,9 +36,9 @@ local LOGIN_READ_DELAY = 5    -- seconds after login
 local FLAG_NEW = 1
 local PROFESSION, YELLOW, GREY, OUTPUT, COUNT, FIRST_REAGENT = 1, 3, 4, 6, 7, 8
 local PROFESSION_SLOTS = 7    -- GetProfessions on Forever: 2 primary, then the secondary ones (any may be empty)
-local DIFFICULTY_SAMPLE = 20  -- known recipes whose two difficulty readings diag keeps
 
 local pending
+local relative                -- Enum.TradeskillRelativeDifficulty value -> colour key, built on first use
 local printed = {}            -- [professionID] = learned count already announced this session
 local checkedSchematics = {}  -- [professionID] = true once the schematics were compared this session
 local probeKnown              -- a learned recipe, for the closed-window probe
@@ -48,6 +50,19 @@ end
 local function HarvestDiag()
     ns.db.diag.harvest = ns.db.diag.harvest or {}
     return ns.db.diag.harvest
+end
+
+-- Blizzard's relativeDifficulty as a colour key ("optimal", "medium", "easy", "trivial"), or nil.
+local function RelativeKey(value)
+    if value == nil then return nil end
+    if not relative then
+        relative = {}
+        local E = Enum.TradeskillRelativeDifficulty or {}
+        for name, key in pairs({ Optimal = "optimal", Medium = "medium", Easy = "easy", Trivial = "trivial" }) do
+            if E[name] then relative[E[name]] = key end
+        end
+    end
+    return relative[value]
 end
 
 -- The recipe IDs the open window lists, the call that gave them, and the filtered count.
@@ -119,6 +134,7 @@ local function Run()
         source = source, listed = #ids, filtered = filteredCount, learned = 0, enchants = 0,
         newListed = 0, notInData = 0, notInDataSample = {},
         spellKnownAgree = 0, spellKnownDisagree = 0, disagreeSample = {},
+        colourAgree = 0, colourDisagree = 0, colourSample = {},
     }
     if compare then
         d.schematicChecked, d.schematicMismatch, d.mismatchSample = 0, 0, {}
@@ -148,6 +164,17 @@ local function Run()
                 d.learned = d.learned + 1
                 known[recipeID] = true
                 probeKnown = probeKnown or recipeID
+                local blizzard = RelativeKey(info.relativeDifficulty)
+                local ours = row and ns.RecipeIndex.Difficulty(prof.skillLevel, row[YELLOW], row[GREY])
+                if blizzard and ours then   -- the window is open on this profession: Blizzard's colour is right
+                    if blizzard == ours then
+                        d.colourAgree = d.colourAgree + 1
+                    else
+                        d.colourDisagree = d.colourDisagree + 1
+                        Sample(d.colourSample, string.format("%d %s: Blizzard %s, ours %s at %s (%d/%d)", recipeID,
+                            tostring(info.name), blizzard, ours, tostring(prof.skillLevel), row[YELLOW], row[GREY]))
+                    end
+                end
                 if row then
                     if compare then
                         d.schematicChecked = d.schematicChecked + 1
@@ -275,7 +302,6 @@ end
 
 local professions, professionKey   -- the list, cached until a profession or a rank changes
 local difficulty = {}              -- [recipeID] = colour key or false, until the skill changes
-local relative                     -- Enum.TradeskillRelativeDifficulty value -> colour key, built on first use
 local colors                       -- colour key -> the profession window's colour, built on first use
 local FALLBACK_COLOR = { optimal = "ffff8040", medium = "ffffff00", easy = "ff40bf40", trivial = "ff808080" }
 
@@ -351,23 +377,8 @@ local function Signature(list)
     return table.concat(parts, ",")
 end
 
--- A known recipe's colour key from Blizzard (GetRecipeInfo works with the window closed [F-123]), or nil.
-local function BlizzardDifficulty(recipeID)
-    if not relative then
-        relative = {}
-        local E = Enum.TradeskillRelativeDifficulty or {}
-        for name, key in pairs({ Optimal = "optimal", Medium = "medium", Easy = "easy", Trivial = "trivial" }) do
-            if E[name] then relative[E[name]] = key end
-        end
-    end
-    local ok, info = pcall(C_TradeSkillUI.GetRecipeInfo, recipeID)
-    if ok and type(info) == "table" and info.relativeDifficulty ~= nil then return relative[info.relativeDifficulty] end
-    return nil
-end
-
 -- This character's professions with recipes in the data, in the order of Blizzard's professions window:
--- { { skillLine, name, rank, maxRank } }. The first read of a session also records the raw slots and,
--- for the known recipes, Blizzard's difficulty against the one from the thresholds.
+-- { { skillLine, name, rank, maxRank } }. The first read of a session also records the raw slots.
 function Harvest.Professions()
     if professions then return professions end
     local raw
@@ -375,18 +386,8 @@ function Harvest.Professions()
     professionKey = Signature(professions)
     if ns.db and not ns.readOnlyDB then
         local old = HarvestDiag().professions
-        -- window: whether the profession window was open for Blizzard's difficulty readings
-        local d = { t = GetServerTime(), build = select(2, GetBuildInfo()), slots = raw, eval = old and old.eval,
-                    difficulty = {}, window = ProfessionsFrame ~= nil and ProfessionsFrame:IsShown() or false }
-        for _, recipeID in ipairs(ns.RecipeIndex.Known()) do
-            if #d.difficulty >= DIFFICULTY_SAMPLE then break end
-            local row = ns.Recipes[recipeID]
-            local rank = Harvest.Rank(row[PROFESSION])
-            d.difficulty[#d.difficulty + 1] = string.format("%d %s/%s at %s (%d/%d)", recipeID,
-                tostring(BlizzardDifficulty(recipeID)), tostring(ns.RecipeIndex.Difficulty(rank, row[YELLOW], row[GREY])),
-                tostring(rank), row[YELLOW], row[GREY])
-        end
-        HarvestDiag().professions = d
+        HarvestDiag().professions = { t = GetServerTime(), build = select(2, GetBuildInfo()), slots = raw,
+                                      eval = old and old.eval }
     end
     return professions
 end
@@ -399,19 +400,18 @@ function Harvest.Rank(skillLine)
     return nil
 end
 
--- A known recipe's skill-up colour key ("optimal", "medium", "easy", "trivial"): Blizzard's own when it
--- gives one, else from your rank and the recipe's thresholds; nil for a recipe this character doesn't know
--- or a profession whose rank is unknown.
+-- A known recipe's skill-up colour key ("optimal", "medium", "easy", "trivial") from your rank and the
+-- recipe's thresholds; nil for a recipe this character doesn't know or a profession whose rank is unknown.
+-- Not Blizzard's relativeDifficulty: it reads optimal for every recipe of a profession whose window isn't
+-- open, so after a /reload every * was orange [F-133]. The thresholds matched it wherever it was right
+-- (the window harvest keeps checking: colourAgree in diag.harvest).
 function Harvest.Difficulty(recipeID)
     local cached = difficulty[recipeID]
     if cached ~= nil then return cached or nil end
     local key
     if ns.RecipeIndex.IsKnown(recipeID, "char") then
-        key = BlizzardDifficulty(recipeID)
-        if not key then
-            local row = ns.Recipes[recipeID]
-            key = row and ns.RecipeIndex.Difficulty((Harvest.Rank(row[PROFESSION])), row[YELLOW], row[GREY])
-        end
+        local row = ns.Recipes[recipeID]
+        key = row and ns.RecipeIndex.Difficulty((Harvest.Rank(row[PROFESSION])), row[YELLOW], row[GREY])
     end
     difficulty[recipeID] = key or false
     return key
@@ -461,10 +461,11 @@ function Harvest.PrintDiag()
     for profID, d in pairs(h) do
         if type(profID) == "number" then
             ns.Print(string.format(
-                "harvest %s (%s, skill %s/%s): %d learned of %d listed by %s (filtered %s); %d new-ID listed; %d not in data, %d enchants; schematics %s checked, %s mismatched; IsSpellKnown agrees %d, disagrees %d",
+                "harvest %s (%s, skill %s/%s): %d learned of %d listed by %s (filtered %s); %d new-ID listed; %d not in data, %d enchants; schematics %s checked, %s mismatched; IsSpellKnown agrees %d, disagrees %d; skill-up colours agree %s, disagree %s",
                 tostring(d.profession), tostring(profID), tostring(d.skill), tostring(d.maxSkill), d.learned, d.listed,
                 tostring(d.source), tostring(d.filtered), d.newListed, d.notInData, d.enchants,
-                tostring(d.schematicChecked), tostring(d.schematicMismatch), d.spellKnownAgree, d.spellKnownDisagree))
+                tostring(d.schematicChecked), tostring(d.schematicMismatch), d.spellKnownAgree, d.spellKnownDisagree,
+                tostring(d.colourAgree), tostring(d.colourDisagree)))
         end
     end
     local c = h.closed
@@ -489,9 +490,6 @@ function Harvest.PrintDiag()
                 tostring(s.maxRank), tostring(s.line), tostring(s.dataLine))
         end
         ns.Print("professions: " .. (#parts > 0 and table.concat(parts, "; ") or "no slot"))
-        if p.difficulty and #p.difficulty > 0 then
-            ns.Print("skill-up (Blizzard/thresholds): " .. table.concat(p.difficulty, "; "))
-        end
         if p.eval then
             ns.Print(string.format("Profession profits: %d recipes evaluated in %d ms (slowest %d ms)", p.eval.n, p.eval.ms,
                 p.eval.maxMs or p.eval.ms))

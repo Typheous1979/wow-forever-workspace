@@ -3,7 +3,8 @@ local addonName, ns = ...
 -- The reagent tray: up to 25 reagents with quantities, saved per character in
 -- BuffettForeverCharDB.tray = { { itemID, qty }, ... } (slot order). Adding an item that's already
 -- there merges into its slot. A new item's quantity defaults to what you own (bags and bank), at
--- least 1; the evaluator crafts as many as the tray quantities allow. Fires TRAY_CHANGED.
+-- least 1; the evaluator crafts as many as the tray quantities allow. A purchase is credited on top
+-- (Tray.Credit: it comes by mail, so the bags don't show it yet). Fires TRAY_CHANGED.
 
 local Tray = {}
 ns.Tray = Tray
@@ -53,6 +54,33 @@ function Tray.Add(itemID, qty)
     entries[#entries + 1] = { itemID = itemID, qty = qty }
     Changed()
     return #entries
+end
+
+-- Add n units to an item's slot, or to a free one. Returns the slot, or nil when the tray is full.
+-- entries: the tray's list (pure, so the self-test runs it).
+function Tray.CreditEntries(entries, itemID, n)
+    for slot, entry in ipairs(entries) do
+        if entry.itemID == itemID then
+            entry.qty = math.min(MAX_QTY, entry.qty + n)
+            return slot
+        end
+    end
+    if #entries >= Tray.SIZE then return nil end
+    entries[#entries + 1] = { itemID = itemID, qty = math.min(MAX_QTY, n) }
+    return #entries
+end
+
+-- A purchase (Pricing/Buy.lua): n units on top of what the tray holds.
+function Tray.Credit(itemID, n)
+    if not ns.charDB then return nil end
+    local slot = Tray.CreditEntries(Entries(), itemID, n)
+    if slot then Changed() end
+    return slot
+end
+
+-- Whether a purchase of the item can be credited: it's in the tray, or a slot is free.
+function Tray.HasRoom(itemID)
+    return Tray.Find(itemID) ~= nil or #Entries() < Tray.SIZE
 end
 
 function Tray.Remove(slot)

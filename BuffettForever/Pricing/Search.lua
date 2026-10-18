@@ -12,7 +12,8 @@ local addonName, ns = ...
 --   result = { mv, min, q, n or prices, full, own } (full = every listing was read; own = your units,
 --   left out of the rest), or nil with a problem. Commodity rows are grouped by unit price [F-121],
 --   so a commodity result counts prices, not auctions (n stays nil). A stored price fires
---   PRICES_CHANGED(itemID), so the list re-evaluates.
+--   PRICES_CHANGED(itemID), so the list re-evaluates; every finished search fires SEARCH_DONE(itemID), and the
+--   throttle's ready event AH_THROTTLE_READY. Searches wait while a purchase is open (Pricing/Buy.lua).
 
 local L = ns.L
 local Search = {}
@@ -64,6 +65,7 @@ local WhenReady = Search.WhenReady
 
 function events:AUCTION_HOUSE_THROTTLED_SYSTEM_READY()
     RunReady()
+    ns.Fire("AH_THROTTLE_READY")
 end
 
 -- commodity, equipment or item from the item-key info; if that isn't cached yet, equipment by
@@ -150,6 +152,7 @@ local function Finish(q, problem)
     Notify(q.itemID, result, problem)
     if result then ns.Fire("PRICES_CHANGED", q.itemID) end
     Search.Pump()
+    ns.Fire("SEARCH_DONE", q.itemID)
 end
 
 local function OnTimeout(q)
@@ -212,8 +215,13 @@ local function Send(entry)
 end
 
 function Search.Pump()
-    if current or #queue == 0 or not ns.ahOpen or ns.Scanner.IsBusy() then return end
+    if current or #queue == 0 or not ns.ahOpen or ns.Scanner.IsBusy() or (ns.Buy and ns.Buy.IsBusy()) then return end
     Send(table.remove(queue, 1))
+end
+
+-- A search is out or waiting.
+function Search.IsBusy()
+    return current ~= nil or #queue > 0
 end
 
 -- Queue a search; the same item asked twice shares one query. Returns false when not at the AH.

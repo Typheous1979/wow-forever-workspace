@@ -92,6 +92,7 @@ ns.DEFAULT_SETTINGS = defaults.settings   -- the settings panel's Defaults butto
 local charDefaults = {
     window = {},   -- main window position (per character)
     tray = {},     -- reagent tray: { { itemID, qty }, ... } in slot order (Crafting/Tray.lua)
+    bought = {},   -- [itemID] = { q bought, base = bags and bank then, t }: on its way by mail (Pricing/Buy.lua)
     results = {    -- the craftable-items list (UI/ResultsList.lua); view: "tray", "vendor", "flips" or "professions"
         sortKey = "rank", sortDesc = true, knownOnly = false, showUnconfirmed = false, view = "tray",
         -- the Profession profits view's own filters, and its collapsed groups ([skillLine] = true)
@@ -177,6 +178,7 @@ end
 function events:PLAYER_REGEN_ENABLED()
     for i = 1, #combatQueue do combatQueue[i]() end
     wipe(combatQueue)
+    ns.Fire("COMBAT_ENDED")
 end
 
 -- What you carry changed (the Vendor crafts view counts it).
