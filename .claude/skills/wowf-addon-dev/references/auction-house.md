@@ -136,6 +136,10 @@ Proven on 70450 from addon code inside a key press [F-132]. Blizzard's flow is i
 3. **Buy:** `ConfirmCommoditiesPurchase(itemID, quantity)` → `COMMODITY_PURCHASE_SUCCEEDED` or `_FAILED`.
 4. **Delivery:** the items come **by mail**, not to the bags [F-132]. Don't count the bags to see what was bought.
    Record the purchase yourself, so the player isn't told to buy it again before the mail is collected.
+   BuffettForever keeps `{ bought, the bag and bank count then }` per item until the count rises by what was bought
+   (`Buy.InMail`, 30 days at most, as the mail lasts).
+5. **The cost:** the quote is the most you pay. A purchase can cost less when cheaper listings appear before the
+   confirm (once on 70450 [F-132]), so take the gold spent from `GetMoney()`.
 
 What to know:
 - **One quote at a time.** Blizzard's buy dialog uses the same quote and cancels whatever quote is open when it

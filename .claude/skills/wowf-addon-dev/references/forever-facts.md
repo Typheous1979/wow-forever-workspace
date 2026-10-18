@@ -397,6 +397,13 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     Linen Cloth was in the mailbox.
   - `COMMODITY_PURCHASED` didn't fire before `SUCCEEDED`. The probe stopped listening at `SUCCEEDED`, so it may come
     later or not at all. Don't rely on it for the quantity.
+  - From a button's click (BuffettForever's Buy bar, 2026-10-18), 4 more purchases went through the same way. Each
+    quote held 30 s, and `SUCCEEDED` came 0.4–0.6 s after the confirm. `COMMODITY_PURCHASED` still never came before
+    it. `CancelCommoditiesPurchase` on an open quote cost nothing.
+  - **The quote is a ceiling, not the price.** 3 Light Leather quoted 2s 13c (71c each) cost 1s 50c. The search
+    15 s before had found nothing under 71c; the next search found 118 at 48c. So the server filled the order from
+    cheaper listings posted while the quote was open. The other 3 purchases cost exactly their quotes. Read the gold
+    spent from `GetMoney()`, not the quote.
   - Still untested: `PlaceBid` (gear), and a quote refused for a price rise.
 
   [Probe 70450]
