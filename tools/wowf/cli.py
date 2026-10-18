@@ -23,6 +23,7 @@ Commands:
   make-icon [--out PATH] [--preview PNG]  draw MusicForever's icon (Media/Icon.tga)
   package ADDON                 lint, then zip to dist/<Addon>-<Version>.zip for CurseForge
   toc-stage ADDON [--dry-run]   stage the TOC's file list, keeping its ## header as committed (see toc_stage.py)
+  publish ADDON [--repo URL] [--push]  split the addon's history for its own repo, scan it, push (see publish.py)
   doctor                        environment check
 """
 import argparse
@@ -240,6 +241,9 @@ def main(argv=None):
     if cmd == "toc-stage":
         import toc_stage
         return toc_stage.main(rest)
+    if cmd == "publish":
+        import publish
+        return publish.main(rest)
     if cmd == "doctor":
         import doctor
         return doctor.main(rest)
