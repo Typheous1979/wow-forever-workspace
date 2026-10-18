@@ -92,7 +92,11 @@ python tools/wowf/cli.py publish <Addon> --repo <url> --push              # then
    4. If the repo holds anything else, ask Justin first.
 
    BuffettForever's repo had GitHub's MIT LICENSE and a two-line README.
-5. Push the workspace too (`git push` to wow-forever-workspace). It's the dev home and public as well, so scan
-   what's unpushed first: `python tools/wowf/cli.py publish --scan origin/main..HEAD`. Its email check skips
-   noreply addresses, reserved example domains and the committer's own; a decorator after a diff's `+` isn't an
-   address.
+5. **Push the workspace too** (wow-forever-workspace). It's the dev home and public as well, so push it through the
+   scan: `python tools/wowf/cli.py publish --scan origin/main..HEAD --push`. It pushes only when the scan is clean.
+   - Never chain a gate in the shell. `publish --scan ... | tail -2 && git push` pushed anyway on 2026-10-18,
+     because the pipe's status is `tail`'s. The hits were only the scanner's own test fixtures, now assembled at
+     run time.
+   - The scan reads what a push adds: commit messages and the added lines of `-U0` diffs.
+   - Its email check skips noreply addresses, reserved example domains and the committer's own. A decorator after a
+     diff's `+` isn't an address.
