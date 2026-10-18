@@ -1,5 +1,96 @@
 # Changelog
 
+## 1.0.0 (2026-10-18)
+- First public release, with everything from 0.1.0 to 0.8.0 below:
+  - Auction House prices and their history;
+  - the reagent tray and the crafting advisor;
+  - the sales ledger and market reality;
+  - vendor crafts and AH flips;
+  - the settings.
+- **Search:** a search box right of the list's heading filters every view by item name as you type. Every word
+  you type must appear, in any order. If the selected item stops matching, the best-ranked match is selected;
+  the top pick still advises on the whole view.
+- **Profession profits**, a fourth tab:
+  - every recipe in your professions, in a collapsible group per profession with your skill;
+  - Known only (on by default) and Show unconfirmed;
+  - only the tray's materials count as yours: everything else is bought, even what's in your bags or bank, and
+    each reagent's tooltip says what your bags and bank hold;
+  - reagents are bought as listed, from the AH or a vendor. When a recipe you know makes one for less (or makes one
+    nobody sells), its tooltip says so;
+  - a Buy bar under the details: Crafts (the batch, and the slots, cost and profit follow it), Best (the best batch
+    within your gold), and Buy. At the Auction House, the recipe's reagents are searched again when their prices are
+    over a minute old;
+  - **buying what's missing at the Auction House**, one reagent at a time: Buy asks for the price, the bar shows it
+    (any rise over the estimate, a loss in red, the last seconds counted down), and Confirm buys it. Cancel, another
+    recipe, closing the Auction House or combat drops the price. What you buy comes by mail; it goes into the tray at
+    once, and its tooltip says it's in your mailbox until you collect it.
+  - **at a vendor,** Buy buys the reagents it sells, in its stack sizes (a second click at 150g or more), straight
+    into your bags and the tray.
+- **Buying AH flips:** on the AH flips tab, the Buy bar searches the flip's item and buys what's still below what a
+  vendor pays: a commodity in one quote (refused if it no longer pays), gear one auction at a time (Buy, then
+  Confirm). A search that finds the flip gone takes it off the list.
+- **The tray shows where things are.** Auction House purchases come by mail, so each slot marks where its units are:
+  - an envelope with the units still in your mailbox;
+  - a grey icon when none of the reagent is in your bags;
+  - an orange count when the tray counts more than you have anywhere;
+  - a line under the buttons while anything is in the mailbox.
+
+  The tooltip lists the tray, your bags, your bank and your mailbox. Load from bags keeps purchases still in the
+  mail.
+- **Collect**, a button under Blizzard's mail window, takes the mail of what BuffettForever bought, one mail per
+  click. Open All still works. The mailbox count comes from the mailbox itself, so it clears however you take the
+  mail.
+- **Create**, in a second row under the details, for recipes you know in every recipe view:
+  - Open Profession opens the profession's window at the recipe (the game crafts only with it open);
+  - then Create n crafts the Crafts box's number from your bags, and during a batch it's Stop;
+  - every finished craft, from either window, takes its reagents off the tray.
+
+  In Tray and Vendor crafts the bar has Best (the best batch your bags make) and Crafts, without Buy.
+- **Sell on AH**, beside Create at the Auction House, lists what you crafted that's still in your bags:
+  - it posts at the cheapest listing by others, from a search just before;
+  - the price, the deposit and what you'd get show first, and Confirm posts;
+  - it refuses a price a vendor beats, and shows one under half the market value in orange;
+  - gear is priced in whole silver;
+  - an expired or cancelled auction counts as yours to sell again once you take it from the mail.
+- **Options > Selling on the Auction House:** the price (the cheapest listing, or 1c, 1%, 5% or 10% under it), the
+  auction length (moved here from Costs), and Never below what a vendor pays (on).
+- Buy, Create and Sell on AH wait for one another.
+- The BuffettForever logo in the window's round portrait, top left, as on Blizzard's Professions window.
+- In the other views, a reagent you'd craft names what it's made from in its tooltip.
+- A targeted search (Alt+Right-click at the AH, or the Buy bar's) re-evaluates the list with the new price.
+- **Skill-up colours:** the * of a recipe you know takes the profession window's orange, yellow, green or grey, and
+  the details pane has a Skill-up row.
+- "Show unconfirmed" hides while "Known only" is on, where it has nothing to show.
+- The details pane no longer jumps back to the top when your bags or the prices change.
+- `/bf selftest`: 141 checks. The 30 new since 0.8.0 cover:
+  - the search's matching, the skill lines and skill-up colours;
+  - tray-only costs, the tray's batch, the groups, buying as listed, another batch;
+  - the shopping list, the best batch within your gold, checking a price and a flip's price, crediting the tray;
+  - a vendor's stack sizes, purchases and the mailbox, Collect's picks, a slot's state, Load from bags with the mail;
+  - crafts and their reasons, the tray's debit, the best batch within your bags;
+  - the posting price rules, the cut, what's posted, a vendor's price, and what comes back.
+- The README and the CurseForge page (docs/BuffettForever-curseforge.md) describe the new tab, buying, Collect,
+  Create and Sell on AH. "It never buys or posts for you" is now "It never buys or posts without your click: each
+  shows its price first."
+- Tested on client 1.60.1.70450:
+  - 2026-10-17: selftest 112/112. The search filters as you type, in any word order, in every view; it says when
+    nothing matches, and it keeps its text across the tabs and when the window reopens.
+  - 2026-10-17 and 18: selftest 126/126. The tab, its groups and filters, the skill-up colours, tray-only costs,
+    Crafts, Best and live prices work. Reagents were bought at the Auction House (Linen Cloth, Ruined Leather Scraps,
+    Light Leather, Simple Wood) and at a vendor (Coarse Thread), and each went into the tray. Two Cross Daggers
+    were bought as a gear flip, and the flip left the list. Cancel and closing the Auction House spent nothing.
+  - 2026-10-18, selftest 141/141:
+    - the tray's envelopes; Collect took BuffettForever's purchases, one mail each;
+    - crafting works only with the profession's window open, so Open Profession, then Create; Stop stopped a batch
+      after the craft under way; Blizzard's own Create also took the reagents off the tray;
+    - Sell on AH posted Handstitched Leather Boots at the cheapest listing (2s), and at 1s for "1c under" (gear takes
+      whole silver), and refused Linen Bandage, which a vendor buys for more;
+    - a cancelled auction came back and could be listed again.
+  - Still to test:
+    - a stackable flip, a price left to run out, and Buy greyed out when your gold is short;
+    - several pieces of gear in one post, the Auction House's warning before a post, and an expired auction coming
+      back.
+
 ## 0.8.0 (not released)
 - **Settings** in Options > AddOns > BuffettForever (or `/bf options`, or right-click the minimap button).
   Changing one re-ranks the list.
