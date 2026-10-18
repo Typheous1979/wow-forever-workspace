@@ -108,6 +108,28 @@ function Tray.Credit(itemID, n)
     return slot
 end
 
+-- A craft used reagents (Crafting/Craft.lua): list = { { itemID, count } } comes off their slots, and a slot
+-- that reaches 0 goes. Returns whether anything changed (pure, so the self-test runs it).
+function Tray.DebitEntries(entries, list)
+    local changed = false
+    for _, d in ipairs(list) do
+        for slot, entry in ipairs(entries) do
+            if entry.itemID == d.itemID then
+                entry.qty = entry.qty - d.count
+                if entry.qty <= 0 then table.remove(entries, slot) end
+                changed = true
+                break
+            end
+        end
+    end
+    return changed
+end
+
+function Tray.Debit(list)
+    if not ns.charDB then return end
+    if Tray.DebitEntries(Entries(), list) then Changed() end
+end
+
 -- Whether a purchase of the item can be credited: it's in the tray, or a slot is free.
 function Tray.HasRoom(itemID)
     return Tray.Find(itemID) ~= nil or #Entries() < Tray.SIZE
@@ -211,5 +233,11 @@ function Tray.SelfTest(report)
     for _, c in ipairs(list) do byID[c.itemID] = c.qty end
     check("TRAY-LOAD-MAIL", #list == 2 and byID[1] == 9 and byID[2] == 2 and byID[3] == nil and list[1].itemID == 1,
         "6 in the bags and 3 in the mail: 9; a reagent only in the mail stays; an item no recipe uses doesn't")
+    local entries = { { itemID = 1, qty = 3 }, { itemID = 2, qty = 2 } }
+    local one = Tray.DebitEntries(entries, { { itemID = 1, count = 1 } })
+    local two = Tray.DebitEntries(entries, { { itemID = 2, count = 3 } })
+    local none = Tray.DebitEntries(entries, { { itemID = 9, count = 1 } })
+    check("TRAY-DEBIT", one and two and not none and #entries == 1 and entries[1].itemID == 1 and entries[1].qty == 2,
+        "3 less 1 leaves 2; 2 less 3 empties the slot; an item not in the tray changes nothing")
     return passed, failed
 end

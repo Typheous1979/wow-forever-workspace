@@ -17,6 +17,9 @@ local addonName, ns = ...
 -- every unit still below what a vendor pays, gear one auction at a time (Buy shows it, Confirm buys it).
 -- If Forever blocks buying, or a reagent isn't a commodity, Buy becomes Search: the name goes into
 -- Blizzard's search box.
+-- Recipes get a second row, UI/CraftRow.lua (Justin, 2026-10-18): Craft (and Post). In the Tray and Vendor
+-- crafts views a recipe you know gets the bar too, with no Buy (those views count your own stock): Best and
+-- Crafts, where Best is the best batch within what your bags make.
 
 local L = ns.L
 local UI = ns.UI
@@ -25,7 +28,9 @@ local BuyBar = {}
 ns.BuyBar = BuyBar
 local events = ns.events
 
-local HEIGHT = 48           -- the status line over the buttons
+local HEIGHT = 48           -- the status line over the buttons (AH flips)
+local RECIPE_HEIGHT = 74    -- and the Craft row under them (recipes)
+local ROW_TOP = -26         -- the first row's top: Best, Crafts, Buy
 local MAX_CRAFTS = 200      -- the box goes higher only when the tray allows more
 local MAX_LETTERS = 4       -- the tray holds at most 9,999 of an item
 local FRESH = 60            -- seconds: a price this recent isn't searched again, nor an item searched this recently
@@ -50,16 +55,45 @@ local function Icon(itemID)
     return icon and string.format("|T%s:14:14|t ", icon) or ""
 end
 
+-- What the bar does for a result: "flip" (AH flips: Buy only), "professions" (Profession profits: Best, Crafts
+-- and Buy, then the Craft row), "tray" or "vendor" (a recipe you know in those views: Best and Crafts, then the
+-- Craft row), or nil (no bar).
+local function Mode(r)
+    if r == nil then return nil end
+    if r.flip then return "flip" end
+    if not r.ctx then return nil end
+    if r.view == "professions" then return "professions" end
+    if not r.known then return nil end
+    if r.view == "vendor" then return "vendor" end
+    if r.view == nil then return "tray" end
+    return nil
+end
+
+-- A recipe Buy buys for (Profession profits).
 local function IsRecipe(r)
-    return r ~= nil and not r.flip and r.view == "professions" and r.ctx ~= nil
+    return Mode(r) == "professions"
 end
 
 local function IsFlip(r)
-    return r ~= nil and r.flip == true
+    return Mode(r) == "flip"
 end
 
-local function Applies(r)
+-- A recipe with the Crafts box (every recipe view).
+local function HasCrafts(r)
+    local mode = Mode(r)
+    return mode ~= nil and mode ~= "flip"
+end
+
+-- Buy's views: Profession profits and AH flips.
+local function Buys(r)
     return IsRecipe(r) or IsFlip(r)
+end
+
+-- Best outside Profession profits: the best batch within what your bags make (Evaluator.CraftableBatch).
+local function BagsBest(r)
+    r.batch = r.batch or ns.Evaluator.BatchAdvice(r.recipe, r.crafts, r.ctx)
+    local craftable = ns.Craft.Craftable(r.recipe.reagents, ns.Tray.UsableCount)
+    return ns.Evaluator.CraftableBatch(r.batch.size, craftable), craftable
 end
 
 local function Checking(r)
@@ -192,7 +226,14 @@ end
 -- What's left to buy, summed up: "To buy: AH 1g 20s, vendor 40c, 1 short".
 local function Summary(r, list)
     if Checking(r) then return GREY .. L["Checking prices at the Auction House..."] .. "|r" end
-    if #list.ah + #list.vendor + #list.short == 0 then return GREEN .. L["Everything is in the tray."] .. "|r" end
+    if #list.ah + #list.vendor + #list.short == 0 then
+        local mail = 0
+        for _, e in ipairs(list.tray) do mail = mail + math.min(e.qty, ns.Collect.InMail(e.itemID)) end
+        if mail > 0 then
+            return GREEN .. L["Everything is in the tray"] .. "|r" .. ORANGE .. string.format(L[", %d in your mailbox."], mail) .. "|r"
+        end
+        return GREEN .. L["Everything is in the tray."] .. "|r"
+    end
     local parts = {}
     if #list.ah > 0 then parts[#parts + 1] = string.format(L["AH %s"], Money.Compact(list.ahCost)) end
     if #list.vendor > 0 then parts[#parts + 1] = string.format(L["vendor %s"], Money.Compact(list.vendorCost)) end
@@ -214,7 +255,9 @@ local function QuoteText(p)
     return Icon(p.itemID) .. text
 end
 
-local function StatusText(r, list, where, line, n)
+-- An open purchase first, then a craft under way; in Tray and Vendor crafts what Craft can do; else what Buy
+-- buys next.
+local function StatusText(r, mode, list, where, line, n)
     local state, p = ns.Buy.State()
     if p and not p.probe then
         if state == "quoting" then
@@ -225,6 +268,8 @@ local function StatusText(r, list, where, line, n)
             return Icon(p.itemID) .. string.format(L["Buying %d %s..."], p.qty, Name(p.itemID))
         end
     end
+    local craftText, busy = ns.CraftRow.Status(r, mode)
+    if busy or mode == "tray" or mode == "vendor" then return craftText or "" end
     if IsFlip(r) then
         if Checking(r) then return GREY .. L["Checking prices at the Auction House..."] .. "|r" end
         if not line then return GREY .. L["Nothing is left below what a vendor pays."] .. "|r" end
@@ -239,23 +284,46 @@ local function StatusText(r, list, where, line, n)
     return Summary(r, list)
 end
 
+-- With Buy, the box sits 30 px left of it (its arrows in the gap); without, at the bar's right edge.
+local function PlaceCrafts(withBuy)
+    if bar.craftsBesideBuy == withBuy then return end
+    bar.craftsBesideBuy = withBuy
+    bar.Crafts:ClearAllPoints()
+    if withBuy then
+        bar.Crafts:SetPoint("RIGHT", bar.Buy, "LEFT", -30, 0)
+    else
+        bar.Crafts:SetPoint("RIGHT", bar, "TOPRIGHT", -30, ROW_TOP - 11)
+    end
+end
+
+function BuyBar.Frame()
+    return bar
+end
+
 function BuyBar.Refresh()
     if not bar then return end
     local r = current
-    local shown = Applies(r)
+    local mode = Mode(r)
+    local shown = mode ~= nil
+    local height = mode == "flip" and HEIGHT or RECIPE_HEIGHT
     bar:SetShown(shown)
-    ns.DetailPanel.SetBottomInset(shown and HEIGHT + 4 or 0)
+    bar:SetHeight(height)
+    ns.DetailPanel.SetBottomInset(shown and height + 4 or 0)
+    ns.CraftRow.Refresh(r, mode)
     if not shown then return end
     local state = ns.Buy.State()
-    local ready = state == "ready"
-    local flip = IsFlip(r)
-    local list = flip and nil or ns.Evaluator.ShoppingList(r)
+    local ready = state == "ready" and not ns.Craft.IsBusy()
+    local flip = mode == "flip"
+    local buys = Buys(r)
+    local list = IsRecipe(r) and ns.Evaluator.ShoppingList(r) or nil
     local where, line, n
     if flip then
         where, line, n = "ah", NextForFlip(r), 1
-    else
+    elseif list then
         where, line, n = NextForRecipe(list)
     end
+    bar.Buy:SetShown(buys)
+    PlaceCrafts(buys)
     bar.Crafts:SetShown(not flip)
     if not flip then
         silent = true
@@ -264,20 +332,23 @@ function BuyBar.Refresh()
         silent = false
         bar.Crafts:SetEnabled(ready)
     end
-    bar.Best:SetShown(not flip or not ready)
-    bar.Best:SetText(ready and L["Best"] or L["Cancel"])
-    bar.Best:SetEnabled(ready and (r.batch == nil or r.batch.size ~= nil) or state == "quoting" or state == "confirm")
-    if state == "confirm" then
-        bar.Buy:SetText(L["Confirm"])
-        bar.Buy:SetEnabled(true)
-    elseif ready then
-        bar.Buy:SetText(line and where == "ah" and UsesSearch(line) and L["Search"] or L["Buy"])
-        bar.Buy:SetEnabled((CanBuy(r, list, where, line)))
-    else
-        bar.Buy:SetText(L["Buy"])
-        bar.Buy:SetEnabled(false)
+    bar.Best:SetShown(not flip or state ~= "ready")
+    bar.Best:SetText(state == "ready" and L["Best"] or L["Cancel"])
+    bar.Best:SetEnabled(ready and (r.batch == nil or r.batch.size ~= nil or not IsRecipe(r)) or state == "quoting"
+        or state == "confirm")
+    if buys then
+        if state == "confirm" then
+            bar.Buy:SetText(L["Confirm"])
+            bar.Buy:SetEnabled(true)
+        elseif ready then
+            bar.Buy:SetText(line and where == "ah" and UsesSearch(line) and L["Search"] or L["Buy"])
+            bar.Buy:SetEnabled((CanBuy(r, list, where, line)))
+        else
+            bar.Buy:SetText(L["Buy"])
+            bar.Buy:SetEnabled(false)
+        end
     end
-    bar.Status:SetText(StatusText(r, list, where, line, n))
+    bar.Status:SetText(StatusText(r, mode, list, where, line, n))
 end
 
 -- ---------------------------------------------------------------- tooltips
@@ -357,7 +428,7 @@ local function BuyTooltip(self)
         GameTooltip:Show()
         return
     end
-    if not Applies(r) then
+    if not Buys(r) then
         GameTooltip:SetText(L["Buy what's missing"], 1, 1, 1)
         GameTooltip:Show()
         return
@@ -444,8 +515,22 @@ local function BestTooltip(self)
         return
     end
     GameTooltip:SetText(L["Best"], 1, 1, 1)
-    GameTooltip:AddLine(L["Sets the crafts to the best batch (the reagents and the market), within your gold."], nil, nil, nil, true)
     local r = current
+    if HasCrafts(r) and not IsRecipe(r) then
+        GameTooltip:AddLine(L["Sets the crafts to the best batch (the reagents and the market), within what your bags make."],
+            nil, nil, nil, true)
+        local n, craftable = BagsBest(r)
+        local a = r.batch
+        if a and a.size then
+            GameTooltip:AddDoubleLine(L["Best batch"], a.limit == "none" and L["no limit"]
+                or string.format("%d (%s)", a.size, L[LIMIT_TEXT[a.limit]]), 1, 0.82, 0, 1, 1, 1)
+        end
+        GameTooltip:AddDoubleLine(L["Your bags make"], tostring(craftable), 1, 0.82, 0, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Best"], tostring(n), 1, 0.82, 0, 1, 1, 1)
+        GameTooltip:Show()
+        return
+    end
+    GameTooltip:AddLine(L["Sets the crafts to the best batch (the reagents and the market), within your gold."], nil, nil, nil, true)
     if IsRecipe(r) then
         local n, byGold = ns.Evaluator.AffordableBatch(r, GetMoney())
         local a = r.batch
@@ -463,22 +548,29 @@ end
 local function CraftsTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetText(L["Crafts"], 1, 1, 1)
-    GameTooltip:AddLine(L["How many to make: the reagents, the cost and the profit follow it."], nil, nil, nil, true)
-    GameTooltip:AddLine(L["It starts at what your tray allows, and does again when you pick another recipe."], nil, nil, nil, true)
+    GameTooltip:AddLine(L["How many to make: the reagents, the cost and the profit follow it, and Craft makes that many."],
+        nil, nil, nil, true)
+    GameTooltip:AddLine(Mode(current) == "vendor" and L["It starts at what your bags allow, and does again when you pick another recipe."]
+        or L["It starts at what your tray allows, and does again when you pick another recipe."], nil, nil, nil, true)
     GameTooltip:Show()
 end
 
 -- ---------------------------------------------------------------- clicks
 
--- Best, or Cancel while a price is open.
+-- Best, or Cancel while a price is open. Within your gold in Profession profits, within your bags elsewhere.
 local function OnBest()
     if ns.Buy.IsBusy() then
         ns.Buy.Cancel()
         return
     end
     local r = current
-    if not IsRecipe(r) then return end
-    local n = ns.Evaluator.AffordableBatch(r, GetMoney())
+    if not HasCrafts(r) or ns.Craft.IsBusy() then return end
+    local n
+    if IsRecipe(r) then
+        n = ns.Evaluator.AffordableBatch(r, GetMoney())
+    else
+        n = BagsBest(r)
+    end
     if n then ns.ResultsList.SetCrafts(r.recipe.recipeID, n) end
 end
 
@@ -490,7 +582,7 @@ local function OnBuy()
         return
     end
     local r = current
-    if state ~= "ready" or not Applies(r) then return end
+    if state ~= "ready" or not Buys(r) then return end
     if IsFlip(r) then
         local line = NextForFlip(r)
         if not line then return end
@@ -542,7 +634,7 @@ local function Build(frame)
     bar.Status:SetWordWrap(false)
 
     bar.Buy = UI.Button(bar, L["Buy"], 80, OnBuy)
-    bar.Buy:SetPoint("BOTTOMRIGHT")
+    bar.Buy:SetPoint("TOPRIGHT", 0, ROW_TOP)
     bar.Buy:SetMotionScriptsWhileDisabled(true)   -- the tooltip says what it needs
     bar.Buy:SetScript("OnEnter", BuyTooltip)
     bar.Buy:SetScript("OnLeave", GameTooltip_Hide)
@@ -551,10 +643,9 @@ local function Build(frame)
     crafts.clampIfInputExceedsRange, crafts.highlightIfInputExceedsRange = true, true   -- as the profession window's
     crafts:SetMaxLetters(MAX_LETTERS)
     crafts:SetWidth(38)
-    crafts:SetPoint("RIGHT", bar.Buy, "LEFT", -30, 0)
     crafts:SetMinMaxValues(1, MAX_CRAFTS)
     crafts:SetOnValueChangedCallback(function(_, value)
-        if silent or not IsRecipe(current) or value < 1 then return end
+        if silent or not HasCrafts(current) or value < 1 then return end
         ns.ResultsList.SetCrafts(current.recipe.recipeID, value)
     end)
     crafts:SetScript("OnEnterPressed", EditBox_ClearFocus)
@@ -564,6 +655,7 @@ local function Build(frame)
         f:HookScript("OnLeave", GameTooltip_Hide)
     end
     bar.Crafts = crafts
+    PlaceCrafts(true)
 
     bar.Best = UI.Button(bar, L["Best"], 56, OnBest)
     bar.Best:SetPoint("RIGHT", crafts, "LEFT", -32, 0)
@@ -579,14 +671,14 @@ ns.On("DETAILS_SHOWN", function(result)
     for id, v in pairs(pending) do
         if v == "eval" then pending[id] = nil end   -- this result is evaluated at the searched prices
     end
-    if Applies(result) then CheckPrices(result) end
+    if Buys(result) then CheckPrices(result) end
     BuyBar.Refresh()
 end)
 
 -- Opening the AH, or the window at the AH, checks the shown recipe's or flip's prices.
 for _, message in ipairs({ "AH_OPEN", "MAIN_SHOWN" }) do
     ns.On(message, function()
-        if Applies(current) then CheckPrices(current) end
+        if Buys(current) then CheckPrices(current) end
         BuyBar.Refresh()
     end)
 end

@@ -490,6 +490,13 @@ function Evaluator.AffordableBatch(r, money)
     return math.max(1, lo), true
 end
 
+-- Best where crafting is what's limited (the Tray and Vendor crafts views, 1.0.0): the best batch (size, from
+-- BatchAdvice; nil when none can be priced) within the crafts your bags make, at least 1.
+function Evaluator.CraftableBatch(size, craftable)
+    if not size then return math.max(1, craftable) end
+    return math.max(1, math.min(size, craftable))
+end
+
 -- The Profession profits view: every recipe on the filter's professions (RecipeIndex.InProfessions),
 -- evaluated on the tray-only context for the crafts the tray allows (1 for a recipe using none of its
 -- reagents), ranked; the context; and the milliseconds it took.

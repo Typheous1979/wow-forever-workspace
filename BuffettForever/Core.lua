@@ -94,6 +94,7 @@ local charDefaults = {
     tray = {},     -- reagent tray: { { itemID, qty }, ... } in slot order (Crafting/Tray.lua)
     bought = {},   -- [itemID] = { q still in the mailbox, t last purchase, k kind }: what BuffettForever bought
                    -- that hasn't been collected yet (Pricing/Collect.lua)
+    made = {},     -- [itemID] = { q, t }: what you crafted, still yours to post (Crafting/Craft.lua)
     results = {    -- the craftable-items list (UI/ResultsList.lua); view: "tray", "vendor", "flips" or "professions"
         sortKey = "rank", sortDesc = true, knownOnly = false, showUnconfirmed = false, view = "tray",
         -- the Profession profits view's own filters, and its collapsed groups ([skillLine] = true)

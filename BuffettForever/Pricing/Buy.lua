@@ -152,6 +152,7 @@ function Buy.CanStart(itemID, cost, noTray)
     if not ns.ahOpen then return false, L["Open the Auction House (talk to an auctioneer) to buy what's missing."] end
     if ns.InCombat() then return false, L["Not in combat."] end
     if state ~= "ready" then return false, L["A purchase is already open."] end
+    if ns.Craft.IsBusy() then return false, L["A craft is under way."] end
     if BlizzardDialogOpen() then return false, L["Close Blizzard's buy window first: the Auction House quotes one price at a time."] end
     if ns.Scanner.IsBusy() then return false, L["A full scan is running."] end
     if ns.Search.IsBusy() then return false, L["Checking prices at the Auction House..."] end
@@ -167,6 +168,7 @@ function Buy.CanVendor(itemID, cost)
     if not ns.Merchant.IsOpen() then return false, L["Talk to a vendor that sells it."] end
     if ns.InCombat() then return false, L["Not in combat."] end
     if state ~= "ready" then return false, L["A purchase is already open."] end
+    if ns.Craft.IsBusy() then return false, L["A craft is under way."] end
     local ok, why = Afford(cost)
     if not ok then return false, why end
     if not ns.Tray.HasRoom(itemID) then return false, L["The tray is full: make room for what you buy."] end

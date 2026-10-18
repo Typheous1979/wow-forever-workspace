@@ -43,6 +43,7 @@ UI\MainFrame.lua
 UI\ReagentTray.lua
 UI\DetailPanel.lua
 UI\BuyBar.lua
+UI\CraftRow.lua
 UI\ResultsList.lua
 UI\AHButton.lua
 UI\MailButton.lua

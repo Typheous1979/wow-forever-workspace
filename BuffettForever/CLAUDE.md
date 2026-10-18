@@ -194,6 +194,23 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
     needsConfirmation false, AUCTION_CREATED 303 ms later, no warning or popup [F-136].
   So Craft opens the window first (OpenRecipe), then crafts, and Post ships in 1.0.0. Not tested: a gear post, a
   same-item mail bought outside BuffettForever, and taking our mail with Blizzard's own click.
+- 1.0.0 tray, Collect, Craft and Post pass 2 (2026-10-18): Craft. Tested on 70450: selftest 136/136; Open opened
+  First Aid at Linen Bandage; Craft 1 from the click (START 0.1 s, SUCCEEDED 3.1 s) took the tray's Linen Cloth; Craft 2
+  then Stop at 1.1 s made 1; the greyed reasons; the Tray view's bar (Best within your bags); AH flips unchanged.
+  charDB.made counted 2 bandages, from the two button crafts; whether Blizzard's own Create (Justin saw the tray drop)
+  was counted isn't in the log, so pass 3 logs every counted craft (diag.counted). Justin's labels for pass 3: "Open
+  Profession" and "Create n". Vendor crafts listed nothing (nothing profits on vendor prices with what he carries).
+  - Crafting/Craft.lua: Craft.Plan (Gather the facts, Craft.Blocker's order: unknown, combat, busy, casting,
+    reagents, requirement, window, blocked, disabled, cooldown), Open (OpenRecipe) then Start (CraftRecipe(id, n),
+    n = the Crafts box within what your bags make), Stop (StopRecipeRepeat), progress from UNIT_SPELLCAST_*, a
+    watchdog, UI errors kept; always on: every finished craft of a recipe in the data takes its reagents off the
+    tray (Tray.Debit) and adds its result to charDB.made (for Post), clamped to the bags; the probe kept.
+  - UI/CraftRow.lua: the second row (Craft, Open, Opening..., Stop), its tooltip (have/need in the bags, the mailbox,
+    what the tray loses, why it's greyed); BuyBar: Mode (flip, professions, tray, vendor), 48 or 74 px, Buy hidden in
+    Tray and Vendor crafts with the box at the right, Best within your bags there (Evaluator.CraftableBatch), the
+    status line's craft progress, "Everything is in the tray, 3 in your mailbox."; Buy refuses during a craft;
+    ResultsList.ClearCrafts after a finished batch.
+  - selftest 136 (CRAFT-COUNT, CRAFT-WHY, CRAFT-SPELL, BEST-BAGS, TRAY-DEBIT).
   - Core owns PLAYER_REGEN_DISABLED (COMBAT_STARTED, ns.InCombat), ADDON_ACTION_BLOCKED/FORBIDDEN (diag.blocked,
     ACTION_BLOCKED) and AUCTION_HOUSE_SHOW_ERROR (AH_ERROR); Buy listens on the bus. Owned passes
     AUCTION_CREATED(auctionID) on, Harvest TRADESKILL_CHANGED(event), Mail MAILBOX_OPEN/READ/CLOSED.
@@ -404,7 +421,8 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 | `Crafting/Craft.lua` | crafting a known recipe from the bags and the tray's debit; the `/bf crafttest` probe |
 | `UI/MailButton.lua` | the Collect button under Blizzard's mail window |
 | `UI/ReagentTray.lua`, `UI/ResultsList.lua`, `UI/DetailPanel.lua` | fill the panes the raw window already lays out |
-| `UI/BuyBar.lua` | the Buy bar under the details in Profession profits (Crafts, Best, Buy) and AH flips (Buy); live prices at the AH |
+| `UI/BuyBar.lua` | the Buy bar under the details in Profession profits (Crafts, Best, Buy) and AH flips (Buy); live prices at the AH; in Tray and Vendor crafts, Best and Crafts for a recipe you know |
+| `UI/CraftRow.lua` | the bar's second row: Craft (Open, then Craft n, Stop during a batch) |
 | `Bags.lua` | Alt+Right-click post-hook on `HandleModifiedItemClick` |
 | `Tooltip.lua` | AH / vendor / fair-value lines via `TooltipDataProcessor` |
 

@@ -489,6 +489,14 @@ function ResultsList.SetCrafts(recipeID, n)
     UpdateTopPick()
 end
 
+-- A batch was crafted (Crafting/Craft.lua): the box goes back to the batch its view gives the recipe now.
+function ResultsList.ClearCrafts(recipeID)
+    if craftsFor and craftsFor.recipeID == recipeID then
+        craftsFor = nil
+        Schedule()
+    end
+end
+
 -- The search box, on every keystroke: the rows already ranked, filtered by name.
 local function Search(text)
     searchText = string.match(text or "", "^%s*(.-)%s*$")
