@@ -1,6 +1,7 @@
 # WoW Forever facts ledger
 
-Facts as of **2026-10-16** (§13 added and its AH probes run on 70425; earlier sections last checked 2026-10-14). Status tags:
+Facts as of **2026-10-16** (§13 added and its AH probes run on 70425; earlier sections last checked 2026-10-14;
+§13 extended through 2026-10-18 on 70450: buying, taking mail, crafting and posting from an addon). Status tags:
 - **[Probe]**: measured in the client (WowfProbe or a community probe);
 - **[Source]**: Blizzard UI source, `forever` branch of Gethe/wow-ui-source;
 - **[Wiki]**: warcraft.wiki.gg;
@@ -269,6 +270,9 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
       `GetRecipeInfo(id).learned` for all 592**, and confirmed all 6 at login. Known recipes can be read at login
       with no profession window.
     - `GetRecipeInfo` and `GetRecipeSchematic` work with the window closed, for known and unknown recipes.
+      **Only once that profession's window has been opened in the session:** before that, `GetRecipeInfo(3275)`
+      read `learned` false, `GetCraftableCount` 0 and `GetRecipeCooldown` nil; after opening and closing it, true,
+      4 and an answer. [Probe 70450, see F-135]
     - `GetBaseProfessionInfo().professionID` is 165, the Classic skill line.
     - The schematic yields and reagents matched the generated data (70450) for every recipe checked.
 - **[F-124]** Vendors: `C_MerchantFrame.GetItemInfo(i)` → `{price (for stackCount units), stackCount,
@@ -436,6 +440,54 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     - So colour from the thresholds: orange below yellow, yellow, green from `floor((yellow + grey) / 2)`, grey from
       grey. They matched every valid reading.
   - Justin saw `DIFFICULT_`/`FAIR_`/`EASY_`/`TRIVIAL_DIFFICULTY_COLOR` match the profession window on 3 recipes.
+
+  [Probe 70450]
+- **[F-134]** **An addon can take mail** (BuffettForever's Collect button, 2026-10-18):
+  - `TakeInboxItem(1, 1)` (runtime-only) from a button's click took 3 Light Leather, then 1 Linen Cloth.
+    `MAIL_SUCCESS` fired 0.2 s and 0.4 s later, with **no item ID**. No `ADDON_ACTION_BLOCKED`.
+  - **One purchase, one mail.** The 3 Light Leather bought in one purchase, filled from cheaper listings than its
+    quote [F-132], came as one won-auction mail with one attachment of 3.
+  - **At `MAIL_SHOW` the inbox reads empty.** At 3 of 3 opens, `GetInboxNumItems()` was 0 and 0, with
+    `HasNewMail()` true and `C_Mail.CanCheckInbox()` true with 0 s to wait. The list arrives with the first
+    `MAIL_INBOX_UPDATE`.
+  - Still untested: Blizzard's Open All while an addon reads the inbox, and whether an AH mail emptied by an addon is
+    deleted.
+
+  [Probe 70450]
+- **[F-135]** **Crafting from an addon** (BuffettForever's probe, 2026-10-18, typed, so inside a key press):
+  - **`C_TradeSkillUI.CraftRecipe` needs the profession window open.** With it closed, 3 calls did nothing: no
+    event, no error, no `ADDON_ACTION_BLOCKED`. `IsTradeSkillReady()` read false and
+    `GetBaseProfessionInfo().professionID` 0.
+  - **With First Aid open,** `CraftRecipe(3275, 1)` made 1 Linen Bandage. The order:
+    1. `TRADE_SKILL_CRAFT_BEGIN(3275)`, inside the call;
+    2. `UNIT_SPELLCAST_START` 0.2 s later;
+    3. `UNIT_SPELLCAST_SUCCEEDED` 3.1 s later, then `STOP`, with spellID 3275 (the recipe ID, never secret);
+    4. `TRADE_SKILL_ITEM_CRAFTED_RESULT` (item 1251 ×1, a GUID, operationID 0).
+  - **`C_TradeSkillUI.StopRecipeRepeat()`** (runtime-only), called during the first cast of `CraftRecipe(3275, 2)`,
+    worked. `UPDATE_TRADESKILL_CAST_STOPPED(false)` fired at once and `GetRemainingRecasts()` read 0. The cast under
+    way still finished, so 1 was made.
+  - **`C_TradeSkillUI.OpenRecipe(3275)` opens the window at the recipe.** It returned nil. With the window closed it
+    cast the profession's spell (SUCCEEDED 3273, First Aid), then `TRADE_SKILL_SHOW`,
+    `OPEN_RECIPE_RESPONSE(3275, 129, 2942)` and `TRADE_SKILL_DATA_SOURCE_CHANGED`.
+  - **`ReagentsFromBankAllowed()` is false,** so crafting counts the bags only (Blizzard's
+    `ItemUtil.GetCraftingReagentCount`).
+  - `GetRecipeRequirements(2538)` with the window closed returned "Cooking Fire" (type 0, SpellFocus), not met.
+    `IsNearProfessionSpellFocus(5)` (Cooking) read false.
+  - The recipe data needs the window to have been opened once in the session: see [F-123] and [F-133].
+
+  [Probe 70450]
+- **[F-136]** **An addon can post a commodity** (BuffettForever's probe, 2026-10-18, typed):
+  - `C_AuctionHouse.PostCommodity(location, 1, 1, 74)` posted 1 Light Leather at 74c, the cheapest listing by others
+    (market value 76c).
+    - It returned `needsConfirmation` false.
+    - `AUCTION_HOUSE_AUCTION_CREATED(auctionID)` came 303 ms later.
+    - No warning, no Blizzard popup, no `ADDON_ACTION_BLOCKED`.
+  - The location came from `ItemLocation:CreateFromBagAndSlot`. `IsSellItemValid(location, false)` true,
+    `GetItemCommodityStatus` 2 (commodity), `GetAvailablePostCount` 12 (every unit in the bags), and
+    `SupportsCopperValues()` true.
+  - `CalculateCommodityDeposit(2318, 1, 1)` = 100, the formula's 1s minimum [F-129].
+  - `GetMoney()` hadn't changed yet when `AUCTION_CREATED` fired. Read the deposit from a later money change.
+  - Still untested: `PostItem` (gear), the post warning (`AUCTION_HOUSE_POST_WARNING`) and multisell.
 
   [Probe 70450]
 

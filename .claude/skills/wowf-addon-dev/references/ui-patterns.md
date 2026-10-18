@@ -54,6 +54,25 @@ Addon frames that you create aren't protected. You only need combat-lockdown car
     Archaeology windows.
   - Start the content under the title bar about 62 px from the left, clear of the ring.
   - `ButtonFrameTemplate_HidePortrait(frame)` is the other choice: no ring, and the title spans the whole width.
+- **A badge on an item slot**, to say where the item is. Example: BuffettForever's tray in 1.0.0 shows purchases still
+  in the mailbox; tested on 70450.
+  - Use Forever's own minimap mail icon, atlas `ui-hud-minimap-mail-icon`
+    (`Blizzard_Minimap\Camelot\MinimapMailFrameTemplate.xml`). On a 36 px slot draw it 12 px tall at TOPLEFT (1, -1)
+    on the OVERLAY layer, keeping its shape (`C_Texture.GetAtlasInfo(atlas).width / height`), with a
+    `NumberFontNormalSmall` count beside it.
+  - In text, write the same icon as `|A:ui-hud-minimap-mail-icon:12:<width>|a`.
+  - Grey the icon (`texture:SetDesaturated(true)`) when none of the item is usable, and colour the bottom-right count
+    orange when the slot claims more than exists. Put the explanation in the tooltip, as label/value rows.
+- **A button on a Blizzard window** that isn't yours, as a child of that window, so it shows and hides with it. Add
+  no hooks, and write nothing into Blizzard's frame.
+  - **The AH:** parent `AuctionHouseFrame` (LoadOnDemand: build it when `Blizzard_AuctionHouseUI` loads), at
+    `TOPRIGHT, AuctionHouseFrame, BOTTOMRIGHT, -6, -2`, right of the bottom tabs. Example: BuffettForever
+    `UI/AHButton.lua`.
+  - **The mailbox:** parent `InboxFrame` (always loaded), so it shows on the Inbox tab only. Anchor it at
+    `TOPRIGHT, MailFrame, BOTTOMRIGHT, -6, -2`: under the 338 px window, right of the Inbox and Send Mail tabs.
+    The bottom strip inside the window holds Blizzard's 120 × 24 Open All, so there's no room there. Example:
+    BuffettForever `UI/MailButton.lua`, tested on 70450.
+  - `SetMotionScriptsWhileDisabled(true)` keeps the tooltip that says why it's greyed out.
 - **A sortable list:**
   - `CreateScrollBoxListLinearView(2, 2, 2, 2, 0)`, `view:SetElementExtent(20)`,
     `view:SetElementInitializer("Button", InitRow)`, then the WowScrollBoxList and MinimalScrollBar pair

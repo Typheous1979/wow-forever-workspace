@@ -15,8 +15,9 @@ AH frame code shows every flow below.
   `PLAYER_INTERACTION_MANAGER_FRAME_SHOW/HIDE(type)` with `Enum.PlayerInteractionType.Auctioneer` (21).
 - Prices are copper, typed `BigUInteger` (a plain Lua number to addons; copper fits easily).
 - Scanning (replicate, browse, search) has no restriction flags. Posting, bidding, buying and cancelling are
-  `HasRestrictions`. Never automate them (golden rule 15). An addon may buy only inside the player's own click,
-  one purchase per click, with the price shown first. Forever allows that for commodities [F-132]; see "Buying".
+  `HasRestrictions`. Never automate them: an addon acts only inside the player's own click (or typed command), one
+  action per click, with the price shown first; never from a timer, a queue or an event. Forever allows that for
+  buying commodities and gear [F-132] and for posting a commodity [F-136]; see "Buying" and "Posting".
 - Nothing here is secret: normal math and table keys are fine.
 
 ## Full scan: ReplicateItems
@@ -135,9 +136,10 @@ Proven on 70450 from addon code inside a key press [F-132]. Blizzard's flow is i
    (`MAXIMUM_PREVIEW_PRICE_DIFFERENTIAL = 1.05`). A smaller rise is shown as an increase before Buy Now is enabled.
 3. **Buy:** `ConfirmCommoditiesPurchase(itemID, quantity)` → `COMMODITY_PURCHASE_SUCCEEDED` or `_FAILED`.
 4. **Delivery:** the items come **by mail**, not to the bags [F-132]. Don't count the bags to see what was bought.
-   Record the purchase yourself, so the player isn't told to buy it again before the mail is collected.
-   BuffettForever keeps `{ bought, the bag and bank count then }` per item until the count rises by what was bought
-   (`Buy.InMail`, 30 days at most, as the mail lasts).
+   Record the purchase yourself, so the player isn't told to buy it again before the mail is collected, and show
+   that it's in the mailbox. BuffettForever keeps the units still in the mailbox per item and lowers them only when
+   the mailbox shows them gone (see "Collecting AH mail"). Guessing from the bag count left units used before the
+   mail was collected counted as "in the mail" for 30 days.
 5. **The cost:** the quote is the most you pay. A purchase can cost less when cheaper listings appear before the
    confirm (once on 70450 [F-132]), so take the gold spent from `GetMoney()`.
 
@@ -172,6 +174,42 @@ What to know:
 - `PlaceBid` is `HasRestrictions`, not protected. No popup is needed: Blizzard's is its own confirmation, and
   yours is the second click.
 - Working code: BuffettForever `Pricing\Buy.lua` (`Buy.StartAuction`, `Buy.Confirm`), the AH flips tab.
+
+## Posting (from a click)
+Proven on 70450 for a commodity, from a typed command [F-136]. Blizzard's flow is in
+`Shared\Blizzard_AuctionHouseSellFrame.lua`, `...CommoditiesSellFrame.lua` and `...ItemSellFrame.lua` [Source 70450]:
+1. **The item:** a bag slot as `ItemLocation:CreateFromBagAndSlot(bag, slot)`, then `IsSellItemValid(location,
+   false)` and `GetItemCommodityStatus(location)` (2 = commodity, 1 = item). For a commodity,
+   `GetAvailablePostCount(location)` is every unit in the bags, and one post takes from all stacks.
+2. **The duration:** the sell frame's CVar `auctionHouseDurationDropdown` (1..3). **The deposit:**
+   `CalculateCommodityDeposit(itemID, d, qty)` or `CalculateItemDeposit(location, d, qty)`, which can return nil, so
+   fall back to the formula [F-129]. Blizzard requires `GetMoney()` ≥ the deposit and
+   `IsThrottledMessageSystemReady()`.
+3. **The price:** Blizzard's default **copies the cheapest listing exactly**, with no undercut. For commodities
+   that's `GetCommoditySearchResultInfo(itemID, 1).unitPrice`; for items, the cheapest buyout at the same item level.
+   With no listings it uses 1.5 × the vendor price, rounded up to a silver. Search first, and leave your own
+   listings out.
+4. **Post:** `PostCommodity(location, d, qty, unitPrice)` or `PostItem(location, d, qty, bid, buyout)`. Both return
+   `needsConfirmation`. When it's true, `AUCTION_HOUSE_POST_WARNING` follows, and a second click sends the same
+   arguments to `ConfirmPostCommodity` or `ConfirmPostItem`.
+5. **The outcome:**
+   - `AUCTION_HOUSE_AUCTION_CREATED(auctionID)` (303 ms on 70450), `AUCTION_HOUSE_POST_ERROR`, or
+     `AUCTION_HOUSE_SHOW_ERROR(error)`.
+   - An item posted several at once is a multisell: `AUCTION_MULTISELL_START(n)`, `_UPDATE(created, total)`,
+     `_FAILURE`, stopped with `CancelSell()`.
+   - `GetMoney()` hadn't changed yet at `AUCTION_CREATED`, so read the deposit later.
+
+What to know:
+- **The popup trap.** Blizzard's `AuctionHouseFrame` answers `AUCTION_HOUSE_POST_WARNING` with its own StaticPopup,
+  whose Accept confirms only Blizzard's own cached post (the sell frames' `pendingPost`). For an addon's post it does
+  nothing.
+  - Don't hide that popup from addon code: `StaticPopup_Hide` taints the shared popup frames. Tell the player to
+    confirm in your UI.
+  - Before posting, read `pendingPost` (reading is fine): if Blizzard has a stale one, its Accept would confirm that
+    post instead.
+  - Don't drive Blizzard's sell frame (`AuctionHouseFrame:SetPostItem`) from addon code either.
+- No warning came for a post at the cheapest listing [F-136]; when it comes is still unknown.
+- Working code: BuffettForever `Pricing\Post.lua` (`/bf posttest`, logged in `diag.posts`).
 
 ## Deposits and the house cut
 - `CalculateCommodityDeposit(itemID, duration, quantity)` and `CalculateItemDeposit(itemLocation, duration,
@@ -233,6 +271,32 @@ What to know when building on them:
 - BuffettForever: `Pricing/Mail.lua` (reading, `Mail.Reconcile`), `Pricing/Ledger.lua` (filing, sale chance,
   measured cut), `Pricing/Owned.lua`.
 - `Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5` is Blizzard's default price (vendor x 1.5).
+
+## Collecting AH mail (from a click)
+Proven on 70450 from a button's click [F-134]:
+- **Taking:** `TakeInboxItem(mailIndex, attachmentIndex)`, as Blizzard's attachment click does.
+  - `MAIL_SUCCESS` follows 0.2–0.4 s later, **with no item ID**; `MAIL_FAILED(itemID)` means a full bag or a
+    unique item.
+  - `AutoLootMailItem(index)` (Shift-click on an inbox row) takes a whole mail.
+  - Leave COD and GM mail alone, as Blizzard's Open All does.
+- **Won-auction mail** is a `"buyer"` invoice, or the `AUCTION_WON_MAIL_SUBJECT` subject on system mail (not
+  `canReply`, not returned, not from a GM). One purchase came as one mail [F-134].
+- **Blizzard's Open All** (`InboxFrame.OpenAllMail`, `MailFrame.lua` 1515–1712) [Source 70450]:
+  - it takes the money first, then each attachment from slot 16 down;
+  - it skips GM and COD mail, and stops at 0 free bag slots (`C_Container.CalculateTotalNumberOfFreeBagSlots`);
+  - every take after the first runs from `OnUpdate`, after 0.15 s and `not C_Mail.IsCommandPending()`;
+  - `MAIL_INBOX_UPDATE` restarts it at mail 1 when the count changes, and `MAIL_FAILED(itemID)` skips that item;
+  - its button is disabled only while it runs.
+  An addon's takes from a timer are untested on Forever, and a silent block's counter clears only on a restart
+  [F-050]. Take one attachment per click.
+- **Knowing what left the mailbox:**
+  - The inbox reads empty at `MAIL_SHOW`: the list comes with the first `MAIL_INBOX_UPDATE` [F-134].
+  - A reopened mailbox can show an old list [F-130].
+  - So never take the first read of a visit to mean a mail is gone. A drop in an item's units between two reads in
+    one visit is a take, whatever took it: your button, Open All, or Blizzard's click.
+- Working code: BuffettForever `Pricing\Collect.lua` (`Collect.MailDrop`, `Collect.Plan`, `/bf mailtest`) and
+  `UI\MailButton.lua` (the button: parented to `InboxFrame`, so it shows on the Inbox tab only, and anchored under
+  `MailFrame`'s BOTTOMRIGHT, right of the tabs).
 
 ## Storing prices in SavedVariables
 - **Key by market.** The AH is per ruleset [F-081]. Put the key in one function (realm and faction until the

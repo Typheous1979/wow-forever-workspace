@@ -25,7 +25,44 @@ Blizzard's docs: lint accepts them, `api show` reports "not in the index". Verif
 
 Recipe data is client-side: `GetRecipeInfo` and `GetRecipeSchematic` work with no profession window open, for
 known and unknown recipes [F-123, Probe 70425]. Blizzard's objective tracker relies on the same thing
-(`Blizzard_ObjectiveTracker\Blizzard_ProfessionsRecipeTracker.lua`).
+(`Blizzard_ObjectiveTracker\Blizzard_ProfessionsRecipeTracker.lua`). But until that profession's window has been
+opened in the session, `GetRecipeInfo(id).learned` reads false, `GetCraftableCount` 0 and `GetRecipeCooldown` nil
+[F-123, Probe 70450]: read "known" from the spellbook (below), and counts from the bags.
+
+### Crafting from an addon [F-135]
+Proven on 70450 from a typed command (a key press):
+1. **The window must be open on that profession.** `C_TradeSkillUI.CraftRecipe(recipeID, n)` with it closed does
+   nothing at all: no event, no error, no block.
+   - It's ready when `IsTradeSkillReady()` is true and `GetBaseProfessionInfo().professionID` is the recipe's skill
+     line (129 First Aid, 165 Leatherworking …).
+   - **`C_TradeSkillUI.OpenRecipe(recipeID)`**, from the player's click, opens it at the recipe. It casts the
+     profession's spell, then `TRADE_SKILL_SHOW` and `OPEN_RECIPE_RESPONSE(recipeID, skillLine, childLine)`.
+   - Don't load `Blizzard_Professions` yourself: `TRADE_SKILL_SHOW` makes Blizzard's own code load and show it.
+2. **Craft:** `CraftRecipe(recipeID, n)` inside the click. Blizzard's Create passes the box's count, and Create All
+   passes the craftable count. Basic reagents aren't passed. The events:
+   - `TRADE_SKILL_CRAFT_BEGIN(recipeID)` fires inside the call;
+   - each cast gives `UNIT_SPELLCAST_START`, then `SUCCEEDED` and `STOP`, with spellID = the recipe ID;
+   - `TRADE_SKILL_ITEM_CRAFTED_RESULT(data)` follows (itemID, quantity, itemGUID).
+3. **Stop a batch:** `C_TradeSkillUI.StopRecipeRepeat()` (runtime-only). The cast under way finishes and the rest
+   are cancelled: `UPDATE_TRADESKILL_CAST_STOPPED` fires and `GetRemainingRecasts()` reads 0. Moving or
+   `UNIT_SPELLCAST_INTERRUPTED`/`FAILED` also ends it. There's no `UPDATE_TRADESKILL_CAST_COMPLETE` on Forever.
+4. **What Blizzard checks before enabling Create** (`ValidateControls` in `Blizzard_ProfessionsCrafting.lua`,
+   [Source 70450]), in this order:
+   1. `learned`;
+   2. `craftable` and not `disabled`;
+   3. the cooldown;
+   4. `GetRecipeRequirements(recipeID)`: `{name, met, type}`, where type 0 is SpellFocus (an anvil, a forge, a
+      Cooking Fire), 1 Totem (a tool) and 2 Area;
+   5. enough reagents.
+
+   It has no combat check.
+5. **Where reagents count:** Blizzard's `ItemUtil.GetCraftingReagentCount` uses
+   `GetItemCount(id, bank, false, bank, bank)` with `bank = ReagentsFromBankAllowed()`. That's **false on
+   Forever**, so the bags only.
+6. **Count finished crafts** on `UNIT_SPELLCAST_SUCCEEDED` (`RegisterUnitEvent(..., "player")`): one per craft, from
+   any window, never for a failed one. The recipe's reagents come from your data by spell ID. Guard the spellID
+   with `issecretvalue` (it wasn't secret on 70450).
+- Working code: BuffettForever `Crafting/Craft.lua` (`/bf crafttest`, logged in `diag.crafts`).
 
 ### The character's professions and skill-up colours [F-133]
 - **Professions without the window:** `GetProfessions()` returns 7 slot indexes, any of which may be nil. Pass each
