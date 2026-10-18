@@ -5,8 +5,10 @@ local addonName, ns = ...
 -- each full scan from every listing, your own left out (Scanner calls Flips.Find), and kept per market:
 --   markets[marketKey].flips = { t = scan time, list = { "itemID:qty:cost:value:lo:hi", ... } }
 -- Flips.Results() gives the AH flips view its rows, in the shape of evaluator results (cogs = cost,
--- best = the vendor's price, a grade from the scan's age: listings vanish fast). Buying stays the
--- player's click.
+-- best = the vendor's price, a grade from the scan's age: listings vanish fast). A search of a flip's
+-- item (the Buy bar's, before and after each purchase) puts its listings in place of the scan's, or takes
+-- the flip out when none is left below the vendor's price (Flips.Update). Buying stays the player's click
+-- (Pricing/Buy.lua).
 
 local L = ns.L
 local Econ = ns.Econ
@@ -22,6 +24,7 @@ local function VendorSell(itemID)
     if type(sell) ~= "number" then return nil end
     return sell
 end
+Flips.VendorSell = VendorSell
 
 -- One item's listings during a full scan: its flip as a packed string, or nil (and true when the
 -- vendor price isn't known yet).
@@ -59,6 +62,34 @@ function Flips.Recheck(t, list, unknown, summary)
         end
     end, RECHECK_TIMEOUT)
 end
+
+-- A search of an item on the flips list: its flip from these listings (your own left out), or out of the
+-- list when nothing is below the vendor's price any more (listings nil: none listed). Returns true when
+-- the list changed.
+function Flips.Update(itemID, listings)
+    local t, list = ns.PriceDB.Flips()
+    if not t or ns.readOnlyDB then return false end
+    for i, text in ipairs(list) do
+        if tonumber(string.match(text, "^(%d+):")) == itemID then
+            local flip = listings and Flips.Find(itemID, listings)
+            if flip == text then return false end
+            if flip then list[i] = flip else table.remove(list, i) end
+            ns.Fire("FLIPS_CHANGED")
+            return true
+        end
+    end
+    return false
+end
+
+-- Only an empty search (none listed, or only your own) means the flip is gone; a timeout or a closed AH
+-- says nothing.
+ns.On("SEARCH_DONE", function(itemID, result, _, empty)
+    if result then
+        Flips.Update(itemID, result.listings)
+    elseif empty then
+        Flips.Update(itemID, nil)
+    end
+end)
 
 -- The confidence in a flip from the scan's age: A under 15 min, B under 1 h, C under 6 h, else D.
 function Flips.AgeGrade(age)

@@ -3,7 +3,8 @@ local addonName, ns = ...
 -- Main window. Three panes: the reagent tray and the top pick (left), the craftable items
 -- with their cost, sale values and ROI (middle), the selected item's details (right), and a
 -- status line for the auction data with the Scan button (enabled only at an auctioneer).
--- The status line works since M1; the panes fill in from M3 (see CLAUDE.md). Built on first open.
+-- The logo sits in the template's round portrait at the top left, as on Blizzard's Professions
+-- window (Justin, 2026-10-18). Built on first open.
 
 local UI = ns.UI
 local L = ns.L
@@ -16,6 +17,8 @@ local TRAY_SLOTS, TRAY_COLUMNS = 25, 5   -- Crafting/Tray.lua holds Tray.SIZE (2
 local SLOT_SIZE, SLOT_GAP = 36, 8
 local LEFT_WIDTH, RIGHT_WIDTH, PICK_HEIGHT = 232, 260, 180
 local EMPTY_SLOT = "Interface\\Buttons\\UI-EmptySlot-Disabled"     -- Blizzard's empty-slot art
+local LOGO = "Interface\\AddOns\\BuffettForever\\Media\\Icon"       -- the coin, also the TOC's IconTexture
+local PORTRAIT_RIGHT = 62   -- the portrait (62 px, from x = -5) and a gap: the status line starts past it
 
 local frame
 
@@ -118,7 +121,7 @@ end
 
 local function Build()
     frame = CreateFrame("Frame", FRAME_NAME, UIParent, "ButtonFrameTemplate")
-    ButtonFrameTemplate_HidePortrait(frame)
+    frame:SetPortraitToAsset(LOGO)   -- the template's round mask crops it; its title moves right of the portrait
     frame:SetSize(WIDTH, HEIGHT)
     frame:SetFrameStrata("HIGH")
     frame:SetToplevel(true)
@@ -150,7 +153,7 @@ local function Build()
     frame.ScanButton = scan
 
     local status = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    status:SetPoint("TOPLEFT", 18, -36)
+    status:SetPoint("TOPLEFT", PORTRAIT_RIGHT, -36)
     status:SetPoint("TOPRIGHT", scan, "TOPLEFT", -8, -5)
     status:SetJustifyH("LEFT")
     status:SetWordWrap(false)

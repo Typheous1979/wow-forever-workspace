@@ -16,7 +16,8 @@ local addonName, ns = ...
 -- profits view only the tray's materials count as yours and the rest is bought as listed: the slots say
 -- "tray", and their tooltips give what the bags and bank hold (not used there) and whether a recipe you
 -- know makes the reagent for less. The profession line shows your skill, and a Skill-up row the profession
--- window's colour for the recipe. The Buy bar (UI/BuyBar.lua) takes the bottom of the pane there.
+-- window's colour for the recipe. The Buy bar (UI/BuyBar.lua) takes the bottom of the pane there and in AH
+-- flips.
 -- Numbers sit in label/value rows; each row's tooltip says where its number comes from (Justin,
 -- 2026-10-17: data, not paragraphs). The pane scrolls (ScrollFrameTemplate).
 
@@ -635,7 +636,8 @@ local function FlipDetails(r)
     local prices = (r.lo and r.hi and r.lo ~= r.hi) and string.format(L["%s to %s"], Money.Compact(r.lo), Money.Compact(r.hi))
         or Money.Compact(r.lo or 0)
     Row(L["Listed"], string.format(L["%d at %s"], r.units, prices), {
-        string.format(L["%d listed below what a vendor pays, at %s each, in your last full scan."], r.units, prices),
+        string.format(L["%d listed below what a vendor pays, at %s each, in your last full scan (or the Buy bar's search since)."],
+            r.units, prices),
     })
     Row(L["Cost"], Money.Compact(r.cogs), { L["What buying all of them costs."] })
 
@@ -661,7 +663,6 @@ local function FlipDetails(r)
         for _, key in ipairs(r.reasons) do why[#why + 1] = ns.Evaluator.ReasonText(key) end
         Add(ORANGE .. L["Not recommended:"] .. "|r " .. table.concat(why, ", ") .. ".")
     end
-    Add(GREY .. L["Buy them in Blizzard's Auction House: BuffettForever doesn't buy for you."] .. "|r")
 end
 
 -- ---------------------------------------------------------------- a recipe

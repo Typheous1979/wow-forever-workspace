@@ -9,10 +9,12 @@ local addonName, ns = ...
 -- Results arrive as COMMODITY_SEARCH_RESULTS_UPDATED/ADDED or ITEM_SEARCH_RESULTS_UPDATED/ADDED;
 -- up to MAX_PAGES pages are read, then PriceDB.Record stores them like a scan.
 --   Search.Request(itemID, itemKey or nil, callback(itemID, result, problem))
---   result = { mv, min, q, n or prices, full, own } (full = every listing was read; own = your units,
---   left out of the rest), or nil with a problem. Commodity rows are grouped by unit price [F-121],
---   so a commodity result counts prices, not auctions (n stays nil). A stored price fires
---   PRICES_CHANGED(itemID), so the list re-evaluates; every finished search fires SEARCH_DONE(itemID), and the
+--   result = { mv, min, q, n or prices, full, own, listings, auctions } (full = every listing was read;
+--   own = your units, left out of the rest; listings = { unit price, qty, ... }; auctions = an item's
+--   { auctionID, buyout, qty }, cheapest first, for buying one), or nil with a problem. Commodity rows are
+--   grouped by unit price [F-121], so a commodity result counts prices, not auctions (n stays nil).
+--   A stored price fires PRICES_CHANGED(itemID), so the list re-evaluates; every finished search fires
+--   SEARCH_DONE(itemID, result, problem, empty) (empty: it worked and nothing is there to buy), and the
 --   throttle's ready event AH_THROTTLE_READY. Searches wait while a purchase is open (Pricing/Buy.lua).
 
 local L = ns.L
@@ -102,9 +104,9 @@ local function ReadCommodity(q)
 end
 
 -- buyoutAmount pays for the whole auction (Blizzard's buy frame bids it), so unit = buyout / quantity.
--- Your own auctions (containsOwnerItem) are left out.
+-- Your own auctions (containsOwnerItem) are left out. q.auctions keeps each one for PlaceBid.
 local function ReadItems(q)
-    local listings = {}
+    local listings, auctions = {}, {}
     q.own = 0
     local n = C_AuctionHouse.GetNumItemSearchResults(q.key) or 0
     for i = 1, n do
@@ -114,8 +116,11 @@ local function ReadItems(q)
         elseif r and (r.quantity or 0) > 0 and (r.buyoutAmount or 0) > 0 then
             listings[#listings + 1] = r.buyoutAmount / r.quantity
             listings[#listings + 1] = r.quantity
+            auctions[#auctions + 1] = { auctionID = r.auctionID, buyout = r.buyoutAmount, qty = r.quantity }
         end
     end
+    table.sort(auctions, function(a, b) return a.buyout / a.qty < b.buyout / b.qty end)
+    q.auctions = auctions
     return listings, n, C_AuctionHouse.HasFullItemSearchResults(q.key)
 end
 
@@ -123,10 +128,11 @@ local function Finish(q, problem)
     if current ~= q then return end
     current = nil
     if q.timer then q.timer:Cancel() end
-    local result
+    local result, empty   -- empty: the search worked, and nothing is there to buy
     local listings = q.listings
     if not problem then
         if not listings or #listings == 0 then
+            empty = true
             if (q.own or 0) > 0 then
                 problem = string.format(L["only your own %d are listed."], q.own)
             else
@@ -135,7 +141,8 @@ local function Finish(q, problem)
         else
             local mv, min, qty, rows = ns.Econ.MarketValue(listings)
             local commodity = q.kind == "commodity"
-            result = { mv = mv, min = min, q = qty, full = q.full, own = q.own }
+            result = { mv = mv, min = min, q = qty, full = q.full, own = q.own, listings = listings,
+                       auctions = not commodity and q.auctions or nil }
             if commodity then result.prices = rows else result.n = rows end
             ns.PriceDB.Record(q.itemID, listings, nil, commodity)
         end
@@ -152,7 +159,7 @@ local function Finish(q, problem)
     Notify(q.itemID, result, problem)
     if result then ns.Fire("PRICES_CHANGED", q.itemID) end
     Search.Pump()
-    ns.Fire("SEARCH_DONE", q.itemID)
+    ns.Fire("SEARCH_DONE", q.itemID, result, problem, empty)
 end
 
 local function OnTimeout(q)
