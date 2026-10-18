@@ -15,7 +15,8 @@ AH frame code shows every flow below.
   `PLAYER_INTERACTION_MANAGER_FRAME_SHOW/HIDE(type)` with `Enum.PlayerInteractionType.Auctioneer` (21).
 - Prices are copper, typed `BigUInteger` (a plain Lua number to addons; copper fits easily).
 - Scanning (replicate, browse, search) has no restriction flags. Posting, bidding, buying and cancelling are
-  `HasRestrictions`: inform the player and let them click; never automate (golden rule 15).
+  `HasRestrictions`. Never automate them (golden rule 15). An addon may buy only inside the player's own click,
+  one purchase per click, with the price shown first. Forever allows that for commodities [F-132]; see "Buying".
 - Nothing here is secret: normal math and table keys are fine.
 
 ## Full scan: ReplicateItems
@@ -122,6 +123,34 @@ Working code: BuffettForever `Pricing\Search.lua` (tested on 70425).
   rows `containsOwnerItem`. Leave them out before pricing. A full scan has no owner flag you can use without names,
   so subtract your own auctions (`GetOwnedAuctions`: quantity and unit price) from the listings at their price:
   BuffettForever `Econ.ExcludeOwn`.
+
+## Buying (commodities)
+Proven on 70450 from addon code inside a key press [F-132]. Blizzard's flow is in
+`Shared\Blizzard_AuctionHouseBuyDialog.lua` and `Blizzard_AuctionHouseFrame.lua` [Source 70450]:
+1. **Quote:** `C_AuctionHouse.StartCommoditiesPurchase(itemID, quantity)` → `COMMODITY_PRICE_UPDATED(unitPrice,
+   totalPrice)`, or `COMMODITY_PRICE_UNAVAILABLE` when that quantity isn't listed. Blizzard passes the preview unit
+   price as an undocumented third argument; the documented two worked. The quote holds for **30 s**
+   (`GetQuoteDurationRemaining()`, whole seconds).
+2. **Check the quote against the price you showed.** Blizzard refuses a unit price more than 5% over its preview
+   (`MAXIMUM_PREVIEW_PRICE_DIFFERENTIAL = 1.05`). A smaller rise is shown as an increase before Buy Now is enabled.
+3. **Buy:** `ConfirmCommoditiesPurchase(itemID, quantity)` → `COMMODITY_PURCHASE_SUCCEEDED` or `_FAILED`.
+4. **Delivery:** the items come **by mail**, not to the bags [F-132]. Don't count the bags to see what was bought.
+   Record the purchase yourself, so the player isn't told to buy it again before the mail is collected.
+
+What to know:
+- **One quote at a time.** Blizzard's buy dialog uses the same quote and cancels whatever quote is open when it
+  hides (`OnHide` → `CancelCommoditiesPurchase`). It also hides itself once `GetQuoteDurationRemaining()` reaches 0.
+  Don't start a quote while `AuctionHouseFrame.BuyDialog` is shown. Cancel yours on `AUCTION_HOUSE_CLOSED`.
+- **The events don't name the item** (except `COMMODITY_PURCHASED(itemID, quantity)`, which didn't fire before
+  `SUCCEEDED` [F-132]). Act on them only while your own quote is open.
+- Blizzard shows the countdown in the last 10 s (`REMAINING_QUOTE_DURATION_THRESHOLD`).
+- Each call goes straight from a click handler (or a typed command), never from a timer, a queue or an event
+  handler: one player action, one purchase.
+- Check `GetMoney()` against the quote's total before confirming. Watch `ADDON_ACTION_BLOCKED` and
+  `ADDON_ACTION_FORBIDDEN(addonName, func)` for your addon's name.
+- Gear: `PlaceBid(auctionID, buyoutAmount)` from `GetItemSearchResultInfo` (Blizzard shows a popup first). Not
+  tested on Forever yet.
+- Working code: BuffettForever `Pricing\Buy.lua` (`/bf buytest`, logged in `diag.purchases`).
 
 ## Deposits and the house cut
 - `CalculateCommodityDeposit(itemID, duration, quantity)` and `CalculateItemDeposit(itemLocation, duration,

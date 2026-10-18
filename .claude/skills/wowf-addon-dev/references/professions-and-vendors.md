@@ -27,6 +27,23 @@ Recipe data is client-side: `GetRecipeInfo` and `GetRecipeSchematic` work with n
 known and unknown recipes [F-123, Probe 70425]. Blizzard's objective tracker relies on the same thing
 (`Blizzard_ObjectiveTracker\Blizzard_ProfessionsRecipeTracker.lua`).
 
+### The character's professions and skill-up colours [F-133]
+- **Professions without the window:** `GetProfessions()` returns 7 slot indexes, any of which may be nil. Pass each
+  to `GetProfessionInfo(i)`; its 7th return is the Classic skill line (165 Leatherworking …), which your recipe data
+  uses. On 70450, slot 3 held First Aid and slot 5 Cooking. If a line ever comes back as a Forever child line
+  (2937–2948 [F-126]), map it with `C_TradeSkillUI.GetProfessionInfoBySkillLineID(line).parentProfessionID`.
+- Re-read on `SKILL_LINES_CHANGED`. It fires for weapon skill-ups too, so compare a signature (line, rank, max rank)
+  before redrawing.
+- **The colour of a known recipe:** `C_TradeSkillUI.GetRecipeInfo(id).relativeDifficulty`, mapped through
+  `Enum.TradeskillRelativeDifficulty` (Optimal, Medium, Easy, Trivial). Colour it with the globals
+  `DIFFICULT_DIFFICULTY_COLOR`, `FAIR_`, `EASY_` and `TRIVIAL_DIFFICULTY_COLOR` (ColorMixins:
+  `:GenerateHexColorMarkup()`), as the profession window does.
+- **For a recipe you don't know**, use the thresholds. Ranks below the yellow threshold are orange, below
+  `floor((yellow + grey) / 2)` yellow, below grey green, the rest grey. That matched Blizzard on 11 of 13 known
+  recipes; on 2 Forever-new ones Blizzard said orange where the thresholds said grey or yellow.
+- Working code: BuffettForever `Crafting/Harvest.lua` (`Professions`, `Difficulty`), `Crafting/RecipeIndex.lua`
+  (`Difficulty`).
+
 ### Recording which recipes a character knows
 **Read them at login; no window needed.** Recipes are spells, and `C_SpellBook.IsSpellKnown(recipeID,
 Enum.SpellBookSpellBank.Player)` agreed with `GetRecipeInfo(id).learned` on all 592 Leatherworking recipes checked

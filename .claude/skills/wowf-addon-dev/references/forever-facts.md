@@ -386,6 +386,34 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   Blizzard's Auctions tab open (`HasFullOwnedAuctionResults()` true). For a commodity auction,
   **`buyoutAmount` is per unit**: 2 Light Leather posted at 5g each read quantity 2, buyoutAmount 50000.
   A 2-hour auction read `timeLeftSeconds` 7198 just after posting. [Probe 70425]
+- **[F-132]** **An addon can buy a commodity**, the way Blizzard's Buy Now button does (BuffettForever's probe,
+  2026-10-17, typed as a slash command, so inside a key press):
+  - `C_AuctionHouse.StartCommoditiesPurchase(2589, 1)` (the 2 documented arguments) brought
+    `COMMODITY_PRICE_UPDATED(19, 19)` (unit, total) 0.1 s later, and `GetQuoteDurationRemaining()` read **30** (seconds).
+  - `ConfirmCommoditiesPurchase(2589, 1)` went through with 1 s of the quote left: `COMMODITY_PURCHASE_SUCCEEDED` came
+    0.4 s later, and exactly the quote (19c) was spent.
+  - No `ADDON_ACTION_BLOCKED` or `ADDON_ACTION_FORBIDDEN`.
+  - **The purchase arrives by mail**, not in the bags. The bag and bank count were unchanged 2 s later, and the
+    Linen Cloth was in the mailbox.
+  - `COMMODITY_PURCHASED` didn't fire before `SUCCEEDED`. The probe stopped listening at `SUCCEEDED`, so it may come
+    later or not at all. Don't rely on it for the quantity.
+  - Still untested: `PlaceBid` (gear), and a quote refused for a price rise.
+
+  [Probe 70450]
+- **[F-133]** **Professions and skill without the window** (BuffettForever's harvest, 2026-10-17):
+  - `GetProfessions()` gave slot 1 Leatherworking, slot 2 Skinning, **slot 3 First Aid** and slot 5 Cooking. Slots 4, 6
+    and 7 were empty for this character (retail's order would put fishing in slot 4: unconfirmed).
+  - `GetProfessionInfo(i)`'s 7th return is the **Classic skill line** (165, 393, 129, 185), not the Forever child line
+    [F-126], so it matches recipe data directly. Rank and max rank: 49/75, 163/225, 1/75 and 1/75.
+  - `C_TradeSkillUI.GetRecipeInfo(id).relativeDifficulty` (`Enum.TradeskillRelativeDifficulty`: Optimal 0, Medium 1,
+    Easy 2, Trivial 3) was set for **13 of 13** known recipes. Whether the profession window was open wasn't recorded.
+    - It matched the thresholds' colour on the 11 Classic recipes: orange below yellow, yellow, then green from
+      `floor((yellow + grey) / 2)`, then grey at grey.
+    - It didn't match on 2 Forever-new recipes. Blizzard said optimal for 1229517 (Skinning 163, thresholds 20/25,
+      which say trivial) and for 1229737 (rank 1, thresholds 1/5, which say medium). Prefer Blizzard's value.
+  - Justin saw `DIFFICULT_`/`FAIR_`/`EASY_`/`TRIVIAL_DIFFICULTY_COLOR` match the profession window on 3 recipes.
+
+  [Probe 70450]
 
 ## 14. Retest checklist (run on every new build)
 
@@ -404,7 +432,8 @@ Use `/wowfprobe full`, then `cli.py probe-report`.
    realm/faction keys and which characters share an AH ([F-081]); `GetRecipeSchematic` with the window closed
    and for an unknown recipe; `GetAllRecipeIDs` signature; `C_SpellBook.IsSpellKnown(recipeID)` for learned recipes
    ([F-123]); merchant `numAvailable` for unlimited stock ([F-124]). BuffettForever's `diag.harvest` answers the
-   profession ones. Its `diag.deposits` checks the deposit formula against the game ([F-129]), and `diag.mail`
-   the AH mail subjects and `daysLeft` ([F-130]).
+   profession ones, with the profession slots and skill-up colours ([F-133]). Its `diag.deposits` checks the deposit
+   formula against the game ([F-129]), `diag.mail` the AH mail subjects and `daysLeft` ([F-130]), and
+   `diag.purchases` whether an addon can still buy and where the purchase goes ([F-132]).
 10. Regenerate recipe data from the new build's tables and diff the counts against [F-126]:
     `python tools/wowf/cli.py recipe-catalog build --build <build>` (then `git diff --stat BuffettForever/Data`).

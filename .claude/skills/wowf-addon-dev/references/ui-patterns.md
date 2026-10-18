@@ -73,6 +73,21 @@ Addon frames that you create aren't protected. You only need combat-lockdown car
     hidden row. Clearing the search then keeps what was picked.
   - The text survives hiding the window. BuffettForever also clears the focus in the box's OnHide, so a window
     closed while typing can't keep the keyboard.
+- **Collapsible groups in one list**, as the profession window's categories. Example: BuffettForever
+  `UI/ResultsList.lua` 1.0.0, tested on 70450.
+  - Put header elements (`{ header = true, ... }`) and row elements in one data provider. Choose the frame per
+    element with `view:SetElementFactory(function(factory, data) factory(template, initializer) end)`, and give
+    each its height with `view:SetElementExtentCalculator(function(index, data) return h end)`.
+    `SetElementInitializer` is a one-template wrapper around the factory.
+  - The header is Blizzard's `ListHeaderVisualTemplate` (Blizzard_SharedXML `ListTemplates.xml`, loads on Forever):
+    a Button with a plus/minus collapse button and a title. Use 25 px tall, as the profession window does. Then:
+    - `SetTitleColor(false, NORMAL_FONT_COLOR)` for the gold title;
+    - `SetHeaderText(text)`;
+    - `GetCollapseButton():UpdateCollapsedState(collapsed)`;
+    - on hover, `CheckHighlightTitle(true)` and `GetCollapseButton():LockHighlight()`.
+  - A click flips the group's saved state and rebuilds the data provider without that group's rows. Nothing is
+    re-evaluated, so it's instant. Save the collapsed groups per character; they survive a `/reload`.
+  - While a search is typed, drop the groups with no match and show "n of m" in their headers.
 - **Scrolling text** (a details pane):
   - `CreateFrame("ScrollFrame", nil, parent, "ScrollFrameTemplate")`; the template loads on Forever, from
     `Blizzard_SharedXML\SecureUIPanelTemplates.xml`. Its `OnLoad` attaches `self.ScrollBar`, and
