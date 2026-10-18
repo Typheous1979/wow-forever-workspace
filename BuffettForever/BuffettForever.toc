@@ -4,6 +4,7 @@
 ## Author: Typheous
 ## Version: 1.0.0
 ## Category: Auction & Economy
+## X-License: MIT
 ## IconTexture: Interface\AddOns\BuffettForever\Media\Icon.tga
 ## SavedVariables: BuffettForeverDB
 ## SavedVariablesPerCharacter: BuffettForeverCharDB
