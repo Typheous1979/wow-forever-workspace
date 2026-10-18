@@ -247,7 +247,8 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   - Next: Justin reviews the page text, takes the screenshots and uploads it as Beta. Then the release set (the TOC
     version, CHANGELOG, README, the page) is committed, and the stress-test client is checked.
 - **1.0.0 released** (2026-10-18): Justin approved the page text, took the screenshots (BuffettForever01/02.png) and
-  uploads the zip to CurseForge as Beta.
+  uploaded the zip to CurseForge as a **Release** (his choice, over Beta). Next changes come from players' feedback, as
+  1.0.x releases.
   - The release set is committed.
   - The license is MIT (Justin's choice on the new repo): LICENSE, and `## X-License: MIT`.
   - The zip has 45 files.
