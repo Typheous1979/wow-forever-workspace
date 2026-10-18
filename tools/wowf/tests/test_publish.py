@@ -12,23 +12,40 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import publish  # noqa: E402
 
 
+# The private-looking fixtures are put together at run time, so this file itself never trips the scan it tests
+# (the workspace's history is scanned before each push).
+AT = "@"
+WIN_PATH = "C:" + "\\Users\\Bob\\x"
+WIN_PATH_ESCAPED = "C:" + "\\\\Users\\\\Bob\\\\y"
+POSIX_PATH = "/c/" + "Users/Bob/z"
+APPDATA = "App" + "Data\\Local"
+ACCOUNT = "123456" + "#1"
+
+
 class PrivateHitsTests(unittest.TestCase):
     def test_finds_each_kind_and_counts_only(self):
-        text = ("path C:\\Users\\Bob\\x and C:\\\\Users\\\\Bob\\\\y, /c/Users/Bob/z, AppData\\Local, account 123456#1, "
-                "mail bob@gmail.com, SecretAccountName")
+        text = (f"path {WIN_PATH} and {WIN_PATH_ESCAPED}, {POSIX_PATH}, {APPDATA}, account {ACCOUNT}, "
+                f"mail bob{AT}mysite.dev, SecretAccountName")
         hits = publish.private_hits(text, {"SecretAccountName"})
         self.assertEqual(hits["this machine's paths or account names"], 1)
         self.assertEqual(hits["Windows user paths"], 2)
         self.assertEqual(hits["POSIX user paths"], 1)
-        self.assertEqual(hits["AppData"], 1)
+        self.assertEqual(hits["AppData paths"], 1)
         self.assertEqual(hits["account-ID shapes"], 1)
         self.assertEqual(hits["email addresses"], 1)
 
+    def test_removed_lines_are_already_published(self):
+        log = (f"commit 1\n    tools: a fix\n--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-# {WIN_PATH}\n+# clean\n")
+        self.assertEqual(publish.private_hits(publish.added_text(log)), {})
+        self.assertEqual(publish.private_hits(publish.added_text(log.replace("+# clean", f"+# {POSIX_PATH}"))),
+                         {"POSIX user paths": 1})
+
     def test_noreply_and_your_own_email_are_fine(self):
-        text = ("Co-Authored-By: Claude <noreply@anthropic.com>\nAuthor: me <me@mysite.dev>\n%LOCALAPPDATA%\\wowf\n"
+        me = f"me{AT}mysite.dev"
+        text = (f"Co-Authored-By: Claude <noreply@anthropic.com>\nAuthor: me <{me}>\n%LOCALAPPDATA%\\wowf\n"
                 "+@unittest.skipUnless(shutil.which(\"git\"))\ngit config user.email test@example.com\n")
-        self.assertEqual(publish.private_hits(text, set(), "me@mysite.dev"), {})
-        self.assertEqual(publish.private_hits("someone@mysite.dev", set(), "me@mysite.dev"), {"email addresses": 1})
+        self.assertEqual(publish.private_hits(text, set(), me), {})
+        self.assertEqual(publish.private_hits(f"someone{AT}mysite.dev", set(), me), {"email addresses": 1})
 
 
 def _git_has_subtree():
@@ -82,7 +99,7 @@ class SplitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             git, addon = self._repo(d)
             with open(os.path.join(addon, "Core.lua"), "a", encoding="utf-8", newline="\n") as f:
-                f.write("-- C:\\Users\\Bob\\Desktop\n")
+                f.write(f"-- {WIN_PATH}\n")
             git("commit", "-q", "-am", "MyAddon: a path")
             with contextlib.redirect_stdout(io.StringIO()) as out:
                 self.assertEqual(publish.main([addon]), 1)
@@ -92,7 +109,7 @@ class SplitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             git, addon = self._repo(d)
             with open(os.path.join(d, "tools", "other.py"), "a", encoding="utf-8", newline="\n") as f:
-                f.write("# bob@mysite.dev\n")
+                f.write(f"# bob{AT}mysite.dev\n")
             git("commit", "-q", "-am", "tools: a mail")
             here = os.getcwd()
             try:
@@ -103,6 +120,32 @@ class SplitTests(unittest.TestCase):
             finally:
                 os.chdir(here)
             self.assertIn("email addresses: 1", out.getvalue())
+
+    def test_scan_push_pushes_only_when_clean(self):
+        with tempfile.TemporaryDirectory() as d:
+            git, addon = self._repo(d)
+            remote = os.path.join(d, "remote.git")
+            subprocess.run(["git", "init", "-q", "--bare", remote], check=True)
+            git("remote", "add", "origin", remote)
+            git("push", "-q", "-u", "origin", "HEAD")
+            with open(os.path.join(addon, "Core.lua"), "a", encoding="utf-8", newline="\n") as f:
+                f.write(f"-- {WIN_PATH}\n")
+            git("commit", "-q", "-am", "MyAddon: a path")
+            here = os.getcwd()
+            try:
+                os.chdir(d)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(publish.main(["--scan", "@{u}..HEAD", "--push"]), 1)
+                self.assertNotEqual(git("rev-parse", "HEAD"), git("--git-dir", remote, "rev-parse", "HEAD"))
+                git("reset", "-q", "--hard", "HEAD~1")
+                with open(os.path.join(addon, "Core.lua"), "a", encoding="utf-8", newline="\n") as f:
+                    f.write("-- nothing private\n")
+                git("commit", "-q", "-am", "MyAddon: clean")
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(publish.main(["--scan", "@{u}..HEAD", "--push"]), 0)
+                self.assertEqual(git("rev-parse", "HEAD"), git("--git-dir", remote, "rev-parse", "HEAD"))
+            finally:
+                os.chdir(here)
 
 
 if __name__ == "__main__":

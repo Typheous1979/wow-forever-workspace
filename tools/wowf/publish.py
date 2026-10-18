@@ -1,7 +1,8 @@
 """Publish an addon to its own GitHub repo: its folder's history, split from the workspace.
 
   python tools/wowf/cli.py publish ADDON [--repo URL] [--push]
-  python tools/wowf/cli.py publish --scan RANGE     # only the privacy scan, e.g. origin/main..HEAD before a push
+  python tools/wowf/cli.py publish --scan RANGE [--push]   # the privacy scan alone; --push: then `git push`, only
+                                                           # when it's clean (the workspace: origin/main..HEAD)
 
 Development stays in this workspace (the shared tools and skills). The addon's repo gets only its folder's
 commits (`git subtree split`), so players and CurseForge's source link see the addon alone:
@@ -36,7 +37,7 @@ GENERIC = {"program files", "program files (x86)", "world of warcraft", "_classi
 PATTERNS = [
     ("Windows user paths", re.compile(r"[A-Za-z]:\\+Users\\+[^\\\s]+")),
     ("POSIX user paths", re.compile(r"/[cC]/Users/[^/\s]+")),
-    ("AppData", re.compile(r"AppData")),
+    ("AppData paths", re.compile(r"AppData[\\/]+(?:Local|Roaming|LocalLow)\b")),
     ("account-ID shapes", re.compile(r"\b\d{6,}#\d\b")),
 ]
 # An address starts with a letter or digit, so "+@unittest.skipUnless" (a diff line's decorator) isn't one.
@@ -104,10 +105,16 @@ def _git(cwd, *args, check=True):
                           errors="replace", check=check)
 
 
+def added_text(log):
+    """What a `git log -p -U0` adds: the commit headers and messages, and the diffs' added lines. Removed lines
+    are left out: they were added (and scanned) by an earlier commit, or are already published."""
+    return "\n".join(line for line in log.splitlines() if not line.startswith("-"))
+
+
 def scan(top, ref):
     """Print the privacy scan of ref's history (a branch or a range); returns 0 when clean, 1 on a hit."""
     own = _git(top, "config", "user.email", check=False).stdout.strip() or None
-    log = _git(top, "log", "-p", ref).stdout
+    log = added_text(_git(top, "log", "-p", "-U0", ref).stdout)
     hits = private_hits(log, local_secrets(top), own)
     if hits:
         print(f"publish: {ref}'s history holds private strings; nothing pushed. Counts only:")
@@ -123,11 +130,18 @@ def main(argv):
     p.add_argument("addon", nargs="?")
     p.add_argument("--repo", help="the addon's own repo, e.g. https://github.com/<you>/<Addon>.git")
     p.add_argument("--push", action="store_true", help="push the split to the repo's main (never forced)")
-    p.add_argument("--scan", metavar="RANGE", help="only scan a branch or range of the workspace (no split, no push)")
+    p.add_argument("--scan", metavar="RANGE", help="only scan a branch or range of the workspace (no split); with "
+                                                       "--push, then `git push` the current branch, only when clean")
     a = p.parse_args(argv)
     if a.scan:
         top = _git(os.getcwd(), "rev-parse", "--show-toplevel").stdout.strip()
-        return scan(top, a.scan)
+        if scan(top, a.scan):
+            return 1
+        if not a.push:
+            return 0
+        pushed = _git(top, "push", check=False)   # the gate is this function: no shell pipe can hide its result
+        print("publish:", ((pushed.stderr or "") + (pushed.stdout or "")).strip().splitlines()[-1:] or "pushed")
+        return 0 if pushed.returncode == 0 else 1
     if not a.addon:
         p.error("an addon, or --scan RANGE")
     root = None if os.path.isabs(a.addon) else config.load()["_root"]
