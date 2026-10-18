@@ -18,7 +18,7 @@ local FLAG_NEW, FLAG_BOP = 1, 2
 local PROFESSION, MIN_RANK, YELLOW, GREY, FLAGS, OUTPUT, COUNT, FIRST_REAGENT = 1, 2, 3, 4, 5, 6, 7, 8
 local PRINT_LIMIT = 20
 
-local byReagent, byOutput, total
+local byReagent, byOutput, total, lines
 
 local function Add(map, key, recipeID)
     local list = map[key]
@@ -31,9 +31,10 @@ end
 
 local function Ensure()
     if byReagent then return end
-    byReagent, byOutput, total = {}, {}, 0
+    byReagent, byOutput, total, lines = {}, {}, 0, {}
     for recipeID, r in pairs(ns.Recipes or {}) do
         total = total + 1
+        lines[r[PROFESSION]] = (lines[r[PROFESSION]] or 0) + 1
         Add(byOutput, r[OUTPUT], recipeID)
         for i = FIRST_REAGENT, #r, 2 do Add(byReagent, r[i], recipeID) end
     end
@@ -150,9 +151,38 @@ function RecipeIndex.FromVendorGoods(isVendorSold, filter)
     return out
 end
 
+-- Every recipe on the filter's professions, filtered, sorted. No professions gives none (a filter without
+-- them would mean every recipe).
+function RecipeIndex.InProfessions(filter)
+    local out = {}
+    if not (filter and filter.professions and next(filter.professions)) then return out end
+    for recipeID in pairs(ns.Recipes or {}) do
+        if RecipeIndex.Matches(recipeID, filter) then out[#out + 1] = recipeID end
+    end
+    table.sort(out)
+    return out
+end
+
 function RecipeIndex.Count()
     Ensure()
     return total
+end
+
+-- The professions the data has recipes for: { [skillLine] = recipe count }.
+function RecipeIndex.ProfessionLines()
+    Ensure()
+    return lines
+end
+
+-- The profession window's difficulty at a skill rank, from the recipe's thresholds: optimal (orange)
+-- below yellowAt, medium (yellow) below the midpoint of yellowAt and greyAt, easy (green) below greyAt,
+-- trivial (grey) from there. nil without a rank.
+function RecipeIndex.Difficulty(rank, yellow, grey)
+    if type(rank) ~= "number" or type(yellow) ~= "number" or type(grey) ~= "number" then return nil end
+    if rank < yellow then return "optimal" end
+    if rank < math.floor((yellow + grey) / 2) then return "medium" end
+    if rank < grey then return "easy" end
+    return "trivial"
 end
 
 -- The client's (localized) profession name, or the skill line ID.
@@ -245,5 +275,9 @@ function RecipeIndex.SelfTest(report)
     end
     check("RECIPES-rows", bad == 0, string.format("%d malformed rows", bad))
     check("VENDOR-seed", ns.VendorSeed ~= nil and ns.VendorSeed[2320] == 10, "Coarse Thread costs 10c at a vendor")
+    local D = RecipeIndex.Difficulty
+    check("SKILL-COLOR", D(54, 55, 75) == "optimal" and D(55, 55, 75) == "medium" and D(64, 55, 75) == "medium"
+        and D(65, 55, 75) == "easy" and D(74, 55, 75) == "easy" and D(75, 55, 75) == "trivial" and D(nil, 55, 75) == nil,
+        "yellow from 55, green from 65, grey from 75")
     return passed, failed
 end

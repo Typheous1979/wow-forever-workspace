@@ -92,8 +92,10 @@ ns.DEFAULT_SETTINGS = defaults.settings   -- the settings panel's Defaults butto
 local charDefaults = {
     window = {},   -- main window position (per character)
     tray = {},     -- reagent tray: { { itemID, qty }, ... } in slot order (Crafting/Tray.lua)
-    results = {    -- the craftable-items list (UI/ResultsList.lua); view: "tray", "vendor" or "flips"
+    results = {    -- the craftable-items list (UI/ResultsList.lua); view: "tray", "vendor", "flips" or "professions"
         sortKey = "rank", sortDesc = true, knownOnly = false, showUnconfirmed = false, view = "tray",
+        -- the Profession profits view's own filters, and its collapsed groups ([skillLine] = true)
+        professions = { knownOnly = true, showUnconfirmed = false, collapsed = {} },
     },
 }
 

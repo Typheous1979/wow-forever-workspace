@@ -100,9 +100,51 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   search scrolls to the top; the count line reads "4 of 168 shown". SEARCH-MATCH in the selftest (112). Tested on
   70450 (Justin's client updated): selftest 112/112, filtering as you type, any word order, the no-match message and
   the empty details, the search kept across tabs and a reopen, the X, and Escape twice. The zip was rebuilt with it.
+- 1.0.0 Profession profits pass 1 (2026-10-17; the plan is in the decisions below):
+  - VIEWS "professions" with Evaluator.ForProfessions on TrayContext (owned = the tray's units only) and TrayCrafts
+    (shared with ForTray);
+  - Harvest.Professions (GetProfessions slots, then known recipes' lines), Rank, Difficulty (GetRecipeInfo's
+    relativeDifficulty, else RecipeIndex.Difficulty from the thresholds), DifficultyColor;
+  - groups as header elements (ListHeaderVisualTemplate, SetElementFactory) in the linear list, GroupElements;
+    per-view filter prefs (results.professions);
+  - the Skill-up row and tray-only slot tooltips in DetailPanel; Show keeps the scroll for the same recipe and view;
+  - the hidden purchase probe `/bf buytest` (Pricing/Buy.lua, diag.purchases);
+  - diag.harvest.professions (raw slots, Blizzard's difficulty against the thresholds', the evaluation time);
+  - selftest 117.
+
+  Tested on 70450: selftest 117/117; the tab, its groups (collapsed state kept over a /reload), the filters and the
+  skill-up colours (the profession window's, checked on 3 recipes) work; tray-only slots work. Blizzard's difficulty
+  matched the thresholds' on 11 of 13 known recipes [F-133]. 399 recipes evaluate in 21 ms (42 ms at worst), so no
+  splitting across frames. `/bf buytest 2589 1` then `confirm` bought 1 Linen Cloth for 19c, delivered by mail
+  [F-132]. Justin found the "Craft" source confusing in this tab, where everything not in the tray is bought.
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). The expiry and mailbox-reopen tests passed on
   70425 (2026-10-17).
+
+## Decisions (2026-10-17, the Profession profits tab; Justin's answers, then the approved plan)
+- **The tab:** "Profession profits", between AH flips and Options. Every recipe in this character's professions, in
+  collapsible groups per profession (Justin chose groups over one list with a dropdown). Known only is on by default.
+  It goes into 1.0.0, which isn't uploaded yet ("before we release").
+- **Materials: tray only** (Justin; not "owned first"). In this tab only the tray's units count as yours; everything
+  else is bought, even what's in the bags or bank. The tooltips say so: the tab, the reagent slots (with the bag and
+  bank count), the Cost row, and later the Buy button.
+- **Buying:** the live price, then a confirm click, per reagent. The Auction House must be open, and the button's
+  tooltip says so.
+  - If Forever blocks addon purchases, the button falls back to `AuctionHouseFrame:SetSearchText(name)` (agreed).
+  - Each purchase call runs inside the player's click, never through a queue or a timer.
+  - Blizzard's 5% rule (a quote more than 5% over the preview is refused) applies only against a fresh search's
+    price; against an older scan, the difference is shown.
+- **The Buy bar** shows on Profession profits and AH flips only. Bought reagents are credited to the tray, because
+  AH purchases most likely arrive by mail: the tray-only plan then never offers them twice.
+- **Extras** (Justin chose all three): skill-up colours on the * known marker in every view (the row's colour still
+  shows profit); buying AH flips (commodities by quote and confirm, gear by PlaceBid on an auction shown first);
+  buying vendor reagents at a merchant (BuyMerchantItem, one click per line, a confirm at 150g or more).
+- **Passes:**
+  1. the grouped tab, tray-only costs, skill and colours, and a hidden purchase probe (`/bf buytest`);
+  2. the bar's Crafts box, Best and live prices at the AH;
+  3. buying AH reagents;
+  4. buying flips and vendor reagents;
+  5. the release docs.
 
 ## Decisions (2026-10-17, M5; Justin: "Proceed with Pass 1" after the plan and its recommendations)
 - **Order:** pass 1 the settings; pass 2 the release (README, CurseForge page, screenshots, 1.0.0, package, then a

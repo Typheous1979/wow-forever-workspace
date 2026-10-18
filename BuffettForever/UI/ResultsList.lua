@@ -1,17 +1,20 @@
 local addonName, ns = ...
 
--- The middle pane, in three views (Blizzard's tabs under the window, like the Auction House's;
+-- The middle pane, in four views (Blizzard's tabs under the window, like the Auction House's;
 -- the pane's heading names the view):
 -- - Tray: every recipe that uses the tray's reagents (Evaluator.ForTray);
 -- - Vendor crafts: recipes you know that profit on vendor prices alone (Evaluator.VendorCrafts);
--- - AH flips: listings in the last full scan below what a vendor pays (Pricing/Flips.lua).
+-- - AH flips: listings in the last full scan below what a vendor pays (Pricing/Flips.lua);
+-- - Profession profits: every recipe in this character's professions, with only the tray's materials
+--   counted as yours (Evaluator.ForProfessions), in a collapsible group per profession (Justin, 2026-10-17).
 -- One row each:
--- - the columns: the item (with the units; * = a recipe this character knows), cost, best exit
---   (AH or V = vendor), profit, ROI and confidence grade;
+-- - the columns: the item (with the units; * = a recipe this character knows, in the profession window's
+--   skill-up colour), cost, best exit (AH or V = vendor), profit, ROI and confidence grade;
 -- - click a heading to sort (the ranking by default; again to reverse); click a row for the details;
 -- - losses are red, recommended rows white, the rest grey; orange: a vendor craft whose materials
 --   would fetch more on the AH;
--- - "Known only" and "Show unconfirmed" filter the Tray view;
+-- - "Known only" and "Show unconfirmed" filter the Tray and Profession profits views, each its own;
+--   "Show unconfirmed" hides while "Known only" is on (a known recipe is always confirmed);
 -- - the search box right of the heading filters every view by item name as you type (every word, in any
 --   order). It only hides rows, with no re-evaluation; the top pick still advises on the whole view.
 -- Also fills the Top pick panel. Re-evaluates (debounced) when the tray, the prices, the known
@@ -34,9 +37,11 @@ local COLUMNS = {   -- left to right, after the item name
 local BAR_SPACE = 24          -- the scroll bar and the box inset, right of the rows
 local QUESTION_MARK = 134400
 local GRADE_COLOR = { A = "|cff33ff33", B = "|cffb4ff33", C = "|cffffd100", D = "|cffff5533" }
+local KNOWN_BLUE = "|cff66ccff"   -- the known marker when the skill is unknown
 local DEBOUNCE = 0.15
 local TAB_HANG = 30   -- how far the tabs reach below the window (32 tall, 2 tucked under its edge)
 local SEARCH_WIDTH = 160   -- as on Blizzard's AddOns list
+local HEADER_HEIGHT = 25   -- a profession's group header, as the profession window's categories
 
 local VIEWS = {   -- label: the tab; title: the pane's heading
     { key = "tray", label = "Tray", title = "Craftable items",
@@ -45,6 +50,8 @@ local VIEWS = {   -- label: the tab; title: the pane's heading
       tip = "Recipes you know that profit on vendor prices alone: reagents from a vendor or your bags (counted at what a vendor pays for them), the result sold to a vendor. Certain profit, no Auction House risk." },
     { key = "flips", label = "AH flips", title = "AH flips",
       tip = "Listings in your last full scan priced below what a vendor pays: buy them on the Auction House and sell them to a vendor. Listings vanish fast, so the confidence follows the scan's age." },
+    { key = "professions", label = "Profession profits", title = "Profession profits",
+      tip = "Every recipe in your professions, grouped by profession. Costs count only what's in your tray: everything else is bought, even what's in your bags or bank." },
 }
 
 local window, panel, pick, box, countText, knownCheck, unconfirmedCheck, searchBox
@@ -55,9 +62,21 @@ local dirty, pending = true, nil
 local words, searchText = {}, ""   -- the search: its lowercased words, and the text as typed (trimmed)
 local scanT                        -- AH flips: when the scan they come from ran
 local viewEmpty = ""               -- what the list says when the view has no rows at all
+local ShowRows                     -- defined below; the group headers call it
 
 local function Prefs()
     return ns.charDB.results
+end
+
+local function View()
+    return Prefs().view or "tray"
+end
+
+-- The filters' prefs: the Profession profits view keeps its own, with its collapsed groups.
+local function ViewPrefs()
+    local prefs = Prefs()
+    if View() == "professions" then return prefs.professions end
+    return prefs
 end
 
 local function Name(itemID)
@@ -66,6 +85,10 @@ end
 
 local function Pct(x)
     return string.format("%d%%", math.floor(x * 100 + 0.5))
+end
+
+local function Recipes(n)
+    return n == 1 and L["1 recipe"] or string.format(L["%d recipes"], n)
 end
 
 -- ---------------------------------------------------------------- search
@@ -146,6 +169,12 @@ local function Color(r)
     return 0.6, 0.6, 0.6
 end
 
+-- "* " in the profession window's skill-up colour for this recipe (blue when the skill is unknown).
+local function KnownMark(r)
+    local key = ns.Harvest.Difficulty(r.recipe.recipeID)
+    return (key and ns.Harvest.DifficultyColor(key) or KNOWN_BLUE) .. "*|r "
+end
+
 local function InitRow(row, data)
     UI.SetupRow(row)
     if not row.icon then
@@ -181,7 +210,8 @@ local function InitRow(row, data)
     local r = data.result
     row.recipeID, row.output = r.recipe.recipeID, r.recipe.output
     row.icon:SetTexture(C_Item.GetItemIconByID(r.recipe.output) or QUESTION_MARK)
-    local mark = r.view and "" or ((r.known and "|cff66ccff*|r " or "") .. (r.vendorOnly and "|cffffd100v|r " or ""))
+    local marks = r.view == nil or r.view == "professions"   -- recipe views: known and vendor-goods marks
+    local mark = marks and ((r.known and KnownMark(r) or "") .. (r.vendorOnly and "|cffffd100v|r " or "")) or ""
     row.left:SetText(string.format("%s%s x%d", mark, Name(r.recipe.output), r.units))
     local cR, cG, cB = Color(r)
     row.left:SetTextColor(cR, cG, cB)
@@ -199,9 +229,96 @@ local function InitRow(row, data)
     row.selected:SetShown(r.recipe.recipeID == selected)
 end
 
+-- ---------------------------------------------------------------- profession groups
+
+-- "Leatherworking 49/75   6 recipes, 2 recommended" (while searching: how many of its recipes match).
+local function HeaderText(e)
+    local p = e.profession
+    local skill = p.rank and p.maxRank and string.format(" %d/%d", p.rank, p.maxRank) or ""
+    local counts = #words > 0 and string.format(L["%d of %d shown"], e.shown, e.total)
+        or string.format(L["%s, %d recommended"], Recipes(e.total), e.recommended)
+    return string.format("%s%s   |cff999999%s|r", p.name or ns.RecipeIndex.ProfessionName(p.skillLine), skill, counts)
+end
+
+local function HeaderEnter(self)
+    self:CheckHighlightTitle(true)
+    self:GetCollapseButton():LockHighlight()
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText(self.title or "", 1, 1, 1)
+    GameTooltip:AddLine(self.collapsed and L["Click to show its recipes."] or L["Click to hide its recipes."], 1, 0.82, 0)
+    GameTooltip:Show()
+end
+
+local function HeaderLeave(self)
+    self:CheckHighlightTitle(false)
+    self:GetCollapseButton():UnlockHighlight()
+    GameTooltip_Hide()
+end
+
+-- A profession's header: Blizzard's ListHeaderVisualTemplate, gold as the profession window's categories,
+-- with the plus/minus of a collapsed or open group. A click hides or shows the group's rows (no re-evaluation).
+local function InitHeader(button, data)
+    if not button.isSetUp then
+        button.isSetUp = true
+        button:SetTitleColor(false, NORMAL_FONT_COLOR)
+        button:SetScript("OnClick", function(self)
+            local collapsed = ViewPrefs().collapsed
+            collapsed[self.skillLine] = not collapsed[self.skillLine] or nil
+            ShowRows()
+        end)
+        button:SetScript("OnEnter", HeaderEnter)
+        button:SetScript("OnLeave", HeaderLeave)
+    end
+    local p = data.profession
+    button.skillLine, button.collapsed = data.skillLine, data.collapsed
+    button.title = (p.name or ns.RecipeIndex.ProfessionName(p.skillLine))
+        .. (p.rank and p.maxRank and string.format(" %d/%d", p.rank, p.maxRank) or "")
+    button:SetHeaderText(HeaderText(data))
+    button:GetCollapseButton():UpdateCollapsedState(data.collapsed)
+end
+
+-- The Profession profits view's list: a header per profession in order (its recipe and recommended counts
+-- over all its rows), then the profession's rows that are shown, in their order; a collapsed group gives
+-- its header only. A profession with no recipes is left out, and so is one with none shown while
+-- searching. (Pure: the self-test runs it.)
+local function GroupElements(professions, all, rows, collapsed, searching)
+    local groups, order = {}, {}
+    for _, p in ipairs(professions) do
+        local g = { profession = p, total = 0, recommended = 0, rows = {} }
+        groups[p.skillLine] = g
+        order[#order + 1] = g
+    end
+    for _, r in ipairs(all) do
+        local g = groups[r.recipe.profession]
+        if g then
+            g.total = g.total + 1
+            if r.recommended then g.recommended = g.recommended + 1 end
+        end
+    end
+    for _, r in ipairs(rows) do
+        local g = groups[r.recipe.profession]
+        if g then g.rows[#g.rows + 1] = r end
+    end
+    local elements = {}
+    for _, g in ipairs(order) do
+        if g.total > 0 and (#g.rows > 0 or not searching) then
+            local line = g.profession.skillLine
+            local closed = collapsed[line] == true
+            elements[#elements + 1] = { header = true, skillLine = line, profession = g.profession, total = g.total,
+                                        recommended = g.recommended, shown = #g.rows, collapsed = closed }
+            if not closed then
+                for _, r in ipairs(g.rows) do elements[#elements + 1] = { result = r } end
+            end
+        end
+    end
+    return elements
+end
+
 local function Repaint()
     if not box then return end
-    box:ForEachFrame(function(row, data) InitRow(row, data) end)
+    box:ForEachFrame(function(frame, data)
+        if data.header then InitHeader(frame, data) else InitRow(frame, data) end
+    end)
 end
 
 -- ---------------------------------------------------------------- top pick
@@ -262,7 +379,7 @@ end
 -- ---------------------------------------------------------------- update
 
 local function Filter()
-    local prefs = Prefs()
+    local prefs = ViewPrefs()
     return { known = prefs.knownOnly and "char" or nil, confirmed = not prefs.showUnconfirmed }
 end
 
@@ -274,10 +391,6 @@ function ResultsList.Select(recipeID)
     end
     ns.DetailPanel.Show(result)
     Repaint()
-end
-
-local function View()
-    return Prefs().view or "tray"
 end
 
 -- The line under the list, and what the list says when it's empty; while searching, how many rows match.
@@ -306,10 +419,11 @@ local function ShowCount()
     panel.Empty:SetShown(#shown == 0)
 end
 
--- The rows the search lets through, in the current sort order (no re-evaluation). The selection stays while
--- its row is shown, else moves to the best-ranked row shown. fromTop: a new search starts at the top of the
--- list. Returns true when the selection changed.
-local function ShowRows(fromTop)
+-- The rows the search lets through, in the current sort order (no re-evaluation); in the Profession
+-- profits view, under their profession's header. The selection stays while the search shows its row (a
+-- collapsed group keeps it), else moves to the best-ranked row shown, one in an open group first.
+-- fromTop: a new search starts at the top of the list. Returns true when the selection changed.
+function ShowRows(fromTop)
     Sort()
     shown = {}
     local visible = {}
@@ -319,18 +433,30 @@ local function ShowRows(fromTop)
             visible[r.recipe.recipeID] = true
         end
     end
+    local grouped = View() == "professions"
+    local collapsed = grouped and ViewPrefs().collapsed or {}
     local previous = selected
     if not (selected and visible[selected]) then
         selected = nil
+        local fallback
         for _, r in ipairs(ranked) do
-            if visible[r.recipe.recipeID] then
-                selected = r.recipe.recipeID
-                break
+            local id = r.recipe.recipeID
+            if visible[id] then
+                fallback = fallback or id
+                if not collapsed[r.recipe.profession] then
+                    selected = id
+                    break
+                end
             end
         end
+        selected = selected or fallback
     end
     local dp = CreateDataProvider()
-    for i, r in ipairs(shown) do dp:Insert({ result = r, index = i }) end
+    if grouped then
+        for _, e in ipairs(GroupElements(ns.Harvest.Professions(), ranked, shown, collapsed, #words > 0)) do dp:Insert(e) end
+    else
+        for i, r in ipairs(shown) do dp:Insert({ result = r, index = i }) end
+    end
     box:SetDataProvider(dp, fromTop and ScrollBoxConstants.DiscardScrollPosition or ScrollBoxConstants.RetainScrollPosition)
     ShowCount()
     return selected ~= previous
@@ -353,6 +479,12 @@ local function EmptyText(view, entries)
     elseif view == "flips" then
         if not scanT then return L["Scan at the Auction House to look for listings below what a vendor pays."] end
         return L["No listing in your last full scan was below what a vendor pays."]
+    elseif view == "professions" then
+        if #ns.Harvest.Professions() == 0 then return L["This character has no profession with recipes yet."] end
+        if ViewPrefs().knownOnly and #ns.RecipeIndex.Known() == 0 then
+            return L["This character knows no recipes yet. Turn off Known only to see what your professions can learn."]
+        end
+        return L["No recipe in your professions matches these filters."]
     end
     if #entries == 0 then return L["Drop a reagent into the tray to see what it can make, what that costs and what it sells for."] end
     return L["No recipe uses these reagents with these filters."]
@@ -367,6 +499,13 @@ function ResultsList.Update()
         ranked = ns.Evaluator.VendorCrafts()
     elseif view == "flips" then
         ranked, scanT = ns.Flips.Results()
+    elseif view == "professions" then
+        local filter, lines = Filter(), {}
+        for _, p in ipairs(ns.Harvest.Professions()) do lines[p.skillLine] = true end
+        filter.professions = lines
+        local list, _, ms = ns.Evaluator.ForProfessions(entries, filter)
+        ranked = list
+        ns.Harvest.NoteEval(#ranked, ms)
     else
         ranked = ns.Evaluator.ForTray(entries, Filter())   -- recipes from vendor goods list even with an empty tray
     end
@@ -404,7 +543,8 @@ end
 
 -- ---------------------------------------------------------------- build
 
--- The tabs show the view and the heading names it; the filters apply to the Tray view only.
+-- The tabs show the view and the heading names it; the filters apply to the Tray and Profession profits
+-- views, each with its own.
 local function ShowView()
     if not knownCheck then return end   -- not built yet
     local view = View()
@@ -414,8 +554,11 @@ local function ShowView()
             panel.Title:SetText(L[v.title])
         end
     end
-    knownCheck:SetShown(view == "tray")
-    unconfirmedCheck:SetShown(view == "tray")
+    local filtered, prefs = view == "tray" or view == "professions", ViewPrefs()
+    knownCheck:SetShown(filtered)
+    knownCheck:SetChecked(prefs.knownOnly)
+    unconfirmedCheck:SetShown(filtered and not prefs.knownOnly)
+    unconfirmedCheck:SetChecked(prefs.showUnconfirmed)
 end
 
 function ResultsList.SetView(view)
@@ -500,11 +643,14 @@ local function Build(frame)
     end
     local nameHeader = Header(panel, L["Item"], "name", "TOPLEFT", 28, 120, "LEFT")
     nameHeader:SetScript("OnEnter", function(self)
+        local H = ns.Harvest
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText(L["Item"], 1, 1, 1)
         GameTooltip:AddLine(L["The default order is the evaluator's ranking: recommended first, then by ROI. Click to sort by name."],
             nil, nil, nil, true)
-        GameTooltip:AddLine("|cff66ccff*|r " .. L["a recipe this character knows"], 1, 1, 1)
+        GameTooltip:AddLine(string.format("%s*%s*%s*%s*|r %s", H.DifficultyColor("optimal"), H.DifficultyColor("medium"),
+            H.DifficultyColor("easy"), H.DifficultyColor("trivial"),
+            L["a recipe this character knows, in the profession window's skill-up colour (blue: skill unknown)"]), 1, 1, 1, true)
         GameTooltip:AddLine("|cffffd100v|r " .. L["made entirely from goods a vendor sells"], 1, 1, 1)
         GameTooltip:AddLine("|cffff9933" .. L["orange"] .. "|r " .. L["a vendor craft whose materials would fetch more on the AH"],
             1, 1, 1)
@@ -515,23 +661,36 @@ local function Build(frame)
     holder:SetPoint("TOPLEFT", 2, -44)
     holder:SetPoint("BOTTOMRIGHT", -2, 30)
     local view = CreateScrollBoxListLinearView(2, 2, 2, 2, 0)
-    view:SetElementExtent(UI.ROW_HEIGHT)
-    view:SetElementInitializer("Button", InitRow)
+    view:SetElementFactory(function(factory, data)
+        if data.header then
+            factory("ListHeaderVisualTemplate", InitHeader)
+        else
+            factory("Button", InitRow)
+        end
+    end)
+    view:SetElementExtentCalculator(function(_, data) return data.header and HEADER_HEIGHT or UI.ROW_HEIGHT end)
     box = UI.ScrollList(holder, view)
 
-    local prefs = Prefs()
     knownCheck = UI.Check(panel, L["Known only"], function(on)
-        prefs.knownOnly = on
+        ViewPrefs().knownOnly = on
+        ShowView()
         ResultsList.Update()
     end)
     knownCheck:SetPoint("BOTTOMLEFT", 6, 2)
-    knownCheck:SetChecked(prefs.knownOnly)
+    knownCheck:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(L["Known only"], 1, 1, 1)
+        GameTooltip:AddLine(View() == "professions"
+            and L["Only the recipes this character knows. Turn it off to also see the recipes your professions can learn."]
+            or L["Only the recipes this character knows. Turn it off to see every recipe that uses your tray."], nil, nil, nil, true)
+        GameTooltip:Show()
+    end)
+    knownCheck:HookScript("OnLeave", GameTooltip_Hide)
     unconfirmedCheck = UI.Check(panel, L["Show unconfirmed"], function(on)
-        prefs.showUnconfirmed = on
+        ViewPrefs().showUnconfirmed = on
         ResultsList.Update()
     end)
     unconfirmedCheck:SetPoint("LEFT", knownCheck.Text, "RIGHT", 14, 0)
-    unconfirmedCheck:SetChecked(prefs.showUnconfirmed)
     UI.Tooltip(unconfirmedCheck, L["Show unconfirmed"],
         L["Also list recipes added after Classic that nobody has confirmed yet: no character of yours knows them and their result hasn't been seen on the Auction House."])
     countText = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -551,6 +710,11 @@ end
 -- ---------------------------------------------------------------- self-test
 
 function ResultsList.SelfTest(report)
+    local passed, failed = 0, 0
+    local function check(name, ok, detail)
+        if ok then passed = passed + 1 else failed = failed + 1 end
+        report(name, ok, detail)
+    end
     local cases = {   -- the item's name, what's typed, whether it matches
         { "Bolt of Linen Cloth", "linen", true },
         { "Bolt of Linen Cloth", "LINEN bolt", true },        -- any case, any order
@@ -567,10 +731,25 @@ function ResultsList.SelfTest(report)
     for _, c in ipairs(cases) do
         if Matches(c[1], Words(c[2])) ~= c[3] then wrong[#wrong + 1] = string.format("%q in %q", c[2], c[1]) end
     end
-    local ok = #wrong == 0
-    report("SEARCH-MATCH", ok, ok and string.format("%d searches match as expected", #cases)
+    check("SEARCH-MATCH", #wrong == 0, #wrong == 0 and string.format("%d searches match as expected", #cases)
         or ("wrong: " .. table.concat(wrong, ", ")))
-    return ok and 1 or 0, ok and 0 or 1
+
+    -- Profession groups: headers in the professions' order with counts over all rows, a collapsed group's
+    -- header alone, a profession without recipes left out, and a search dropping groups with no match.
+    local professions = { { skillLine = 165, name = "LW", rank = 49, maxRank = 75 }, { skillLine = 185, name = "Cooking" },
+                          { skillLine = 129, name = "First Aid" } }
+    local function R(id, line, recommended) return { recipe = { recipeID = id, profession = line }, recommended = recommended } end
+    local all = { R(1, 165, true), R(2, 185, false), R(3, 165, false) }
+    local e = GroupElements(professions, all, all, {}, false)
+    local open = #e == 5 and e[1].header and e[1].skillLine == 165 and e[1].total == 2 and e[1].recommended == 1
+        and e[2].result == all[1] and e[3].result == all[3] and e[4].header and e[4].skillLine == 185 and e[5].result == all[2]
+    local c = GroupElements(professions, all, all, { [165] = true }, false)
+    local closed = #c == 3 and c[1].collapsed and c[2].header and c[2].skillLine == 185 and c[3].result == all[2]
+    local s = GroupElements(professions, all, { all[2] }, {}, true)
+    local searched = #s == 2 and s[1].skillLine == 185 and s[1].shown == 1 and s[1].total == 1
+    check("GROUPS", open and closed and searched, string.format("open %s, collapsed %s, searched %s", tostring(open),
+        tostring(closed), tostring(searched)))
+    return passed, failed
 end
 
 ns.On("MAIN_BUILT", Build)
@@ -581,3 +760,8 @@ for _, message in ipairs({ "TRAY_CHANGED", "SCAN_DONE", "RECIPES_KNOWN_CHANGED",
                            "BAGS_CHANGED", "VENDOR_PRICES_CHANGED", "FLIPS_CHANGED", "SETTINGS_CHANGED" }) do
     ns.On(message, Schedule)
 end
+-- A skill-up changes the group headers and the skill-up colours only: repaint, no re-evaluation.
+ns.On("PROFESSIONS_CHANGED", function()
+    if not box or not ns.Main.IsShown() then return end
+    if View() == "professions" then ShowRows() else Repaint() end
+end)

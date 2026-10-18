@@ -12,7 +12,10 @@ local addonName, ns = ...
 --   market sets it);
 -- - Mr. Market, when a price is well away from its fair value; then the verdict.
 -- A vendor craft (the Vendor crafts view) counts vendor prices only and shows what your materials would
--- fetch raw on the AH; an AH flip gets its own layout (buy, sell, result, verdict).
+-- fetch raw on the AH; an AH flip gets its own layout (buy, sell, result, verdict). In the Profession
+-- profits view only the tray's materials count as yours: the slots say "tray", and their tooltips give
+-- what the bags and bank hold (not used there). The profession line shows your skill, and a Skill-up row
+-- the profession window's colour for the recipe.
 -- Numbers sit in label/value rows; each row's tooltip says where its number comes from (Justin,
 -- 2026-10-17: data, not paragraphs). The pane scrolls (ScrollFrameTemplate).
 
@@ -37,6 +40,11 @@ local SOURCE_COLOR = { vendor = GOLD, ah = BLUE, craft = "|cffff88ff" }
 local SOURCE_TEXT = { vendor = "Vendor", ah = "AH", craft = "Craft" }
 local SOURCE_FROM = { vendor = "from a vendor", ah = "from the AH", craft = "crafted" }
 local GRADE_COLOR = { A = GREEN, B = "|cffb4ff33", C = GOLD, D = RED }
+local SKILL_TEXT = { optimal = "Orange", medium = "Yellow", easy = "Green", trivial = "Grey" }
+local SKILL_TIP = {
+    optimal = "A skill point every craft.", medium = "A skill point most crafts.",
+    easy = "A skill point now and then.", trivial = "No more skill points from it.",
+}
 
 local panel, scroll, child, current, header
 local lines, rows, slots = {}, {}, {}
@@ -209,11 +217,12 @@ local function Header(itemID, count, subLines)
     Place(header, h)
 end
 
--- Where a reagent's units come from: "2 owned (8s), 2 AH (10s)".
-local function Sources(line)
+-- Where a reagent's units come from: "2 owned (8s), 2 AH (10s)" ("2 tray" where only the tray counts).
+local function Sources(line, trayOnly)
     local parts = {}
     if line.owned > 0 then
-        parts[#parts + 1] = string.format(L["%d owned (%s)"], line.owned, Money.Compact(line.ownedCost))
+        parts[#parts + 1] = string.format(trayOnly and L["%d tray (%s)"] or L["%d owned (%s)"], line.owned,
+            Money.Compact(line.ownedCost))
     end
     if line.rest > 0 then
         if line.source then
@@ -226,15 +235,26 @@ local function Sources(line)
     return table.concat(parts, ", ")
 end
 
--- The same per unit, for the slot's tooltip.
-local function SourceTips(line)
+-- The same per unit, for the slot's tooltip. Where only the tray counts, also what the bags and bank hold
+-- (not used), in orange when the tray counts more than you carry: you'd be short at the craft.
+local function SourceTips(line, trayOnly)
     local tip = {}
     if line.owned > 0 then
-        tip[#tip + 1] = string.format(L["%d of yours: %s each"], line.owned, Money.Format(line.ownedCost / line.owned))
+        tip[#tip + 1] = string.format(trayOnly and L["%d from your tray: %s each"] or L["%d of yours: %s each"], line.owned,
+            Money.Format(line.ownedCost / line.owned))
     end
     if line.rest > 0 then
         tip[#tip + 1] = line.source and string.format(L["%d %s: %s each"], line.rest, L[SOURCE_FROM[line.source]],
             Money.Format(line.buyCost / line.rest)) or string.format(L["%d with no price yet"], line.rest)
+    end
+    if trayOnly then
+        local carried = C_Item.GetItemCount(line.itemID, true)
+        if line.owned > carried then
+            tip[#tip + 1] = ORANGE .. string.format(L["The tray counts %d, but your bags and bank hold %d: you'd be short when you craft."],
+                line.owned, carried) .. "|r"
+        else
+            tip[#tip + 1] = GREY .. string.format(L["Bags and bank: %d (only the tray counts in this tab)"], carried) .. "|r"
+        end
     end
     return tip
 end
@@ -248,8 +268,9 @@ local function NameColor(enough)
 end
 
 -- One reagent as the profession window shows it: a slot (Blizzard's slot art and quality frame) and
--- "have/need Name"; under the name, where the units come from. have: what you carry and bank.
-local function Slot(line, have)
+-- "have/need Name"; under the name, where the units come from. have: what you carry and bank (what the
+-- tray holds where only the tray counts).
+local function Slot(line, have, trayOnly)
     usedSlots = usedSlots + 1
     local row = slots[usedSlots]
     if not row then
@@ -285,7 +306,7 @@ local function Slot(line, have)
         slots[usedSlots] = row
     end
     local itemID = line.itemID
-    row.itemID, row.tip = itemID, SourceTips(line)
+    row.itemID, row.tip = itemID, SourceTips(line, trayOnly)
     row.icon:SetTexture(C_Item.GetItemIconByID(itemID) or QUESTION_MARK)
     local frames = PROFESSIONS_ITEM_QUALITY_ICON_BORDER_ATLASES
     local atlas = frames and frames[C_Item.GetItemQualityByID(itemID) or -1]
@@ -293,7 +314,7 @@ local function Slot(line, have)
     row.border:SetShown(atlas ~= nil)
     row.name:SetText(string.format("%d/%d %s", have, line.need, ItemName(itemID)))
     row.name:SetTextColor(NameColor(have >= line.need))
-    row.detail:SetText(Sources(line))
+    row.detail:SetText(Sources(line, trayOnly))
     row:Show()
     Place(row, SLOT_SIZE, SLOT_GAP)
 end
@@ -620,6 +641,22 @@ end
 
 -- ---------------------------------------------------------------- a recipe
 
+-- The profession window's colour for this recipe at your skill: Blizzard's own for a recipe you know,
+-- the thresholds' for one you'd learn; nothing when your skill in it is unknown.
+local function SkillUpRow(r)
+    local recipe = r.recipe
+    local rank = ns.Harvest.Rank(recipe.profession)
+    if not rank then return end
+    local key = r.known and ns.Harvest.Difficulty(recipe.recipeID) or ns.RecipeIndex.Difficulty(rank, recipe.yellow, recipe.grey)
+    if not key then return end
+    Row(L["Skill-up"], ns.Harvest.DifficultyColor(key) .. L[SKILL_TEXT[key]] .. "|r", {
+        L[SKILL_TIP[key]],
+        string.format(L["Yellow from %d, green from %d, grey from %d; your skill is %d."], recipe.yellow,
+            math.floor((recipe.yellow + recipe.grey) / 2), recipe.grey, rank),
+        not r.known and L["You don't know this recipe yet: this is what crafting it would give."] or nil,
+    })
+end
+
 local function RecipeDetails(r)
     local recipe = r.recipe
     local status = {}
@@ -635,20 +672,30 @@ local function RecipeDetails(r)
             or (ORANGE .. L["new, unconfirmed"] .. "|r")
     end
     if r.crafts > 1 then status[#status + 1] = Crafts(r.crafts) end
+    local profession = ns.RecipeIndex.ProfessionName(recipe.profession)
+    local rank, maxRank = ns.Harvest.Rank(recipe.profession)
     local about = {
-        string.format("%s (%d/%d)", ns.RecipeIndex.ProfessionName(recipe.profession), recipe.yellow, recipe.grey),
+        rank and string.format("%s %d/%d", profession, rank, maxRank) or string.format("%s (%d/%d)", profession,
+            recipe.yellow, recipe.grey),
         table.concat(status, ", "),
     }
     if r.vendorOnly then about[#about + 1] = GOLD .. L["Made entirely from goods a vendor sells."] .. "|r" end
     Header(recipe.output, r.units, about)
+    SkillUpRow(r)
 
     Heading(L["Reagents"])
+    local trayOnly = r.ctx and r.ctx.trayOnly
     local owned = r.ctx and r.ctx.owned
-    for _, line in ipairs(r.lines) do Slot(line, owned and owned[line.itemID] or line.owned) end
-    Row(L["Cost"], r.complete and Money.Compact(r.cogs) or "?", {
-        r.view == "vendor" and L["Reagents you own count at what a vendor pays for them; the rest come from a vendor."]
-            or L["Reagents you own count at what they'd sell for; the rest come from the cheapest of a vendor, the AH or a recipe you know."],
-    })
+    for _, line in ipairs(r.lines) do Slot(line, owned and owned[line.itemID] or line.owned, trayOnly) end
+    local costTip
+    if r.view == "vendor" then
+        costTip = L["Reagents you own count at what a vendor pays for them; the rest come from a vendor."]
+    elseif trayOnly then
+        costTip = L["Only the reagents in your tray count as yours here, at what they'd sell for. Everything else is bought from the cheapest of a vendor, the AH or a recipe you know, even what's in your bags or bank."]
+    else
+        costTip = L["Reagents you own count at what they'd sell for; the rest come from the cheapest of a vendor, the AH or a recipe you know."]
+    end
+    Row(L["Cost"], r.complete and Money.Compact(r.cogs) or "?", { costTip })
 
     Sell(r)
     Result(r)
@@ -673,9 +720,16 @@ function DetailPanel.Refresh()
     child:SetHeight(math.max(1, height + 8))
 end
 
--- result: an Evaluator result, or nil for the placeholder text.
+-- Which recipe in which view: a re-evaluation brings a new result object for the same one.
+local function Key(r)
+    if not r then return nil end
+    return (r.flip and "flip" or (r.view or "tray")) .. ":" .. r.recipe.recipeID
+end
+
+-- result: an Evaluator result, or nil for the placeholder text. The pane scrolls back to the top only
+-- for another recipe or view, not when your bags or the prices change.
 function DetailPanel.Show(result)
-    local changed = result ~= current
+    local changed = Key(result) ~= Key(current)
     current = result
     DetailPanel.Refresh()
     if changed and scroll then scroll:SetVerticalScroll(0) end

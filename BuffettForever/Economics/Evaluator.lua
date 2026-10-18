@@ -326,17 +326,41 @@ function Evaluator.LiveContext()
     return ctx
 end
 
--- Every recipe that uses the tray's reagents, plus every recipe made entirely from goods a vendor
--- sells (those are craftable whatever the tray holds), evaluated and ranked; and the context the
--- results came from. Batch size: the crafts the tray quantities allow (at least 1), but a tray
--- reagent a vendor sells doesn't cap it (the vendor has more) unless it is all the tray offers.
--- tray: { { itemID, qty } }. filter: RecipeIndex filter.
-function Evaluator.ForTray(tray, filter)
+-- The tray's items in slot order, and its units per item. tray: { { itemID, qty } }.
+local function TrayQty(tray)
     local ids, qty = {}, {}
     for _, e in ipairs(tray) do
         if not qty[e.itemID] then ids[#ids + 1] = e.itemID end
         qty[e.itemID] = (qty[e.itemID] or 0) + e.qty
     end
+    return ids, qty
+end
+
+-- The crafts the tray quantities allow (qty: { [itemID] = units }), at least 1: a tray reagent a vendor
+-- sells doesn't cap the batch (the vendor has more) unless it is all the tray offers. A recipe using none
+-- of the tray's reagents: 1.
+function Evaluator.TrayCrafts(recipe, qty, vendorSold)
+    local crafts, vendorCrafts
+    for _, g in ipairs(recipe.reagents) do
+        local have = qty[g.itemID]
+        if have then
+            local n = math.floor(have / g.count)
+            if vendorSold(g.itemID) then
+                vendorCrafts = vendorCrafts and math.min(vendorCrafts, n) or n
+            else
+                crafts = crafts and math.min(crafts, n) or n
+            end
+        end
+    end
+    return math.max(1, crafts or vendorCrafts or 1)
+end
+
+-- Every recipe that uses the tray's reagents, plus every recipe made entirely from goods a vendor
+-- sells (those are craftable whatever the tray holds), evaluated for the crafts the tray allows
+-- (TrayCrafts) and ranked; and the context the results came from. tray: { { itemID, qty } }.
+-- filter: RecipeIndex filter.
+function Evaluator.ForTray(tray, filter)
+    local ids, qty = TrayQty(tray)
     local ctx = Evaluator.LiveContext()
     local candidates, vendorOnly = {}, {}
     for _, recipeID in ipairs(ns.RecipeIndex.UsingAny(ids, filter)) do candidates[#candidates + 1] = recipeID end
@@ -352,25 +376,52 @@ function Evaluator.ForTray(tray, filter)
     local results = {}
     for _, recipeID in ipairs(candidates) do
         local recipe = ns.RecipeIndex.Get(recipeID)
-        local crafts, vendorCrafts
-        for _, g in ipairs(recipe.reagents) do
-            local have = qty[g.itemID]
-            if have then
-                local n = math.floor(have / g.count)
-                if vendorSold(g.itemID) then
-                    vendorCrafts = vendorCrafts and math.min(vendorCrafts, n) or n
-                else
-                    crafts = crafts and math.min(crafts, n) or n
-                end
-            end
-        end
-        local result = Evaluator.Evaluate(recipe, math.max(1, crafts or vendorCrafts or 1), ctx)
+        local result = Evaluator.Evaluate(recipe, Evaluator.TrayCrafts(recipe, qty, vendorSold), ctx)
         result.known = ns.RecipeIndex.IsKnown(recipeID, "char")
         result.vendorOnly = vendorOnly[recipeID]
         result.ctx = ctx   -- the details pane re-evaluates other batch sizes against it (BatchAdvice)
         results[#results + 1] = result
     end
     return Evaluator.Rank(results), ctx
+end
+
+-- ---------------------------------------------------------------- Profession profits (1.0.0)
+
+-- The context with only the tray's materials counted as yours (Justin, 2026-10-17): owned = the tray's
+-- units per item (qty), so everything else is bought, even what's in the bags or bank. The other tables
+-- are shared; trayOnly tells the details pane.
+function Evaluator.TrayContext(ctx, qty)
+    local out = {}
+    for k, v in pairs(ctx) do out[k] = v end
+    out.owned, out.trayOnly = qty, true
+    return out
+end
+
+-- The Profession profits view: every recipe on the filter's professions (RecipeIndex.InProfessions),
+-- evaluated on the tray-only context for the crafts the tray allows (1 for a recipe using none of its
+-- reagents), ranked; the context; and the milliseconds it took.
+function Evaluator.ForProfessions(tray, filter)
+    local started = debugprofilestop()
+    local _, qty = TrayQty(tray)
+    local ctx = Evaluator.TrayContext(Evaluator.LiveContext(), qty)
+    local function vendorSold(itemID) return ctx.vendorBuy[itemID] end
+    local results = {}
+    for _, recipeID in ipairs(ns.RecipeIndex.InProfessions(filter)) do
+        local recipe = ns.RecipeIndex.Get(recipeID)
+        local r = Evaluator.Evaluate(recipe, Evaluator.TrayCrafts(recipe, qty, vendorSold), ctx)
+        r.view, r.ctx = "professions", ctx
+        r.known = ns.RecipeIndex.IsKnown(recipeID, "char")
+        local vendorOnly = true
+        for _, g in ipairs(recipe.reagents) do
+            if not vendorSold(g.itemID) then
+                vendorOnly = false
+                break
+            end
+        end
+        r.vendorOnly = vendorOnly or nil
+        results[#results + 1] = r
+    end
+    return Evaluator.Rank(results), ctx, debugprofilestop() - started
 end
 
 -- ---------------------------------------------------------------- vendor crafts (M4 pass 3)
@@ -628,6 +679,20 @@ function Evaluator.SelfTest(report)
     check("VEND-RAW", vr ~= nil and near(vr.profit, 585) and near(vr.rawAH, 5130) and vr.rawBetter == true,
         string.format("profit %s at vendor prices; the 6 owned would fetch %s on the AH", tostring(vr and vr.profit),
             tostring(vr and vr.rawAH)))
+
+    -- Profession profits (1.0.0): only the tray counts as yours, and the tray sets the batch.
+    local live = bolts(0)
+    local empty = Evaluator.Evaluate(bolt, 10, Evaluator.TrayContext(live, {}))
+    local trayed = Evaluator.Evaluate(bolt, 10, Evaluator.TrayContext(live, { [2589] = 6 }))
+    check("TRAY-CTX", empty.lines[1].owned == 0 and near(empty.cogs, 19000) and trayed.lines[1].owned == 6
+        and near(trayed.cogs, 18715) and live.owned[2589] == 6,
+        string.format("6 in the bags but none in the tray: all 20 bought (%s); 6 in the tray: CRAFT-1's %s",
+            tostring(empty.cogs), tostring(trayed.cogs)))
+    local function vendorSold(itemID) return itemID == 52 end
+    local T = Evaluator.TrayCrafts
+    check("TRAY-CRAFTS", T(craft, { [51] = 7, [52] = 1 }, vendorSold) == 3 and T(craft, { [52] = 4 }, vendorSold) == 4
+        and T(craft, {}, vendorSold) == 1 and T(craft, { [51] = 1 }, vendorSold) == 1,
+        "7 of a 2-a-craft reagent: 3 (the vendor one doesn't cap); vendor goods only: 4; nothing: 1; too few: 1")
 
     -- Branch scenarios with results from the Python reference (Economics/EvaluatorVectors.lua,
     -- generated by `cli.py econ vectors`): every field must match.

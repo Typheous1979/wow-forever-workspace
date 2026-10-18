@@ -16,6 +16,11 @@ local addonName, ns = ...
 --   diag.harvest.closed probes the window-closed calls; diag.harvest.login describes the login read.
 --   Being listed by the window isn't evidence a recipe exists on Forever: GetAllRecipeIDs lists the
 --   whole skill line, Season-of-Discovery recipes included.
+-- Also this character's professions and skill (Harvest.Professions, for the Profession profits view):
+-- GetProfessions' slots read through GetProfessionInfo with no window open, as Forever's own professions
+-- book does (undocumented, present at runtime [F-123]), plus the profession of any known recipe no slot
+-- showed; and each known recipe's skill-up colour (Harvest.Difficulty). diag.harvest.professions keeps
+-- the raw slots, Blizzard's difficulty against ours, and the view's evaluation time.
 
 local L = ns.L
 local Harvest = {}
@@ -27,7 +32,9 @@ local SAMPLE = 10             -- IDs kept in each diagnostics sample
 local CLOSED_PROBE_DELAY = 1  -- seconds after TRADE_SKILL_CLOSE
 local LOGIN_READ_DELAY = 5    -- seconds after login
 local FLAG_NEW = 1
-local OUTPUT, COUNT, FIRST_REAGENT = 6, 7, 8
+local PROFESSION, YELLOW, GREY, OUTPUT, COUNT, FIRST_REAGENT = 1, 3, 4, 6, 7, 8
+local PROFESSION_SLOTS = 7    -- GetProfessions on Forever: 2 primary, then the secondary ones (any may be empty)
+local DIFFICULTY_SAMPLE = 20  -- known recipes whose two difficulty readings diag keeps
 
 local pending
 local printed = {}            -- [professionID] = learned count already announced this session
@@ -264,6 +271,188 @@ function Harvest.KnownByCharacter()
     return key and ns.db and ns.db.recipesKnown[key] or {}
 end
 
+-- ---------------------------------------------------------------- professions and skill
+
+local professions, professionKey   -- the list, cached until a profession or a rank changes
+local difficulty = {}              -- [recipeID] = colour key or false, until the skill changes
+local relative                     -- Enum.TradeskillRelativeDifficulty value -> colour key, built on first use
+local colors                       -- colour key -> the profession window's colour, built on first use
+local FALLBACK_COLOR = { optimal = "ffff8040", medium = "ffffff00", easy = "ff40bf40", trivial = "ff808080" }
+
+-- The data's skill line for one the client reports: the line itself when the data has recipes on it,
+-- else its parent's (Forever gives each profession a child line [F-126]); nil otherwise. isDataLine and
+-- parentOf come in as functions, so the self-test runs on plain tables.
+function Harvest.ProfessionLine(line, isDataLine, parentOf)
+    if type(line) ~= "number" then return nil end
+    if isDataLine(line) then return line end
+    local parent = parentOf(line)
+    if type(parent) == "number" and isDataLine(parent) then return parent end
+    return nil
+end
+
+-- The slots' professions in order, then the lines of known recipes no slot showed (their rank unknown).
+-- slots: { { line, name, rank, maxRank } }; knownLines: skill lines; nameOf(line) names the extra ones.
+function Harvest.MergeProfessions(slots, knownLines, nameOf)
+    local list, seen = {}, {}
+    for _, s in ipairs(slots) do
+        if s.line and not seen[s.line] then
+            seen[s.line] = true
+            list[#list + 1] = { skillLine = s.line, name = s.name, rank = s.rank, maxRank = s.maxRank }
+        end
+    end
+    for _, line in ipairs(knownLines) do
+        if not seen[line] then
+            seen[line] = true
+            list[#list + 1] = { skillLine = line, name = nameOf(line) }
+        end
+    end
+    return list
+end
+
+local function IsDataLine(line)
+    return ns.RecipeIndex.ProfessionLines()[line] ~= nil
+end
+
+local function ParentOf(line)
+    local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoBySkillLineID, line)
+    return ok and type(info) == "table" and info.parentProfessionID or nil
+end
+
+-- The professions now, and the raw slots for diag.
+local function ReadProfessions()
+    local slots, raw = {}, {}
+    local indexes = type(GetProfessions) == "function" and { GetProfessions() } or {}
+    for i = 1, PROFESSION_SLOTS do
+        local index = indexes[i]
+        if index then
+            local name, _, rank, maxRank, _, _, line = GetProfessionInfo(index)
+            local dataLine = Harvest.ProfessionLine(line, IsDataLine, ParentOf)
+            raw[#raw + 1] = { slot = i, name = name, rank = rank, maxRank = maxRank, line = line, dataLine = dataLine }
+            if dataLine then slots[#slots + 1] = { line = dataLine, name = name, rank = rank, maxRank = maxRank } end
+        end
+    end
+    local knownLines, seen = {}, {}
+    for _, recipeID in ipairs(ns.RecipeIndex.Known()) do
+        local line = ns.Recipes[recipeID][PROFESSION]
+        if not seen[line] then
+            seen[line] = true
+            knownLines[#knownLines + 1] = line
+        end
+    end
+    table.sort(knownLines)
+    return Harvest.MergeProfessions(slots, knownLines, ns.RecipeIndex.ProfessionName), raw
+end
+
+local function Signature(list)
+    local parts = {}
+    for _, p in ipairs(list) do
+        parts[#parts + 1] = string.format("%d:%s/%s", p.skillLine, tostring(p.rank), tostring(p.maxRank))
+    end
+    return table.concat(parts, ",")
+end
+
+-- A known recipe's colour key from Blizzard (GetRecipeInfo works with the window closed [F-123]), or nil.
+local function BlizzardDifficulty(recipeID)
+    if not relative then
+        relative = {}
+        local E = Enum.TradeskillRelativeDifficulty or {}
+        for name, key in pairs({ Optimal = "optimal", Medium = "medium", Easy = "easy", Trivial = "trivial" }) do
+            if E[name] then relative[E[name]] = key end
+        end
+    end
+    local ok, info = pcall(C_TradeSkillUI.GetRecipeInfo, recipeID)
+    if ok and type(info) == "table" and info.relativeDifficulty ~= nil then return relative[info.relativeDifficulty] end
+    return nil
+end
+
+-- This character's professions with recipes in the data, in the order of Blizzard's professions window:
+-- { { skillLine, name, rank, maxRank } }. The first read of a session also records the raw slots and,
+-- for the known recipes, Blizzard's difficulty against the one from the thresholds.
+function Harvest.Professions()
+    if professions then return professions end
+    local raw
+    professions, raw = ReadProfessions()
+    professionKey = Signature(professions)
+    if ns.db and not ns.readOnlyDB then
+        local old = HarvestDiag().professions
+        local d = { t = GetServerTime(), build = select(2, GetBuildInfo()), slots = raw, eval = old and old.eval,
+                    difficulty = {} }
+        for _, recipeID in ipairs(ns.RecipeIndex.Known()) do
+            if #d.difficulty >= DIFFICULTY_SAMPLE then break end
+            local row = ns.Recipes[recipeID]
+            local rank = Harvest.Rank(row[PROFESSION])
+            d.difficulty[#d.difficulty + 1] = string.format("%d %s/%s at %s (%d/%d)", recipeID,
+                tostring(BlizzardDifficulty(recipeID)), tostring(ns.RecipeIndex.Difficulty(rank, row[YELLOW], row[GREY])),
+                tostring(rank), row[YELLOW], row[GREY])
+        end
+        HarvestDiag().professions = d
+    end
+    return professions
+end
+
+-- A profession's rank and max rank, or nil when no slot gave them.
+function Harvest.Rank(skillLine)
+    for _, p in ipairs(Harvest.Professions()) do
+        if p.skillLine == skillLine then return p.rank, p.maxRank end
+    end
+    return nil
+end
+
+-- A known recipe's skill-up colour key ("optimal", "medium", "easy", "trivial"): Blizzard's own when it
+-- gives one, else from your rank and the recipe's thresholds; nil for a recipe this character doesn't know
+-- or a profession whose rank is unknown.
+function Harvest.Difficulty(recipeID)
+    local cached = difficulty[recipeID]
+    if cached ~= nil then return cached or nil end
+    local key
+    if ns.RecipeIndex.IsKnown(recipeID, "char") then
+        key = BlizzardDifficulty(recipeID)
+        if not key then
+            local row = ns.Recipes[recipeID]
+            key = row and ns.RecipeIndex.Difficulty((Harvest.Rank(row[PROFESSION])), row[YELLOW], row[GREY])
+        end
+    end
+    difficulty[recipeID] = key or false
+    return key
+end
+
+-- The profession window's colour for a difficulty key, as |c markup.
+function Harvest.DifficultyColor(key)
+    if not colors then
+        colors = { optimal = DIFFICULT_DIFFICULTY_COLOR, medium = FAIR_DIFFICULTY_COLOR, easy = EASY_DIFFICULTY_COLOR,
+                   trivial = TRIVIAL_DIFFICULTY_COLOR }
+    end
+    local color = colors[key]
+    if type(color) == "table" and color.GenerateHexColorMarkup then return color:GenerateHexColorMarkup() end
+    return "|c" .. (FALLBACK_COLOR[key] or "ffffffff")
+end
+
+-- The Profession profits view's evaluation: how many recipes and how long (the latest and the slowest).
+function Harvest.NoteEval(n, ms)
+    if not ns.db or ns.readOnlyDB then return end
+    local d = HarvestDiag().professions or {}
+    HarvestDiag().professions = d
+    local maxMs = math.max(d.eval and d.eval.maxMs or 0, ms)
+    d.eval = { t = GetServerTime(), n = n, ms = math.floor(ms + 0.5), maxMs = math.floor(maxMs + 0.5) }
+end
+
+-- Skill-ups, a profession learned or dropped (weapon skill-ups too, which change nothing here): re-read,
+-- and tell the list only when a profession or a rank changed.
+function events:SKILL_LINES_CHANGED()
+    if not professions then return end
+    local list = ReadProfessions()
+    local key = Signature(list)
+    if key == professionKey then return end
+    professions, professionKey = list, key
+    wipe(difficulty)
+    ns.Fire("PROFESSIONS_CHANGED")
+end
+
+ns.On("RECIPES_KNOWN_CHANGED", function()   -- a first recipe can bring a profession with it
+    professions = nil
+    wipe(difficulty)
+end)
+
 -- /bf diag: one line per harvested profession, plus the closed-window and login probes.
 function Harvest.PrintDiag()
     local h = ns.db and ns.db.diag.harvest
@@ -291,9 +480,43 @@ function Harvest.PrintDiag()
         ns.Print(string.format("login: %d known recipes read from the spellbook (%d checked, %s before) in %d ms",
             g.known, g.checked, tostring(g.before), g.ms or 0))
     end
+    local p = h.professions
+    if p then
+        local parts = {}
+        for _, s in ipairs(p.slots or {}) do
+            parts[#parts + 1] = string.format("%d %s %s/%s line %s -> %s", s.slot, tostring(s.name), tostring(s.rank),
+                tostring(s.maxRank), tostring(s.line), tostring(s.dataLine))
+        end
+        ns.Print("professions: " .. (#parts > 0 and table.concat(parts, "; ") or "no slot"))
+        if p.difficulty and #p.difficulty > 0 then
+            ns.Print("skill-up (Blizzard/thresholds): " .. table.concat(p.difficulty, "; "))
+        end
+        if p.eval then
+            ns.Print(string.format("Profession profits: %d recipes evaluated in %d ms (slowest %d ms)", p.eval.n, p.eval.ms,
+                p.eval.maxMs or p.eval.ms))
+        end
+    end
+end
+
+-- /bf selftest: the skill-line mapping and the professions' order.
+function Harvest.SelfTest(report)
+    local data, parents = { [165] = true, [185] = true, [129] = true }, { [2937] = 165 }
+    local function isData(line) return data[line] == true end
+    local function parentOf(line) return parents[line] end
+    local P = Harvest.ProfessionLine
+    local mapped = P(165, isData, parentOf) == 165 and P(2937, isData, parentOf) == 165 and P(999, isData, parentOf) == nil
+        and P(nil, isData, parentOf) == nil
+    local list = Harvest.MergeProfessions({ { line = 165, name = "Leatherworking", rank = 49, maxRank = 75 } }, { 129, 165 },
+        function(line) return "line " .. line end)
+    local merged = #list == 2 and list[1].skillLine == 165 and list[1].rank == 49 and list[2].skillLine == 129
+        and list[2].rank == nil and list[2].name == "line 129"
+    local ok = mapped and merged
+    report("PROF-MAP", ok, ok and "a client line maps to the data's (or its parent's); known recipes add the rest"
+        or string.format("mapping %s, merging %s", tostring(mapped), tostring(merged)))
+    return ok and 1 or 0, ok and 0 or 1
 end
 
 for _, event in ipairs({ "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED",
-    "TRADE_SKILL_CLOSE", "NEW_RECIPE_LEARNED" }) do
+    "TRADE_SKILL_CLOSE", "NEW_RECIPE_LEARNED", "SKILL_LINES_CHANGED" }) do
     ns.eventFrame:RegisterEvent(event)
 end
