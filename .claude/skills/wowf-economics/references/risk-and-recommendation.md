@@ -89,3 +89,22 @@ margin of safety, ranks the candidates and words the advice.
 - **Small posts of cheap items lose money on Forever.** Every auction pays at least a 1s deposit [F-129], so 2
   Coarse Thread at 19c each risk 1s to earn 36c. Advise posting a batch in one auction, or selling cheap goods to
   a vendor.
+
+## Posting prices (BuffettForever 1.0.0, Sell on AH)
+- **Price at the cheapest listing by others**, from a search just before posting, with your own left out. That's
+  Blizzard's own default. Undercutting is a setting: 1c, 1%, 5% or 10% under, rounded down.
+- **Gear is whole silver on Forever** (wowf-addon-dev [F-136]), so on gear every undercut is at least 1s. On a 2s item
+  that's half the price, so show the price before the confirm click.
+- **Refuse a price a vendor beats:** when price − floor(price × cut) ≤ what a vendor pays, a sale nets less than the
+  vendor. Linen Bandage on 70450: the cheapest listing was 9c, a vendor pays 10c, so it was refused. Allow it only
+  as the player's choice (BuffettForever's "Never below what a vendor pays", on by default), shown in red.
+- **Flag a troll price:** under half the market value, the cheapest listing may be someone dumping. Show it in
+  orange, and let the player decide.
+- **Post only what was crafted for sale.** Stock you already had stays out. When an auction expires or is cancelled,
+  the units that come back count as crafted again, so they can be posted again.
+- PRICE vectors (Pricing/Post.lua, POST-PRICE):
+  - 74c: matched 74c, 1c under 73c;
+  - 2s: 5% under 1s 90c; on gear, 1c under 1s;
+  - 10c: 1% under 9c;
+  - 50g gear: 5% under 47g 50s;
+  - never under 1c (1s on gear).

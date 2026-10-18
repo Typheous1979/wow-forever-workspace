@@ -296,6 +296,10 @@ Proven on 70450 from a button's click [F-134]:
   - A reopened mailbox can show an old list [F-130].
   - So never take the first read of a visit to mean a mail is gone. A drop in an item's units between two reads in
     one visit is a take, whatever took it: your button, Open All, or Blizzard's click.
+  - The same rule on expired and cancelled auction mail (system mail with `AUCTION_EXPIRED_MAIL_SUBJECT` /
+    `AUCTION_REMOVED_MAIL_SUBJECT`, the items attached) tells you what came back from your auctions. BuffettForever
+    counts what it posted as crafted again (`Pricing\Post.lua`, `Post.ReturnDrop`). A cancelled auction came back
+    that way on 70450.
 - Working code: BuffettForever `Pricing\Collect.lua` (`Collect.MailDrop`, `Collect.Plan`, `/bf mailtest`) and
   `UI\MailButton.lua` (the button: parented to `InboxFrame`, so it shows on the Inbox tab only, and anchored under
   `MailFrame`'s BOTTOMRIGHT, right of the tabs).
