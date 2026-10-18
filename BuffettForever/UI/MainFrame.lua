@@ -96,7 +96,7 @@ local function BuildDetails(content)
     return panel
 end
 
--- The column headings, rows, filters and the view tabs under the window are UI/ResultsList.lua's.
+-- The column headings, rows, filters, search box and the view tabs under the window are UI/ResultsList.lua's.
 local function BuildResults(content, tray, details)
     local panel = UI.TitledPanel(content, L["Craftable items"])
     panel:SetPoint("TOPLEFT", tray, "TOPRIGHT", 6, 0)

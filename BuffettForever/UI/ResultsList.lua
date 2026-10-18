@@ -11,7 +11,9 @@ local addonName, ns = ...
 -- - click a heading to sort (the ranking by default; again to reverse); click a row for the details;
 -- - losses are red, recommended rows white, the rest grey; orange: a vendor craft whose materials
 --   would fetch more on the AH;
--- - "Known only" and "Show unconfirmed" filter the Tray view.
+-- - "Known only" and "Show unconfirmed" filter the Tray view;
+-- - the search box right of the heading filters every view by item name as you type (every word, in any
+--   order). It only hides rows, with no re-evaluation; the top pick still advises on the whole view.
 -- Also fills the Top pick panel. Re-evaluates (debounced) when the tray, the prices, the known
 -- recipes, the sales ledger, the deposits, your bags, vendor prices, the flips or the settings change,
 -- while the window is open; otherwise on the next open.
@@ -34,6 +36,7 @@ local QUESTION_MARK = 134400
 local GRADE_COLOR = { A = "|cff33ff33", B = "|cffb4ff33", C = "|cffffd100", D = "|cffff5533" }
 local DEBOUNCE = 0.15
 local TAB_HANG = 30   -- how far the tabs reach below the window (32 tall, 2 tucked under its edge)
+local SEARCH_WIDTH = 160   -- as on Blizzard's AddOns list
 
 local VIEWS = {   -- label: the tab; title: the pane's heading
     { key = "tray", label = "Tray", title = "Craftable items",
@@ -44,11 +47,14 @@ local VIEWS = {   -- label: the tab; title: the pane's heading
       tip = "Listings in your last full scan priced below what a vendor pays: buy them on the Auction House and sell them to a vendor. Listings vanish fast, so the confidence follows the scan's age." },
 }
 
-local window, panel, pick, box, countText, knownCheck, unconfirmedCheck
+local window, panel, pick, box, countText, knownCheck, unconfirmedCheck, searchBox
 local tabs = {}
-local results, ranked = {}, {}
+local results, ranked, shown = {}, {}, {}   -- sorted, ranked, and the sorted rows the search lets through
 local selected
 local dirty, pending = true, nil
+local words, searchText = {}, ""   -- the search: its lowercased words, and the text as typed (trimmed)
+local scanT                        -- AH flips: when the scan they come from ran
+local viewEmpty = ""               -- what the list says when the view has no rows at all
 
 local function Prefs()
     return ns.charDB.results
@@ -60,6 +66,32 @@ end
 
 local function Pct(x)
     return string.format("%d%%", math.floor(x * 100 + 0.5))
+end
+
+-- ---------------------------------------------------------------- search
+
+-- The words of a search, lowercased.
+local function Words(text)
+    local out = {}
+    for word in string.gmatch(string.lower(text or ""), "%S+") do out[#out + 1] = word end
+    return out
+end
+
+-- Every word appears in the name, in any order, as plain text ("(" or "%" is only a character).
+-- No words: everything matches.
+local function Matches(name, list)
+    name = string.lower(name)
+    for _, word in ipairs(list) do
+        if not string.find(name, word, 1, true) then return false end
+    end
+    return true
+end
+
+-- A row whose item name hasn't loaded yet is left out of a search until it has.
+local function Shown(r)
+    if #words == 0 then return true end
+    local name = C_Item.GetItemNameByID(r.recipe.output)
+    return name ~= nil and Matches(name, words)
 end
 
 -- ---------------------------------------------------------------- sorting
@@ -170,7 +202,6 @@ end
 local function Repaint()
     if not box then return end
     box:ForEachFrame(function(row, data) InitRow(row, data) end)
-    if panel then panel.Empty:SetShown(#results == 0) end
 end
 
 -- ---------------------------------------------------------------- top pick
@@ -245,20 +276,77 @@ function ResultsList.Select(recipeID)
     Repaint()
 end
 
--- The rows in the current sort order (no re-evaluation).
-local function ShowRows()
-    Sort()
-    local dp = CreateDataProvider()
-    for i, r in ipairs(results) do dp:Insert({ result = r, index = i }) end
-    box:SetDataProvider(dp, ScrollBoxConstants.RetainScrollPosition)
-end
-
 local function View()
     return Prefs().view or "tray"
 end
 
--- What the list says when it's empty, by view.
-local function EmptyText(view, entries, scanT)
+-- The line under the list, and what the list says when it's empty; while searching, how many rows match.
+local function ShowCount()
+    local view, recommended = View(), 0
+    for _, r in ipairs(ranked) do
+        if r.recommended then recommended = recommended + 1 end
+    end
+    local age = view == "flips" and scanT and ns.FormatAge(GetServerTime() - scanT)
+    local count = ""
+    if #words > 0 and #ranked > 0 then
+        count = age and string.format(L["%d of %d shown; scanned %s ago"], #shown, #ranked, age)
+            or string.format(L["%d of %d shown"], #shown, #ranked)
+    elseif age then
+        count = string.format(L["%d flips, %d recommended; scanned %s ago"], #ranked, recommended, age)
+    elseif #ranked > 0 then
+        count = string.format(view == "vendor" and L["%d vendor crafts, %d recommended"] or L["%d recipes, %d recommended"],
+            #ranked, recommended)
+    end
+    countText:SetText(count)
+    if #ranked > 0 and #shown == 0 then
+        panel.Empty:SetText(string.format(L["No item matches \"%s\"."], (string.gsub(searchText, "|", "||"))))
+    else
+        panel.Empty:SetText(viewEmpty)
+    end
+    panel.Empty:SetShown(#shown == 0)
+end
+
+-- The rows the search lets through, in the current sort order (no re-evaluation). The selection stays while
+-- its row is shown, else moves to the best-ranked row shown. fromTop: a new search starts at the top of the
+-- list. Returns true when the selection changed.
+local function ShowRows(fromTop)
+    Sort()
+    shown = {}
+    local visible = {}
+    for _, r in ipairs(results) do
+        if Shown(r) then
+            shown[#shown + 1] = r
+            visible[r.recipe.recipeID] = true
+        end
+    end
+    local previous = selected
+    if not (selected and visible[selected]) then
+        selected = nil
+        for _, r in ipairs(ranked) do
+            if visible[r.recipe.recipeID] then
+                selected = r.recipe.recipeID
+                break
+            end
+        end
+    end
+    local dp = CreateDataProvider()
+    for i, r in ipairs(shown) do dp:Insert({ result = r, index = i }) end
+    box:SetDataProvider(dp, fromTop and ScrollBoxConstants.DiscardScrollPosition or ScrollBoxConstants.RetainScrollPosition)
+    ShowCount()
+    return selected ~= previous
+end
+
+-- The search box, on every keystroke: the rows already ranked, filtered by name.
+local function Search(text)
+    searchText = string.match(text or "", "^%s*(.-)%s*$")
+    local now = Words(text)
+    if table.concat(now, " ") == table.concat(words, " ") then return end   -- only spaces changed
+    words = now
+    if box and ShowRows(true) then ResultsList.Select(selected) end
+end
+
+-- What the list says when the view has no rows, by view.
+local function EmptyText(view, entries)
     if view == "vendor" then
         if #ns.RecipeIndex.Known() == 0 then return L["This character knows no recipes yet."] end
         return L["None of your recipes profits on vendor prices with what you carry and what vendors sell. Visiting vendors that sell reagents can find more."]
@@ -273,7 +361,8 @@ end
 function ResultsList.Update()
     dirty = false
     if not box then return end
-    local view, entries, scanT = View(), ns.Tray.Entries(), nil
+    local view, entries = View(), ns.Tray.Entries()
+    scanT = nil
     if view == "vendor" then
         ranked = ns.Evaluator.VendorCrafts()
     elseif view == "flips" then
@@ -281,30 +370,11 @@ function ResultsList.Update()
     else
         ranked = ns.Evaluator.ForTray(entries, Filter())   -- recipes from vendor goods list even with an empty tray
     end
-    ShowRows()
-    local recommended = 0
-    for _, r in ipairs(ranked) do
-        if r.recommended then recommended = recommended + 1 end
-    end
-    local count = ""
-    if view == "flips" and scanT then
-        count = string.format(L["%d flips, %d recommended; scanned %s ago"], #ranked, recommended,
-            ns.FormatAge(GetServerTime() - scanT))
-    elseif #ranked > 0 then
-        count = string.format(view == "vendor" and L["%d vendor crafts, %d recommended"] or L["%d recipes, %d recommended"],
-            #ranked, recommended)
-    end
-    countText:SetText(count)
-    -- keep the selection when it's still listed, else select the top of the ranking
-    local keep
-    for _, r in ipairs(ranked) do
-        if r.recipe.recipeID == selected then keep = true end
-    end
-    if not keep then selected = ranked[1] and ranked[1].recipe.recipeID or nil end
-    panel.Empty:SetText(EmptyText(view, entries, scanT))
+    viewEmpty = EmptyText(view, entries)
+    ShowRows()   -- keeps the selection while it's shown, else selects the top of the ranking
     ResultsList.Select(selected)
     UpdateTopPick()
-    -- names and icons may still be loading: repaint when they're in
+    -- names and icons may still be loading: repaint when they're in (and search the names that came in)
     local ids = {}
     for _, r in ipairs(ranked) do
         ids[#ids + 1] = r.recipe.output
@@ -312,7 +382,11 @@ function ResultsList.Update()
     end
     if #ids > 0 then
         ns.Items.Load(ids, function()
-            if Prefs().sortKey == "name" then ShowRows() else Repaint() end
+            if Prefs().sortKey == "name" or #words > 0 then
+                if ShowRows() then ResultsList.Select(selected) end
+            else
+                Repaint()
+            end
             ns.DetailPanel.Refresh()
             UpdateTopPick()
         end)
@@ -462,8 +536,41 @@ local function Build(frame)
         L["Also list recipes added after Classic that nobody has confirmed yet: no character of yours knows them and their result hasn't been seen on the Auction House."])
     countText = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     countText:SetPoint("BOTTOMRIGHT", -8, 10)
+
+    -- Blizzard's search box (magnifying glass, grey "Search", the X), right of the heading. The template's own
+    -- OnTextChanged shows the X and the grey hint: hook it, as the AddOns list does, never replace it.
+    searchBox = CreateFrame("EditBox", nil, panel, "SearchBoxTemplate")
+    searchBox:SetSize(SEARCH_WIDTH, 20)
+    searchBox:SetPoint("TOPRIGHT", -8, -4)
+    searchBox:HookScript("OnTextChanged", function(self) Search(self:GetText()) end)
+    searchBox:HookScript("OnHide", function(self) self:ClearFocus() end)   -- a closed window keeps no keyboard
     ShowView()
     ResultsList.Update()
+end
+
+-- ---------------------------------------------------------------- self-test
+
+function ResultsList.SelfTest(report)
+    local cases = {   -- the item's name, what's typed, whether it matches
+        { "Bolt of Linen Cloth", "linen", true },
+        { "Bolt of Linen Cloth", "LINEN bolt", true },        -- any case, any order
+        { "Bolt of Linen Cloth", "  bolt   cloth ", true },   -- extra spaces
+        { "Bolt of Linen Cloth", "", true },                  -- nothing typed: every row
+        { "Bolt of Linen Cloth", "wool", false },
+        { "Bolt of Linen Cloth", "linen wool", false },       -- every word must appear
+        { "Linen Cloth", "linen-cloth", false },
+        { "Elixir of Lion's Strength", "lion's", true },
+        { "Potion (Rare)", "(rare", true },                   -- plain text: "(" is only a character
+        { "Potion (Rare)", "%a", false },                     -- and "%a" isn't a pattern
+    }
+    local wrong = {}
+    for _, c in ipairs(cases) do
+        if Matches(c[1], Words(c[2])) ~= c[3] then wrong[#wrong + 1] = string.format("%q in %q", c[2], c[1]) end
+    end
+    local ok = #wrong == 0
+    report("SEARCH-MATCH", ok, ok and string.format("%d searches match as expected", #cases)
+        or ("wrong: " .. table.concat(wrong, ", ")))
+    return ok and 1 or 0, ok and 0 or 1
 end
 
 ns.On("MAIN_BUILT", Build)

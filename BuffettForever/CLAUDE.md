@@ -90,6 +90,16 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   window at our page and lowers our window under it (Justin: fewer slash commands). The Deposit row marks the
   1s minimum "(min)". Tested on 70425: both work. Still to see in game: a deposit changing with the auction
   length (Alt+Right-click a stack in the bags prints it for the length in use).
+- 1.0.0 M5 pass 2 (2026-10-17, in progress): the README rewritten for 1.0.0, the CurseForge page
+  (docs/BuffettForever-curseforge.md), version 1.0.0, and dist/BuffettForever-1.0.0.zip (37 files, 152 KB; the
+  logo is dist/BuffettForever-logo-512.png). Next: Justin reviews the page, takes the screenshots and uploads it
+  as Beta; then a check on the stress-test client (`_forever_`, from Oct 19).
+- 1.0.0 search (2026-10-17; Justin: the list gets long): Blizzard's SearchBoxTemplate right of the list's
+  heading filters every view by item name on each keystroke (Words, Matches, Shown in UI/ResultsList.lua; rows only,
+  no re-evaluation). ShowRows keeps the selection while it's shown, else selects the best-ranked row shown; a new
+  search scrolls to the top; the count line reads "4 of 168 shown". SEARCH-MATCH in the selftest (112). Tested on
+  70450 (Justin's client updated): selftest 112/112, filtering as you type, any word order, the no-match message and
+  the empty details, the search kept across tabs and a reopen, the X, and Escape twice. The zip was rebuilt with it.
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). The expiry and mailbox-reopen tests passed on
   70425 (2026-10-17).
@@ -104,6 +114,9 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 - **Settings bind to db.settings** through Blizzard's panel. The defaults live in Core.lua only
   (ns.DEFAULT_SETTINGS). Lowering the price history deletes the older days at the next login (PriceDB.Prune), and
   the tooltip says so.
+- **Search** (Justin, 2026-10-17: "Proceed with item names only"): the search matches the row's item name only, not
+  its reagents' names. Every word must appear, in any order, as plain text. The top pick and Most gold ignore the
+  search. The text is kept across views and while the window is closed, but isn't saved (a /reload starts empty).
 
 ## Decisions (2026-10-16, M4; Justin approved the plan's recommendations)
 - **Order:** pass 1 an honest AH exit (sales ledger, measured cut, deposits, your auctions); pass 2 market reality

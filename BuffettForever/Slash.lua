@@ -24,7 +24,7 @@ local function SelfTest()
     end
     local passed, failed = 0, 0
     for _, suite in ipairs({ ns.Econ.SelfTest, ns.Evaluator.SelfTest, ns.RecipeIndex.SelfTest, ns.Ledger.SelfTest,
-                             ns.Mail.SelfTest, ns.Deposits.SelfTest, ns.Options.SelfTest }) do
+                             ns.Mail.SelfTest, ns.Deposits.SelfTest, ns.Options.SelfTest, ns.ResultsList.SelfTest }) do
         local p, f = suite(report)
         passed, failed = passed + p, failed + f
     end
