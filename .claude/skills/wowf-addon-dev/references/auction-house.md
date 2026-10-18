@@ -152,9 +152,26 @@ What to know:
   handler: one player action, one purchase.
 - Check `GetMoney()` against the quote's total before confirming. Watch `ADDON_ACTION_BLOCKED` and
   `ADDON_ACTION_FORBIDDEN(addonName, func)` for your addon's name.
-- Gear: `PlaceBid(auctionID, buyoutAmount)` from `GetItemSearchResultInfo` (Blizzard shows a popup first). Not
-  tested on Forever yet.
 - Working code: BuffettForever `Pricing\Buy.lua` (`/bf buytest`, logged in `diag.purchases`).
+
+## Buying gear (one auction)
+Proven on 70450 from a button's click [F-132]. Blizzard's Buy button shows the `BUYOUT_AUCTION` popup, then calls
+`PlaceBid` [Source 70450]:
+1. **Search the item** (equipment with `SendSellSearchQuery`, see Targeted searches) and read each auction with
+   `GetItemSearchResultInfo(itemKey, i)`: `auctionID`, `buyoutAmount` (for the whole auction), `quantity`,
+   `containsOwnerItem`. Sort by `buyoutAmount ÷ quantity` and leave your own out.
+2. **Show the auction and its price**, then let a second click buy it:
+   `C_AuctionHouse.PlaceBid(auctionID, buyoutAmount)`. A bid equal to the buyout buys outright.
+3. **`AUCTION_HOUSE_PURCHASE_COMPLETED(auctionID)`** names the auction (0.6 s later on 70450). Match it against
+   yours. A failure comes as `AUCTION_HOUSE_SHOW_ERROR(error)` (untested on Forever): drop that auction.
+4. **Delivery:** by mail, like commodities [F-132]. Exactly the buyout is spent.
+5. **Search again** before offering the next auction: the results go stale once you buy.
+
+What to know:
+- The same rules as commodities: one call per click, the AH open, out of combat, `GetMoney()` checked first.
+- `PlaceBid` is `HasRestrictions`, not protected. No popup is needed: Blizzard's is its own confirmation, and
+  yours is the second click.
+- Working code: BuffettForever `Pricing\Buy.lua` (`Buy.StartAuction`, `Buy.Confirm`), the AH flips tab.
 
 ## Deposits and the house cut
 - `CalculateCommodityDeposit(itemID, duration, quantity)` and `CalculateItemDeposit(itemLocation, duration,

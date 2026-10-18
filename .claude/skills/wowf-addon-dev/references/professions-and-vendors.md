@@ -124,6 +124,20 @@ ns.On("LOGIN", function() C_Timer.After(5, ReadKnownRecipes) end)
   unlimited** (confirmed on 70425 [F-124]). Reputation discounts are already applied.
 - Working code: BuffettForever `Pricing\Merchant.lua` (MERCHANT_SHOW/UPDATE, 0.2 s debounce, tested on 70425).
 - `GetMerchantItemInfo` is gone; Blizzard's own merchant frame uses `C_MerchantFrame.GetItemInfo`.
+- **Buying from a vendor** (proven on 70450 from a button's click [F-124]): `BuyMerchantItem(index, quantity)`,
+  runtime-only, quantity in items. Blizzard's merchant frame (Mainline `MerchantFrame.lua`, which Forever loads)
+  [Source 70450]:
+  - A right-click buys one stack: `BuyMerchantItem(index)`, `stackCount` items. A left-click picks the item up
+    (`PickupMerchantItem`).
+  - Shift-click opens the stack split, in steps of `stackCount` up to `min(GetMerchantItemMaxStack(index), what your
+    gold buys)`, then calls `BuyMerchantItem(index, split)`.
+  - At 150g or more (`MERCHANT_HIGH_PRICE_COST = 1500000`) it asks first (`CONFIRM_HIGH_COST_ITEM`).
+
+  So buy whole stacks, at most `GetMerchantItemMaxStack` a call (the item's stack size), and no more than
+  `numAvailable` when it isn't -1. The items go **straight to the bags**, unlike AH purchases, so the bag count's
+  rise confirms the purchase. Re-check `GetMerchantItemID(index)` before the call: the merchant's list can change.
+  Working code: BuffettForever `Pricing\Merchant.lua` (`Merchant.BuyQty`, `Merchant.Find`) and `Pricing\Buy.lua`
+  (`Buy.StartVendor`).
 
 ## Money
 - Coin icons: `C_CurrencyInfo.GetCoinTextureString(copper[, fontHeight])`; plain text:

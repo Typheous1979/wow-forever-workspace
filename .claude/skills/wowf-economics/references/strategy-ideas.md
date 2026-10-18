@@ -25,6 +25,15 @@ Features that use the same data. Each lists its inputs and which are available o
     - For a commodity, buying the flip's quantity takes the cheapest units first, which are exactly these.
   - FLIP-1: listings 40c × 5, 45c × 10, 60c × 20, vendor 50c → 15 units, cost 6s 50c, worth 7s 50c, 40c to
     45c. FLIP-2: vendor price 0 → none. FLIP-3: all above → none. FLIP-4: 49.5c × 3 → 3 (half a copper counts).
+  - **Buying a flip** (BuffettForever 1.0.0; gear tested on 70450):
+    - Search the item first, because a scan's listings can be gone.
+    - A stackable flip is one quote for every unit still below the vendor price. Refuse it unless the total stays
+      under units × the vendor price (`Buy.FlipCheck`).
+    - Gear goes one auction at a time, cheapest first.
+    - Search again after each purchase, and drop the flip once nothing is left below the vendor price.
+  - **Flips on the beta were thin** (70450, 2026-10-18). Five flips from one scan made 24c to 99c each in all, on
+    76s to 3g 89s spent, so none reached the 10s minimum profit, and the view marked them not recommended. Two
+    Cross Daggers bought at 38s paid 30c each at a vendor.
 
 ## Mr. Market signals
 - z-score of today's market value against fair value: `z = (now − fair) / σ` over the window.

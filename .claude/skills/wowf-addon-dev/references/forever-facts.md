@@ -277,6 +277,12 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   - **`numAvailable` = -1 means unlimited stock** (37 of 37 items at a trade-goods vendor). `price` buys
     `stackCount` units: one item cost 10c for a stack of 5. A limited item hasn't been seen yet. Harvesting from
     `MERCHANT_SHOW`/`MERCHANT_UPDATE` (0.2 s debounce) worked. [Probe 70425]
+  - **An addon can buy from a vendor** (BuffettForever's Buy bar, 2026-10-18): `BuyMerchantItem(7, 1)` from a
+    button's click bought 1 Coarse Thread for exactly its 10c. The bag count was up by 1 when the addon's debounced
+    bag message came, 0.9 s later. No `ADDON_ACTION_BLOCKED`. Unlike an AH purchase [F-132], it goes straight to the
+    bags. Still untested: an item sold in stacks (`stackCount` > 1) and a quantity above 1. [Probe 70450]
+  - `GetMerchantItemMaxStack(i)` (runtime-only) is the most one call buys, the item's stack size: 1 for 5 tools,
+    20 for Coarse Thread (sold 1 at a time) and Mild Spices (sold 5 at a time), 10 for Weak Flux. [Probe 70450]
 - **[F-125]** Items and item UI:
   - `C_Item.GetItemInfo`: `sellPrice` 11th, `bindType` 14th, `isCraftingReagent` 17th return.
   - Absent: `PickupItem` (use `C_Item.PickupItem`), the `ItemButtonTemplate` template (use
@@ -404,7 +410,13 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     15 s before had found nothing under 71c; the next search found 118 at 48c. So the server filled the order from
     cheaper listings posted while the quote was open. The other 3 purchases cost exactly their quotes. Read the gold
     spent from `GetMoney()`, not the quote.
-  - Still untested: `PlaceBid` (gear), and a quote refused for a price rise.
+  - **An addon can buy gear outright** (the Buy bar, 2026-10-18): `C_AuctionHouse.PlaceBid(auctionID, buyoutAmount)`,
+    with both from `GetItemSearchResultInfo`, bought 2 Cross Daggers at 38s each, one click each after the auction was
+    shown. `AUCTION_HOUSE_PURCHASE_COMPLETED(auctionID)` came 0.6 s after each call, naming the auction. Exactly the
+    buyout was spent, and the daggers came **by mail**, as commodities do. Blizzard's `BUYOUT_AUCTION` popup is only
+    its UI's confirmation, not needed by the call.
+  - Still untested: a quote refused for a price rise, and `AUCTION_HOUSE_SHOW_ERROR` for an auction sold before the
+    click.
 
   [Probe 70450]
 - **[F-133]** **Professions and skill without the window** (BuffettForever's harvest, 2026-10-17 and 18):

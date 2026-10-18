@@ -45,6 +45,15 @@ Addon frames that you create aren't protected. You only need combat-lockdown car
 - **Size:** at UI scale 1 on a 1080p screen, UIParent is about 1366 × 768. A main window up to about 1040 × 600 fits
   with room to spare.
 - **Fonts:** WoW's default font (Friz Quadrata) has no ∞ and no en dash; they render as boxes. Write "n/a" and "to".
+- **The addon's logo in the window's corner**, as on the Professions and Quest log windows. Example: BuffettForever
+  `UI/MainFrame.lua` 1.0.0 (Justin's request), tested on 70450.
+  - `ButtonFrameTemplate` comes with Blizzard_SharedXML's `PortraitFrameMixin`: a 62 × 62 `portrait` texture at
+    TOPLEFT (-5, 7), cropped to a circle by the `TempPortraitAlphaMask`, with the title starting 58 px in.
+  - `frame:SetPortraitToAsset("Interface\\AddOns\\<Addon>\\Media\\Icon")` puts your icon in it; a square 64 × 64
+    TGA works, and the mask rounds it. Blizzard passes an icon path the same way for the Collections, Shop and
+    Archaeology windows.
+  - Start the content under the title bar about 62 px from the left, clear of the ring.
+  - `ButtonFrameTemplate_HidePortrait(frame)` is the other choice: no ring, and the title spans the whole width.
 - **A sortable list:**
   - `CreateScrollBoxListLinearView(2, 2, 2, 2, 0)`, `view:SetElementExtent(20)`,
     `view:SetElementInitializer("Button", InitRow)`, then the WowScrollBoxList and MinimalScrollBar pair
