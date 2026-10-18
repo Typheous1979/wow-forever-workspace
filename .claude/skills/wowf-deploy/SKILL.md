@@ -58,3 +58,8 @@ Done for MusicForever 0.2.0 and BuffettForever 1.0.0.
    - the release type: Beta until the addon has run on the launch client.
 6. Before launch, deploy to `_forever_` (`--client forever`) and check it there: `/reload`, the addon's self-test if
    it has one, and a real play session.
+
+While the release files wait for Justin's review, code still gets committed. Leave the README, the CHANGELOG, the
+page and `## Version` out of those commits. New Lua files still need their TOC lines, so stage the TOC with
+`python tools/wowf/cli.py toc-stage <Addon>`. It stages the working copy's file list under the committed `##`
+header, and lists the header lines it kept back (`--dry-run` shows the result first). Used for BuffettForever 1.0.0.
