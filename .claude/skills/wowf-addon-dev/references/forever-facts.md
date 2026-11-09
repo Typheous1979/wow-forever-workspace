@@ -107,8 +107,11 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   `[Family]` expands to `Mainline` and `[Game]` to `Camelot`. [Source; Wiki]
 - **[F-022]** Suffix precedence on Forever: `_Camelot`/`_Forever` > `_Mainline` > bare `Name.toc`. Shipped addons use `_Camelot.toc` (Questie, MapUtils, MoveAny), `-Camelot.toc` (Guidelime) and multi-value Interface lines (RXP, TomTom). `_Forever.toc` is unverified in the wild. [Wiki; observed]
 - **[F-023]** Inline `[AllowLoadGameType camelot]`: if **no** listed type is recognized, the line STILL LOADS. Pair it with `[ExcludeLoadGameType ...]`. [Wiki]
-- **[F-024]** New addon folder: the wiki says `/reload` detects new addons (9.0.1+); the community says Forever needs a full client restart. Treat restart as the safe default and **record what Justin observes**. [Wiki vs Community — conflict]
-  - An **existing** addon's changed TOC (five new Lua files, a new `## Version`) was re-read on `/reload`, no restart (BuffettForever 0.2.0). [Probe 70425] A brand-new folder is still unrecorded.
+- **[F-024]** New addon folder: `/reload` detects it, as the wiki says (9.0.1+). The community's "Forever needs a full client restart" was wrong on live 70862 (below). [Wiki; Probe 70862]
+  - An **existing** addon's changed TOC (five new Lua files, a new `## Version`) was re-read on `/reload`, no restart (BuffettForever 0.2.0). [Probe 70425]
+  - **A brand-new folder loads on `/reload`** (live 70862, 2026-11-09): WowfProbe was linked at 17:51 and
+    `/wowfprobe full` ran at 17:55 after a `/reload`, with no client launch between (the logs weren't restarted). The
+    wiki is right; a restart isn't needed. [Probe 70862]
 - **[F-025]** Out-of-date: an addon whose Interface doesn't match is flagged out of date. Whether Forever force-blocks them, as Midnight does below 120000, is undocumented. [Wiki TODO]
 - **[F-026]** `## LoadSavedVariablesFirst: 1` (11.1.5+) loads SVs before your files. Questie's Forever TOC uses it. [Wiki; observed]
 
@@ -387,8 +390,10 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     sell. Items no vendor buys pay the 1s minimum.
   - Item 2657 (vendor 875c): 100c, 172c and 516c, so the floor comes before the multiplier (875 ÷ 20 = 43.75 → 43).
   - `CalculateCommodityDeposit` answers away from the AH too (1 Linen Cloth: 100).
+  - On live 70862 (2026-11-09) it gave nil at BuffettForever's login check (5 s after login, away from the AH) at both
+    logins, but 100 when Justin typed it later in the session, still away from the AH.
 
-  [Probe 70425]
+  [Probe 70425; Probe 70862]
 - **[F-130]** **Auction House mail.**
   - The subject strings exist:
     - `AUCTION_EXPIRED_MAIL_SUBJECT` = "Auction expired: %s"
@@ -531,6 +536,22 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   - Still untested: the post warning (`AUCTION_HOUSE_POST_WARNING`), and multisell (several gear items in one call).
 
   [Probe 70450]
+
+- **[F-141]** **Hotfixes change game data after a build ships, so generated tables can lag the live game.**
+  - Blizzard's Nov 6, 2026 hotfixes: Tanning Rack needs Leatherworking 125 (was 140); Mild Spices sell to vendors for
+    1c (was 2c). Blizzard's Oct 15 notes cut many crafted items' vendor sell prices.
+  - The live client's `Logs\Hotfix.log` (70862) lists hotfixed records: ItemSparse for 6,333 items (46 of them in
+    BuffettForever's sell-price table), TradeSkillItem, SkillLineAbility (56 records, none of the 1,976 item
+    recipes), SpellReagents (1).
+  - Data generated from the 70862 tables differs from 70450's only in Mild Spices' sell price.
+  - So prefer the client's figure for anything hotfixable: BuffettForever 1.0.1 takes the sell price from
+    `select(11, C_Item.GetItemInfo(id))` once `C_Item.IsItemDataCachedByID(id)`, and from its data only until then.
+    Its selftest records in `diag.sellPrices` how many cached items differ from the data.
+
+  [Official; Probe 70862 (Hotfix.log); Source (wago DB2)]
+- **[F-142]** **The Account Bank is enabled on Forever:** `C_PlayerInfo.IsAccountBankEnabled()` returned true on live
+  70862 (Justin, 2026-11-09). `C_Item.GetItemCount`'s fifth argument (includeAccountBank) counts it; BuffettForever's
+  tray counts already pass it. [Probe 70862]
 
 ## 14. Retest checklist (run on every new build)
 
