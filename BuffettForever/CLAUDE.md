@@ -281,6 +281,11 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
     Pricing/Post.lua `/bf posttest` (facts, the price from a search, confirm, a second confirm after a warning;
     diag.posts).
   - selftest 131 (COLLECT-REMEMBER, MAIL-DROP, MAIL-LEGACY replaces IN-MAIL, COLLECT-PICK, TRAY-SLOT, TRAY-LOAD-MAIL).
+- **1.0.1 released** (2026-11-09, uploaded by Justin as a new file on the project; awaiting approval): vendor sell
+  prices from the client first (Items.SellPrice: the cached client's figure, then the data's, then a server request), so
+  Blizzard's hotfixes apply [F-141]; Data regenerated from live 70862 (only Mild Spices, 2c -> 1c). Tested on live 70862
+  with the workspace build linked (the CurseForge copy moved aside, then restored): selftest 143/143; 47 cached items,
+  none differing from the data (diag.sellPrices). Zip: dist/BuffettForever-1.0.1.zip, 45 files.
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). From pass 3 (2026-10-18): Buy greyed out with "Not
   enough gold" when Crafts makes the cost more than your gold, and a quote left to run out (the last 10 s counted
@@ -302,7 +307,7 @@ reads `diag` with savedvars.py after his `/reload`. Read General.log before any 
    on Nov 6) and compare the printed deposit with diag.deposits. Also
    `/run print(C_AuctionHouse.CalculateCommodityDeposit(2589,1,1))` at the AH: nil at login away from it on 70862
    [F-129].
-4. **Live sell prices**, if 1.0.1 prefers `C_Item.GetItemInfo`'s sell price to the data's: a flip's "Vendor pays" and a
+4. **Live sell prices** (1.0.1 prefers the client's): a flip's "Vendor pays" and a
    hotfixed item's deposit match the game.
 5. **The buttons:** the Scan button under the AH frame and Collect under the mail window sit where they did on the beta
    (the AH frame is unchanged on 70862; the unit frames and minimap header were reskinned on 70425).
