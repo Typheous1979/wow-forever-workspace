@@ -290,6 +290,27 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   envelope should still go). The expiry and mailbox-reopen tests passed on
   70425 (2026-10-17).
 
+## At the Auction House on the live client (logged 2026-11-09; run when Justin says he's at one)
+Justin is levelling, away from Auction Houses. When he's at one, go through these in order: he does the clicks, and Igor
+reads `diag` with savedvars.py after his `/reload`. Read General.log before any client restart [F-137].
+1. **The first full scan on live 70862:** Scan (the window, or the button under the AH frame). From diag.scanner: the
+   listings, items and seconds (the beta had 61,933 listings and 2,998 items in 5.5 s), the market key (the live
+   realm and faction), and the saved file's size (SAVED_VARIABLES_TOO_LARGE pauses scanning).
+2. **Who shares the AH** (sets `marketKey`, open since M1): scan with a character of the other faction on the same realm
+   and compare the ladders. Live realms are one mega-realm per ruleset [F-081].
+3. **Deposits:** Alt+Right-click a stack in the bags (Linen Cloth; Mild Spices if carried, hotfixed to a 1c sell price
+   on Nov 6) and compare the printed deposit with diag.deposits. Also
+   `/run print(C_AuctionHouse.CalculateCommodityDeposit(2589,1,1))` at the AH: nil at login away from it on 70862
+   [F-129].
+4. **Live sell prices**, if 1.0.1 prefers `C_Item.GetItemInfo`'s sell price to the data's: a flip's "Vendor pays" and a
+   hotfixed item's deposit match the game.
+5. **The buttons:** the Scan button under the AH frame and Collect under the mail window sit where they did on the beta
+   (the AH frame is unchanged on 70862; the unit frames and minimap header were reskinned on 70425).
+6. **The tests logged for later** (above): the house cut (`/bf ledger` after 3 sales worth 1g), Buy greyed with "Not
+   enough gold", a quote left to run out, a stackable flip bought by quote, a gear post, a same-item mail you bought
+   yourself, our mail taken with Blizzard's own click, and an expired auction coming back. The vendor reagent sold in
+   stacks (Mild Spices, 5 a purchase) needs a trade-goods vendor, not the AH.
+
 ## Decisions (2026-10-18, the tray's mailbox, Collect, Craft and Post; Justin's answers, then the approved plan)
 - **Justin's questions:** can an AH purchase go straight into the bags, so the tray's units are really there? Can a
   button in the details craft a known recipe from the tray's materials? Can it post at the AH? All go into 1.0.0.
