@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "facts_as_of": "2026-10-16",
+  "facts_as_of": "2026-11-09",
   "forever_interfaces": [
     16001
   ],
   "other_interfaces": {
-    "standard_live": 120100,
-    "standard_test": 120105,
+    "standard_live": 120105,
+    "standard_test": 120107,
     "vanilla": 11509,
     "tbc": 20506,
     "wrath": 38002,
@@ -17,12 +17,12 @@
     "wow_classic_beta": {
       "folder": "_classic_beta_",
       "exe": "WowB.exe",
-      "role": "Forever beta"
+      "role": "Forever beta (closed Oct 23, 2026; last build 70532)"
     },
     "wowf": {
       "folder": "_forever_",
       "exe": "Wow.exe",
-      "role": "Forever stress test / launch"
+      "role": "Forever live (launched Nov 4, 2026)"
     }
   },
   "client_search_roots": [

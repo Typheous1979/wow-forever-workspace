@@ -13,7 +13,7 @@
 
 ## Interface
 - A Forever-only addon uses `## Interface: 16001` [F-020].
-- A multi-client addon uses a comma-separated list, e.g. `## Interface: 120100, 120105, 16001, 11509`.
+- A multi-client addon uses a comma-separated list, e.g. `## Interface: 120105, 120107, 16001, 11509`.
 - The live Forever interface number may change at launch; the wiki's "Forever" row is still blank. `/wowf-refresh` checks it.
 
 ## Which TOC the Forever client loads [F-022]
@@ -99,7 +99,7 @@ Options.lua
 
 **One package for Midnight and Forever:**
 ```
-## Interface: 120100, 120105, 16001
+## Interface: 120105, 120107, 16001
 ## Title: My Addon
 ## SavedVariables: MyAddonDB
 

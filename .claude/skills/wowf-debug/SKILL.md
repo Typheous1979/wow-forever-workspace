@@ -30,7 +30,7 @@ python "${CLAUDE_SKILL_DIR}/scripts/probe_report.py"                    # ingest
    - `savedvars.py status <Addon>`: is it deployed (junction OK, not dangling) and enabled in AddOns.txt?
    - Is the folder name the same as the TOC name?
    - Is `## Interface` 16001? The TOC must not have a BOM (lint TOC00x).
-   - A brand-new folder needs a client restart [F-024].
+   - A brand-new folder loads on `/reload`; no restart needed (live 70862) [F-024].
    - In game: `/dump C_AddOns.GetAddOnInfo("Name")`. The 5th return is the reason: `INTERFACE_VERSION`, `WRONG_GAME_TYPE` (an `AllowLoadGameType` issue), `DEP_*`, `DEMAND_LOADED`, `DISABLED`.
 2. **A Lua error.** Players usually hide errors, but `Logs\General.log` has each one with its stack: read it first
    [F-137]. To see them in game: `/console scriptErrors 1` (or BugSack). Then map the text with the catalog below. Lint the file.
@@ -111,6 +111,6 @@ It records what this client really provides. It uses `type()`/`pairs()` only and
    - the documented-vs-runtime namespace diff.
 
    It also writes `wowf-api/data/runtime-surface.jsonl`, which `wowf-api` and the lint then use.
-4. Run it on every new build, and in `_forever_` after Oct 19. Lint-queued unknown names go into `assets/WowfProbe/Queries.lua` automatically.
+4. Run it on every new build, in `_forever_` (the live client). Lint-queued unknown names go into `assets/WowfProbe/Queries.lua` automatically.
 
 Never ship WowfProbe; it's marked `## X-Wowf-DevOnly: 1`.

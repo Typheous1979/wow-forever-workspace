@@ -32,7 +32,7 @@ python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" --prune                         #
 2. The folder name must equal the TOC name; deploy refuses otherwise.
 
 ## After deploying, tell Justin
-- **A brand-new addon:** restart the client, or at least `/reload` (the community says a restart is needed [F-024]). Then enable it in the AddOns list at character select. Ask what happened and record it.
+- **A brand-new addon:** `/reload` is enough; it loaded a new folder on live 70862 [F-024]. Then enable it in the AddOns list at character select. Ask what happened and record it.
 - **Code edits:** with a junction, edits are live after `/reload`. Changes to the TOC or new files may need a restart.
 - **SavedVariables** are written only at `/reload` or logout.
 

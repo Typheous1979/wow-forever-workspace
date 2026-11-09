@@ -85,7 +85,8 @@ local function ExperiencePreset()
     if not (C_GameRules and C_GameRules.GetForeverExperiencePreset) then return "unavailable" end
     local p = C_GameRules.GetForeverExperiencePreset()        -- nilable
     if p == Enum.ForeverExperiencePreset.Classic then return "Classic" end
-    if p == Enum.ForeverExperiencePreset.Modern then return "Modern" end
+    -- 70862 renamed Modern to Enhanced [F-014]; the "or" keeps older clients working
+    if p == (Enum.ForeverExperiencePreset.Enhanced or Enum.ForeverExperiencePreset.Modern) then return "Enhanced" end
     return "unknown"
 end
 -- C_GameRules.IsHardcoreActive(), C_GameRules.IsSelfFoundAllowed()

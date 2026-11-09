@@ -39,7 +39,9 @@ You run as a forked helper. **Gather and propose only. Don't edit the skill file
    ```
    python "${CLAUDE_SKILL_DIR}/scripts/wowf.py" probe-report
    ```
-6. **Retest checklist:** walk section 13 of `forever-facts.md` and say which items the new evidence answers.
+6. **Retest checklist:** walk section 14 of `forever-facts.md` and say which items the new evidence answers.
+   Since launch, also read Blizzard's hotfix threads, the client's `Logs\Hotfix.log` and the wago.tools build list:
+   hotfixes change game data after a build ships [F-141].
 
 ## Output (return exactly this structure)
 - **Builds:** a table of server, client, index and probe builds.

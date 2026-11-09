@@ -1,6 +1,6 @@
 # WoW Forever facts ledger
 
-Facts as of **2026-10-16** (§13 added and its AH probes run on 70425; earlier sections last checked 2026-10-14;
+Facts as of **2026-11-09** (live 70862: the launch facts, the 70862 API changes and the live probes; before that §13 added and its AH probes run on 70425; earlier sections last checked 2026-10-14;
 §13 extended through 2026-10-18 on 70450: buying, taking mail, crafting and posting from an addon). Status tags:
 - **[Probe]**: measured in the client (WowfProbe or a community probe);
 - **[Source]**: Blizzard UI source, `forever` branch of Gethe/wow-ui-source;
@@ -31,12 +31,12 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
 - **[F-001]** Forever = game type **Camelot** in the Mainline family. Blizzard: "Forever and modern WoW (Midnight) are two game types within the Mainline code family: Camelot (to be renamed before launch) and Standard." It shares "the vast majority of APIs available in 12.1.5"; Midnight's addon disarmament, secrets included, is active; the 12.1.0 AuraContainer/AuraButton changes are included. [Official, WoW UI Discord via Wowhead, 2026-09-16]
 - **[F-002]** The addon API is "the modern API approach". [Official, dev Q&A 2026-09-17, 01:20:52]
 - **[F-003]** Dates:
-  - beta Sep 17 – Oct 21/22, 2026;
-  - **stress test Oct 19** ("WoW: Forever - Stress Test");
-  - **launch Nov 4, 2026, 3:00 p.m. PST**, level cap 60;
-  - raids Dec 9; Hardcore in winter.
+  - beta Sep 17 – Oct 23, 2026 (last build 70532);
+  - stress test **Oct 21** ("WoW: Forever - Stress Test"); name reservation from Oct 27 (3 characters per account);
+  - **launched Nov 4, 2026, 3:00 p.m. PST**, all regions at once, on build 70790; level cap 60;
+  - raids Dec 9 (Barrow Deeps, Hyjal Summit, Onyxia's Lair); Hardcore in winter 2026/27.
 
-  [Official]
+  [Official; Wiki World_of_Warcraft:_Forever]
 - **[F-004]** Builds:
 
   | Build | Date | Note |
@@ -57,6 +57,11 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   | 70374 | Oct 13 | |
   | 70425 | Oct 16 | beta server and Justin's client; API index rebuilt |
   | 70450 | Oct 16 (late) | beta server, and Justin's client from Oct 17; API index rebuilt (no AH, profession or merchant API changes) |
+  | 70532 | Oct 20–22 | last beta build; the `wowf` stress test |
+  | 70630–70755 | Oct 27 – Nov 3 | |
+  | 70790 | Nov 4 | launch |
+  | 70840 | | |
+  | 70862 | Nov 7 | live server and Justin's client on Nov 9; API index rebuilt (no AH, profession, merchant or mail API changes) |
 
   [Source: forever branch commits]
 - **[F-005]** Version server, Oct 14:
@@ -66,12 +71,16 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
 
   Oct 16: `wow_classic_beta` = **1.60.1.70425**, then **1.60.1.70450** the same evening; `wowf` still 1.60.1.70245.
 
+  Nov 9: `wowf` = **1.60.1.70862** (live), `wow_classic_beta` = 1.60.1.70532 (frozen), retail 12.1.5.70783. No Forever
+  test product answers (`wowft`, `wowf_ptr`, `wowf_beta`).
+
   Endpoint: `http://us.patch.battle.net:1119/<product>/versions`. [Official data]
 - **[F-006]** Client folders:
   - beta: `World of Warcraft\_classic_beta_\` with `WowB.exe`;
   - `wowf` (stress test/launch): **`_forever_`** with `Wow.exe`.
 
   Interface, WTF and Cache are **per folder**, so addons and SavedVariables don't carry over. [Official CDN product config]
+  Since launch Justin plays on `_forever_` (70862 on 2026-11-09); his beta client is uninstalled. [Probe, local disk]
 - **[F-007]** Justin's beta client was on build 70338 (Oct 12), 70425 on Oct 16, and **70450** on Oct 17 (BuffettForever's
   selftest saved that build, and the version server's beta matched). Its install path lives in the gitignored `wowf.local.json`. Per-character data lives under `WTF\Account\<acct>\<region-id>\<Char-Realm>\`; on 70425 the "Char-Realm" folder is `<First>-<Surname>` (the surname takes the realm slot, [F-080]) under region-id `70`. Folders from older builds (`<Realm Name>\<First>`) stay beside it. [Probe, local disk 70425]
 
@@ -88,7 +97,9 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   ```
   You can also read the TOC: `## X-Game: [Game]` → `C_AddOns.GetAddOnMetadata(addonName, "X-Game") == "Camelot"`. [Source/Wiki]
 - **[F-014]** `C_GameRules`: 29 functions.
-  - `GetForeverExperiencePreset()` is **nilable**; `Enum.ForeverExperiencePreset` is Classic=0, Modern=1.
+  - `GetForeverExperiencePreset()` is **nilable**; `Enum.ForeverExperiencePreset` is Classic=0, **Enhanced=1** since 70862 (it was Modern; code comparing
+    with `.Modern` now compares with nil). Setters: `SetForeverExperiencePresetPreLogin`/`PostLogin` (the old
+    `SetForeverExperiencePreset` is gone at runtime); event `SETTINGS_HEADER_TEXT_UPDATE`. The probe read preset 1.
   - Also `IsHardcoreActive`, `IsSelfFoundAllowed`, `IsGameRuleActive(Enum.GameRule.X)`, `GetActiveGameMode`.
   - Events: `GAME_RULES_CHANGED`, `ACTIVE_GAME_MODE_UPDATED`.
   - `Enum.GameRule` and `Enum.GameMode` are runtime-only (not in the docs).
@@ -97,7 +108,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   [Source; Community fact sheet]
 
 ## 3. TOC and loading
-- **[F-020]** Interface **16001** for Forever Beta (70374) and Forever Test/PTR (70245). The live "Forever" row is still blank. Retail Standard is 120100; Standard Test is 120105. [Wiki TOC_format]
+- **[F-020]** Interface **16001** for Forever live (70790; the probe read 16001 on 70862), Beta (70532) and Test (70245). Every launch-updated addon in `_forever_` lists 16001. Retail Standard is **120105**; Standard Test is **120107**. [Wiki LatestPatchInfo; Probe 70862]
 - **[F-021]** Game-type tokens:
   - `camelot`, alias `forever` (since **70291**);
   - family `mainline` (includes camelot, standard, plunderstorm, wowhack);
@@ -105,7 +116,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   - `classic` = vanilla/tbc/wrath/cata/mists.
 
   `[Family]` expands to `Mainline` and `[Game]` to `Camelot`. [Source; Wiki]
-- **[F-022]** Suffix precedence on Forever: `_Camelot`/`_Forever` > `_Mainline` > bare `Name.toc`. Shipped addons use `_Camelot.toc` (Questie, MapUtils, MoveAny), `-Camelot.toc` (Guidelime) and multi-value Interface lines (RXP, TomTom). `_Forever.toc` is unverified in the wild. [Wiki; observed]
+- **[F-022]** Suffix precedence on Forever: `_Camelot`/`_Forever` > `_Mainline` > bare `Name.toc`. Shipped addons use `_Camelot.toc` (Questie, MapUtils, MoveAny), `-Camelot.toc` (Guidelime) and multi-value Interface lines (RXP, TomTom). Questie and QuestieDB ship `_Forever.toc` beside `_Camelot.toc` (both 16001, 70862); which one the client picks is unverified. [Wiki; observed]
 - **[F-023]** Inline `[AllowLoadGameType camelot]`: if **no** listed type is recognized, the line STILL LOADS. Pair it with `[ExcludeLoadGameType ...]`. [Wiki]
 - **[F-024]** New addon folder: `/reload` detects it, as the wiki says (9.0.1+). The community's "Forever needs a full client restart" was wrong on live 70862 (below). [Wiki; Probe 70862]
   - An **existing** addon's changed TOC (five new Lua files, a new `## Version`) was re-read on `/reload`, no restart (BuffettForever 0.2.0). [Probe 70425]
@@ -118,7 +129,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
 ## 4. API surface changes by build
 - **[F-030]** Absent on 69913: `GetSpellInfo`, `GetItemInfo`, `GetSpellBookItemName`, `GetNumTalentTabs`, `GetTalentInfo`, `GetNumSkillLines`, `GetSkillLineInfo`, `UnitAura`, `GetAddOnMetadata`, `UnitPVPRank`, `GetPVPRankInfo`. `IsSpellKnown` survives. [Community probe 69913]
 - **[F-031]** 12.1.5 (Forever's base) removed about 40 item globals (`GetItemInfo`, `GetItemCount`, `GetItemIcon`…), the coin-string helpers and `PlayVocalErrorSoundID`. 12.0.0 removed the spell globals, `CombatLog*`, the action-bar globals and `IsEncounterInProgress`. Full table: `api-migration.md` and `tools/wowf/data/removed_apis.json`. [Wiki]
-- **[F-032]** Forever-only namespaces: C_SwingTimer, C_AutoLoot, C_LootFrame, C_Flyout, C_LFGListRoles, C_NameUtil, C_GamepadUI, C_GamepadTargeting, C_InputInterfaceStyle, C_BlizzCon2026 (+ constants). Also `C_SkillInfo`, `C_PetInfo.GetPetHappiness/Loyalty/TrainingPoints`, `UnitUsesAmmo`, `UnitDefenseSkill`, `UnitResistance`, `ToggleSit`, `UIReload`, `C_CVar.SetTempCVar`/`RemoveTempCVar`, `C_DateAndTime.IsDayTime`, and the events `DIEL_CYCLE_CHANGED`, `PLAYER_SWING`, `UNIT_HAPPINESS`. [Source; Wiki]
+- **[F-032]** Forever-only namespaces: C_SwingTimer, C_AutoLoot, C_LootFrame, C_Flyout, C_LFGListRoles, C_NameUtil, C_GamepadUI, C_GamepadTargeting, C_InputInterfaceStyle, C_BlizzCon2026 (+ constants). Also `C_SkillInfo`, `C_PetInfo.GetPetHappiness/Loyalty/TrainingPoints`, `UnitUsesAmmo`, `UnitDefenseSkill`, `UnitResistance`, `ToggleSit`, `UIReload`, `C_CVar.SetTempCVar`/`RemoveTempCVar`, `C_DateAndTime.IsDayTime`, and the events `DIEL_CYCLE_CHANGED`, `PLAYER_SWING`, `UNIT_HAPPINESS`. Unchanged on 70862: the same 78 forever-only records. [Source; Wiki]
 - **[F-033]** Lua `require` was added, then renamed to **`import`** in 70291. It returns the value a *loaded* module file returned and can't load new files. [Wiki API:import]
 - **[F-034]** Documented C_ namespaces vs runtime on 69913: 277 documented, 269 present, 27 documented-but-absent, about 19 present-but-undocumented. [Community probe]
 - **[F-035]** `PlayMusic`, `StopMusic`, `PlaySoundFile`, `StopSound`, `MuteSoundFile` and `UnmuteSoundFile` are **not in any generated doc**, yet they are used on Forever (Questie `PlaySoundFile(fileID, ch)`; the Soundtrack port played MP3s; Blizzard code calls `StopSound`). **Confirmed present (all six are functions) on 70374.** [Probe 70374]
@@ -134,6 +145,24 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
 - **[F-036]** `Menu.ModifyMenu` / `MenuUtil` are FrameXML Lua tables (not in the C docs) and present. Legacy `UnitPopupButtons` is nil. [Community probe]
 - **[F-037]** `SetDesaturation` has no Lua definition on Forever (use `texture:SetDesaturated`). Questie reports the `UnitAura` global "can fail internally". [Source; Community]
 - **[F-038]** Absent Blizzard UI on Camelot: EncounterJournal, ChallengesUI, retail GroupFinder (Forever has GroupFinder_VanillaStyle), PVPUI, PerksProgram, Housing*, Delves*, ExpansionLandingPage. Present only on Camelot: SwingTimer, Statistics, LegacySystem/LegacyChallengeTracker, Gamepad*, HardcoreUI, QuestTimer. Check with `wowf-api addon Blizzard_X`. [Source]
+- **[F-138]** **70450 → 70862 API changes** (Source, compare 172a387e3ab8...9dc84f0d3bba):
+  - renamed: `Enum.ForeverExperiencePreset.Modern` → `Enhanced` [F-014]; in the docs `Constants.LevelConstsExposed` →
+    `LevelConstsExposed_Camelot` (`MIN_RES_SICKNESS_LEVEL` 10 → 11), but the 70862 runtime still has the old name only;
+  - added: `C_ActionBar.IsHighestSpellRank(spellID)`, `C_BattleNet.GetDefaultTitleWhisperTarget(id)`,
+    `C_PetInfo.IsPetOrderMoveToPending()`; events `PET_ORDER_MOVE_TO_PENDING_CHANGED`, `SETTINGS_HEADER_TEXT_UPDATE`;
+    `Enum.NamePartType.Combined = 2`; an optional `subIcon` on the `C_Texture` title-icon calls;
+  - FrameXML: an Options > Preset page (switch Classic/Enhanced in game); `ContainerFrameItemButtonMixin:Initialize(
+    containerFrame, bag, slot)`; `ItemSlotBackgroundCombinedBagsTemplate` and `NavButtonMixin` removed; Menu resetters run
+    through `securecallfunction`; `Blizzard_GamepadSmartNavigation/SecureHelper.lua` gates on
+    `C_RestrictedActions.IsAddOnRestrictionActive(Combat)`;
+  - unchanged: the AH, trade skill, merchant and mail docs, `Blizzard_AuctionHouseUI`, the bag modified-click path.
+
+  The lint's API008 flags a removed `Enum.X.Member` or an unknown `Enum`/`Constants` table. [Source; Probe 70862]
+- **[F-140]** Blizzard's API notes not recorded earlier: 70291 `C_PvP.IsWarModeFeatureEnabled()` is false on Forever;
+  `GetInspectHonorData` returns 2 more values. 70425: creature, vehicle, pet and object GUIDs have obfuscated server and
+  spawn IDs (stable within a session; they can't detect layers); CVars `nameplateMaxVerticalDistance` and
+  `...AtMaxRange` (0 disables); the unit frames and minimap header were reskinned, so anchors may need adjusting.
+  [Official, via Wiki Patch_1.60.1/API_changes/notes]
 
 ## 5. Secret values and restrictions
 - **[F-040]** Secret values are active (Midnight rules). `C_Secrets.HasSecretRestrictions()` reports it. [Official; Source]
@@ -145,6 +174,10 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
 - **[F-046]** **Printing** a secret throws on Forever and can blank your frame (concatenation alone is allowed by the wiki rules). [Community]
 - **[F-047]** The restriction system: `Enum.AddOnRestrictionType` (Combat, Encounter, ChallengeMode, PvPMatch, Map, Chat), the event `ADDON_RESTRICTION_STATE_CHANGED`, and the test CVars `addon*RestrictionsForced`. [Wiki/Source]
 - **[F-048]** `GetFrameStrata` returns a secret for frames with the new FrameStrata secret aspect (70291). [Wiki]
+- **[F-139]** **70862 tightened secrets:** `UNIT_COMBAT`'s `amount` is secret; `C_LossOfControl.GetActiveLossOfControlData`
+  (and `...DataByUnit`) are secret through `SecretWhenLossOfControlRestricted` (always, unless a PvP spectator or
+  commentator); `specIconID` in the damage meter's combat sources is secret; `C_Spell.IsSpellCrowdControl` takes
+  secret arguments only untainted; `C_Roleset.ApplyRolesetFilters` gained HasRestrictions. [Source 70862]
 
 ## 6. Protected, forbidden and silent calls
 - **[F-050]** Silent failure (no Lua error, `pcall` useless): `ChatFrame_OpenChat`, `ChatEdit_ActivateChat`, `C_SuperTrack.SetSuperTrackedUserWaypoint`, and secure attributes on Blizzard unit frames. The symptom is "Interface action failed because of an AddOn" plus an AddOns-panel counter that only a **full restart** clears. [Community]
@@ -177,10 +210,13 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
     - the addon compartment reads an addon's `_G` callbacks only when it calls them, and calls them insecure;
     - the UI panel manager's delegate frame is forbidden, so `ShowUIPanel`/`HideUIPanel` start secure.
 
+  - 70862 also runs Menu resetters through `securecallfunction`; Blizzard's Nov 3 notes: "Improved Gamepad UI
+    compatibility with user-created add-ons".
+
   [Probe 70862; Source 70450]
 
 ## 7. Beta defects (history)
-- **[F-060]** SavedVariables were written but not restored (Sep 18–21). **Fixed in 70009** (wiki and forum). Builds have since occasionally reset interface settings. [Wiki; Community]
+- **[F-060]** SavedVariables were written but not restored (Sep 18–21). **Fixed in 70009** (wiki and forum). Builds have since occasionally reset interface settings. On live 70862 BuffettForever read back the 7 recipes an earlier session saved. [Wiki; Community; Probe 70862]
 - **[F-061]** Secure snippets failed on 69913 ("RestrictedExecution.lua:79: attempt to call a nil value"). The wiki says 70009 fixed "RestrictedEnvironment not loading". `type(loadstring_untainted) == "nil"` is **by design**, because EnvironmentCleanup clears it for addons. Retest with a real snippet. [Wiki; Source]
 - **[F-062]** `UnitName("player")` returned "Unknown", nil before `PLAYER_LOGIN` until 70170. [Wiki]
 - **[F-063]** `NAME_PLATE_UNIT_ADDED` fires before the unit is populated, and plate frames lack `namePlateUnitToken`. Recheck after `C_Timer.After(0)` or sweep `nameplate1..40`. [Community, unverified]
@@ -194,14 +230,17 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   - **click-cast bindings** and **mouseover cast** (Options > Keybindings);
   - ping wheel;
   - Edit Mode (layouts saved per UI type since 70291).
+  - Launch-day notes (70790): combined bags show each slot's bag; the swing timer stays until the swing lands;
+    nameplates show elite status and their debuffs are click-through; gamepad support is a functional beta; newly
+    learned spells no longer go on the bars by themselves; bags no longer auto-equip.
 
   [Official; Source; Community]
-- **[F-071]** Classic Mode (chosen at first login) turns off quest tracking and transmog. `Enum.ForeverExperiencePreset` Classic/Modern. [Official]
+- **[F-071]** Classic Mode (chosen at first login, changeable in Options > Preset since launch) turns off quest tracking and transmog. `Enum.ForeverExperiencePreset` Classic/**Enhanced** (Modern before 70862). [Official; Source]
 - **[F-072]** Absent: Encounter Journal, M+ Challenges, Housing, Delves, Trading Post, retail PvP UI ([F-038]). [Source]
 
 ## 9. Names, realms and data shapes
 - **[F-080]** Two-part names ("First Surname"), unique per region. On **70009+**, `UnitFullName("player")` returns `"First", "Surname"` (the surname sits in the realm slot). `UnitName` returns the first name. `GetNormalizedRealmName()` is still the realm. Whisper and ignore need the full name. `C_PlayerInfo.ShouldDisplaySurname()`. [Community probe 70009]
-- **[F-081]** "Super districts" and rulesets replace realms: Normal, PvP, Roleplaying, Hardcore (later). The auction house is per ruleset. `/who` can be disabled (`IngameWhoListDisabled` game rule). [Official; Source]
+- **[F-081]** "Super districts" and rulesets replace realms: Normal, PvP, Roleplaying, **RP-PvP** (added Oct 26), Hardcore (later); one mega-realm per ruleset per region. The auction house is per ruleset. `/who` can be disabled (`IngameWhoListDisabled` game rule). [Official; Source]
 - **[F-082]** Races include **Windshaper Skyborne** (Horde) and **High Order Skyborne** (Alliance); race ID 96 was seen. [Community]
 - **[F-083]** Realm values on the beta: `GetRealmName()` = `"Classic Beta PvP 2"`, `GetNormalizedRealmName()` =
   `"ClassicBetaPvP2"`, `UnitFactionGroup("player")` = `"Horde"`, `C_GameRules.IsHardcoreActive()` = false;
@@ -328,6 +367,8 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
     return false silently.
 
   [Source 70374]
+  - 70862: the modified-click path into `HandleModifiedItemClick(link, itemLocation)` is unchanged;
+    `ContainerFrameItemButtonMixin:Initialize(containerFrame, bag, slot)`; the combined-bags slot template is gone. [Source 70862]
 - **[F-126]** Forever's game tables on wago.tools (build **1.60.1.70245**, read 2026-10-16) hold all recipe data:
   SpellReagents (3,300 rows), SkillLineAbility, SpellEffect (Effect 24 → `EffectItemType`, count in
   `EffectBasePointsF`), ItemSparse (`SellPrice`, `BuyPrice`, `VendorStackCount`, `Bonding`).
@@ -364,6 +405,8 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
       `startswith("ID,")`.
 
     [Source: wago.tools DB2 70450; Probe 70425]
+  - Fishing, Herbalism and Skinning have 3 each (1,976 in all). On 70862: the same 1,976 recipes, 183 enchant-only
+    (Enchant Boots - Speed is new), ItemSparse +67 rows; BuffettForever's data changed only in Mild Spices' sell price. [Source 70862]
 - **[F-127]** `SAVED_VARIABLES_TOO_LARGE(addOnName)` exists; Blizzard shows a popup (`GameEvent.HandleSavedVariablesTooLarge`).
   Whether data is dropped at load or at save is unverified on Forever, and so is the size limit. [Source 70374]
   - SavedVariables are written **without indentation**, one key per line. 2,998 price rows with one day of history
@@ -469,6 +512,8 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
   - Justin saw `DIFFICULT_`/`FAIR_`/`EASY_`/`TRIVIAL_DIFFICULTY_COLOR` match the profession window on 3 recipes.
 
   [Probe 70450]
+  - Confirmed on live 70862 (2026-11-09): slots 1 Skinning 58/75, 3 First Aid 23/75, 5 Cooking 24/75; Classic lines
+    393, 129, 185; 7 recipes known at login. [Probe 70862]
 - **[F-134]** **An addon can take mail** (BuffettForever's Collect button, 2026-10-18):
   - `TakeInboxItem(1, 1)` (runtime-only) from a button's click took 3 Light Leather, then 1 Linen Cloth.
     `MAIL_SUCCESS` fired 0.2 s and 0.4 s later, with **no item ID**. No `ADDON_ACTION_BLOCKED`.
