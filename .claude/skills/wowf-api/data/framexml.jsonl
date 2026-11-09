@@ -1,4 +1,4 @@
-{"k":"meta","schema":1,"branch":"forever","commit":"172a387e3ab85b26e6640d3058d5ec1e6ccd4c63","build":"1.60.1.70450","files":642,"parse_failures":0,"compared_live":false,"layer":"framexml"}
+{"k":"meta","schema":1,"branch":"forever","commit":"9dc84f0d3bbae1768ac3405b3716000bd93eda06","build":"1.60.1.70862","files":642,"parse_failures":0,"compared_live":true,"layer":"framexml"}
 {"k":"addon","id":"Blizzard_APIDocumentation","forever":true,"lod":true}
 {"k":"addon","id":"Blizzard_APIDocumentationGenerated","forever":true,"lod":true}
 {"k":"addon","id":"Blizzard_AccessibilityTemplates","forever":true}
@@ -887,6 +887,7 @@
 {"k":"fx","id":"ActionButtonUtil.HideAllQuickKeybindButtonHighlights","type":"member","a":"Blizzard_ActionBar"}
 {"k":"fx","id":"ActionButtonUtil.IsExtraActionButtonDisabled","type":"member","a":"Blizzard_ActionBar"}
 {"k":"fx","id":"ActionButtonUtil.IsSpellOnAnyActiveMkbActionBar","type":"member","a":"Blizzard_ActionBar"}
+{"k":"fx","id":"ActionButtonUtil.OverrideStatusForUnplacedSpell","type":"member","a":"Blizzard_ActionBar"}
 {"k":"fx","id":"ActionButtonUtil.SetAllQuickKeybindButtonHighlights","type":"member","a":"Blizzard_ActionBar"}
 {"k":"fx","id":"ActionButtonUtil.ShowAllActionButtonGrids","type":"member","a":"Blizzard_ActionBar"}
 {"k":"fx","id":"ActionButtonUtil.ShowAllQuickKeybindButtonHighlights","type":"member","a":"Blizzard_ActionBar"}
@@ -3871,6 +3872,7 @@
 {"k":"fx","id":"ChatFrameUtil.GetAuctionHouseNotificationText","type":"member","a":"Blizzard_ChatFrameUtil"}
 {"k":"fx","id":"ChatFrameUtil.GetChannelColor","type":"member","a":"Blizzard_ChatFrameBase"}
 {"k":"fx","id":"ChatFrameUtil.GetChannelShortcutName","type":"member","a":"Blizzard_ChatFrameBase"}
+{"k":"fx","id":"ChatFrameUtil.GetCharacterWhisperTargetIfTitleFriend","type":"member","a":"Blizzard_ChatFrameBase"}
 {"k":"fx","id":"ChatFrameUtil.GetChatCategory","type":"member","a":"Blizzard_ChatFrameBase"}
 {"k":"fx","id":"ChatFrameUtil.GetChatFocusOverride","type":"member","a":"Blizzard_ChatFrameBase"}
 {"k":"fx","id":"ChatFrameUtil.GetChatFrame","type":"member","a":"Blizzard_ChatFrameBase"}
@@ -6462,6 +6464,7 @@
 {"k":"fx","id":"CreateFramePool","type":"var","a":"Blizzard_SharedXMLBase"}
 {"k":"fx","id":"CreateFramePoolCollection","type":"var","a":"Blizzard_SharedXMLBase"}
 {"k":"fx","id":"CreateFromSecureMixins","type":"var","a":"Blizzard_EnvironmentCleanup"}
+{"k":"fx","id":"CreateHDSDToggleOptions","type":"function","a":"Blizzard_SettingsDefinitions_Shared"}
 {"k":"fx","id":"CreateIndexRangeDataProvider","type":"function","a":"Blizzard_SharedXML"}
 {"k":"fx","id":"CreateInterpolator","type":"function","a":"Blizzard_SharedXML"}
 {"k":"fx","id":"CreateKeyChordString","type":"function","a":"Blizzard_SharedXML"}
@@ -6474,6 +6477,7 @@
 {"k":"fx","id":"CreateMinimalSliderFormatter","type":"function","a":"Blizzard_SharedXML"}
 {"k":"fx","id":"CreateObjectPool","type":"var","a":"Blizzard_SharedXMLBase"}
 {"k":"fx","id":"CreateObjectUpdater","type":"function","a":"Blizzard_SharedXMLBase"}
+{"k":"fx","id":"CreatePanelInfo","type":"var","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"CreatePendingInviteConfirmationNames","type":"function","a":"Blizzard_LFGUtil"}
 {"k":"fx","id":"CreatePendingInviteConfirmationText","type":"function","a":"Blizzard_LFGUtil"}
 {"k":"fx","id":"CreatePendingInviteConfirmationText_AppendWarnings","type":"function","a":"Blizzard_LFGUtil"}
@@ -9223,6 +9227,7 @@
 {"k":"fx","id":"GamepadBagBar","type":"xml-frame","a":"Blizzard_MainMenuBarBagButtons"}
 {"k":"fx","id":"GamepadBagBarMixin","type":"var","a":"Blizzard_MainMenuBarBagButtons"}
 {"k":"fx","id":"GamepadBagSlotButtonMixin","type":"var","a":"Blizzard_MainMenuBarBagButtons"}
+{"k":"fx","id":"GamepadBagSlotMixin","type":"var","a":"Blizzard_MainMenuBarBagButtons"}
 {"k":"fx","id":"GamepadBaseDialogMixin","type":"var","a":"Blizzard_GamepadSharedUtility"}
 {"k":"fx","id":"GamepadButtonIconWithTextMixin","type":"var","a":"Blizzard_Gamepad"}
 {"k":"fx","id":"GamepadCharacterReagentBagMixin","type":"var","a":"Blizzard_MainMenuBarBagButtons"}
@@ -9328,7 +9333,6 @@
 {"k":"fx","id":"GamepadPopupHandler.InitializeBindings","type":"member","a":"Blizzard_StaticPopup"}
 {"k":"fx","id":"GamepadPopupHandler.InitializePopup","type":"member","a":"Blizzard_StaticPopup"}
 {"k":"fx","id":"GamepadPopupHandler.IsStaticPopupShowing","type":"member","a":"Blizzard_StaticPopup"}
-{"k":"fx","id":"GamepadPopupHandler.RefreshFrameFocus","type":"member","a":"Blizzard_StaticPopup"}
 {"k":"fx","id":"GamepadPopupHandler.TrackPopupFrames","type":"member","a":"Blizzard_StaticPopup"}
 {"k":"fx","id":"GamepadPopupHandler.TryClickOrHoldButton","type":"member","a":"Blizzard_StaticPopup"}
 {"k":"fx","id":"GamepadPopupHandler.UpdateVisiblePopups","type":"member","a":"Blizzard_StaticPopup"}
@@ -10169,6 +10173,7 @@
 {"k":"fx","id":"GetGroupMemberCountsForDisplay","type":"function","a":"Blizzard_FrameXMLUtil"}
 {"k":"fx","id":"GetHighlightedNumberDifferenceString","type":"function","a":"Blizzard_SharedXML"}
 {"k":"fx","id":"GetHolidayBGHonorCurrencyBonuses","type":"function","a":"Blizzard_UIPanels_Game","forever":false}
+{"k":"fx","id":"GetHonorableKillsHeaderTextID","type":"function","a":"Blizzard_PVPMatch"}
 {"k":"fx","id":"GetIconForRole","type":"function","a":"Blizzard_SharedXMLBase"}
 {"k":"fx","id":"GetIconForRoleEnum","type":"function","a":"Blizzard_SharedXMLBase"}
 {"k":"fx","id":"GetInspectSpecialization","type":"var","a":"Blizzard_Deprecated","deprecated":true}
@@ -10382,7 +10387,6 @@
 {"k":"fx","id":"GraphicsOverrides.AdjustAdvancedQualityControls","type":"member","a":"Blizzard_Settings_Shared"}
 {"k":"fx","id":"GraphicsOverrides.CreateAdvancedRaidSettingsTable","type":"member","a":"Blizzard_Settings_Shared"}
 {"k":"fx","id":"GraphicsOverrides.CreateAdvancedSettingsTable","type":"member","a":"Blizzard_Settings_Shared"}
-{"k":"fx","id":"GraphicsOverrides.CreateHDSDToggleOptions","type":"member","a":"Blizzard_Settings_Shared"}
 {"k":"fx","id":"GraphicsOverrides.CreateHiResOptions","type":"member","a":"Blizzard_Settings_Shared"}
 {"k":"fx","id":"GraphicsOverrides.GetTextureResolutionOptions","type":"member","a":"Blizzard_Settings_Shared"}
 {"k":"fx","id":"GraphicsOverrides.RunSettingsCallback","type":"member","a":"Blizzard_Settings_Shared"}
@@ -10587,7 +10591,12 @@
 {"k":"fx","id":"GuildInviteFrame","type":"xml-frame","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"GuildInviteFrame_OnEnter","type":"function","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"GuildInviteFrame_OnEvent","type":"function","a":"Blizzard_FrameXML"}
+{"k":"fx","id":"GuildInviteFrame_OnHide","type":"function","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"GuildInviteFrame_OnLeave","type":"function","a":"Blizzard_FrameXML"}
+{"k":"fx","id":"GuildInviteFrame_OnLoad","type":"function","a":"Blizzard_FrameXML"}
+{"k":"fx","id":"GuildInviteFrame_OnUpdate","type":"function","a":"Blizzard_FrameXML"}
+{"k":"fx","id":"GuildInviteFrame_RegisterForTransitions","type":"function","a":"Blizzard_FrameXML"}
+{"k":"fx","id":"GuildInviteFrame_SetupGamepad","type":"function","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"GuildItemSearchBox","type":"xml-editbox","a":"Blizzard_GuildBankUI"}
 {"k":"fx","id":"GuildMemberListDropdownMixin","type":"var","a":"Blizzard_Communities"}
 {"k":"fx","id":"GuildMicroButton","type":"xml-button","a":"Blizzard_MicroMenu"}
@@ -11616,6 +11625,7 @@
 {"k":"fx","id":"InterfaceOverrides.HasSwingTimer","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"InterfaceOverrides.RegisterOutlineSettings","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"InterfaceOverrides.RunSettingsCallback","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
+{"k":"fx","id":"InterfaceOverrides.SetupToastSettings","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"InterfaceOverrides.ShowTutorialsOnButtonClick","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"InterfaceUtil","type":"var","a":"Blizzard_SharedXML"}
 {"k":"fx","id":"InterfaceUtil.GetScreenHeightScale","type":"member","a":"Blizzard_SharedXML"}
@@ -12547,6 +12557,7 @@
 {"k":"fx","id":"LegacyTreeTraitPanelMixin","type":"var","a":"Blizzard_LegacySystem"}
 {"k":"fx","id":"LegacyTreeUtil","type":"var","a":"Blizzard_LegacySystem"}
 {"k":"fx","id":"LegacyTreeUtil.GetEdgeTemplateType","type":"member","a":"Blizzard_LegacySystem"}
+{"k":"fx","id":"LegacyTreeUtil.GetSpecializedMixin","type":"member","a":"Blizzard_LegacySystem"}
 {"k":"fx","id":"LegacyTreeUtil.GetTemplateForTalentType","type":"member","a":"Blizzard_LegacySystem"}
 {"k":"fx","id":"LegendHighlightablePoiPinMixin","type":"var","a":"Blizzard_SharedMapDataProviders"}
 {"k":"fx","id":"LegendaryItemAlertFrame_OnClick","type":"function","a":"Blizzard_FrameXML"}
@@ -13063,6 +13074,7 @@
 {"k":"fx","id":"Menu.CreateRootMenuDescription","type":"member","a":"Blizzard_Menu"}
 {"k":"fx","id":"Menu.GetManager","type":"member","a":"Blizzard_Menu"}
 {"k":"fx","id":"Menu.GetOpenMenuTags","type":"member","a":"Blizzard_Menu"}
+{"k":"fx","id":"Menu.IsMenuProxy","type":"member","a":"Blizzard_Menu"}
 {"k":"fx","id":"Menu.ModifyMenu","type":"member","a":"Blizzard_Menu"}
 {"k":"fx","id":"Menu.PopulateDescription","type":"member","a":"Blizzard_Menu"}
 {"k":"fx","id":"Menu.PrintOpenMenuTags","type":"member","a":"Blizzard_Menu"}
@@ -13570,6 +13582,7 @@
 {"k":"fx","id":"MovieFrameMixin","type":"var","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"MovieFrameSubtitleArea","type":"xml-texture","a":"Blizzard_GlueXML"}
 {"k":"fx","id":"MovieFrame_Close","type":"function","a":"Blizzard_GlueXML"}
+{"k":"fx","id":"MovieFrame_OnGamePadButtonUp","type":"function","a":"Blizzard_GlueXML"}
 {"k":"fx","id":"MovieFrame_OnHide","type":"function","a":"Blizzard_GlueXML"}
 {"k":"fx","id":"MovieFrame_OnKeyUp","type":"function","a":"Blizzard_GlueXML"}
 {"k":"fx","id":"MovieFrame_OnLoad","type":"function","a":"Blizzard_GlueXML"}
@@ -13846,7 +13859,6 @@
 {"k":"fx","id":"NamePlateDriverFrame","type":"xml-frame","a":"Blizzard_NamePlates"}
 {"k":"fx","id":"NamePlateDriverMixin","type":"var","a":"Blizzard_NamePlates"}
 {"k":"fx","id":"NamePlateEnemyFrameOptions","type":"var","a":"Blizzard_NamePlates"}
-{"k":"fx","id":"NamePlateEnemyFrameOptions.showClassificationIndicator","type":"member","a":"Blizzard_NamePlates"}
 {"k":"fx","id":"NamePlateFriendlyFrameOptions","type":"var","a":"Blizzard_NamePlates"}
 {"k":"fx","id":"NamePlateHealthBarMixin","type":"var","a":"Blizzard_NamePlates"}
 {"k":"fx","id":"NamePlatePreviewMixin","type":"var","a":"Blizzard_SettingsDefinitions_Frame"}
@@ -13873,7 +13885,6 @@
 {"k":"fx","id":"NameplatesOverrides.GetNameplateStyleOptions","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"NameplatesOverrides.ShowClassColorSetting","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"NameplatesOverrides.ShowHighlightImportantCastsOption","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
-{"k":"fx","id":"NameplatesOverrides.ShowRarityIconInfoDisplayOption","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"NameplatesOverrides.ShowRealmOption","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"NarratableTooltipMixin","type":"var","a":"Blizzard_SharedXML"}
 {"k":"fx","id":"NarrateMyMessagesCheckButton_OnClick","type":"function","a":"Blizzard_ChatFrame"}
@@ -13920,7 +13931,6 @@
 {"k":"fx","id":"NavBar_OpenTo","type":"function","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"NavBar_OverflowItemOnClick","type":"function","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"NavBar_Reset","type":"function","a":"Blizzard_FrameXML"}
-{"k":"fx","id":"NavButtonMixin","type":"var","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"NavButtonTemplate_OnShow","type":"function","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"NavButtonTemplate_SetupDropdown","type":"function","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"NavigationBarButtonMixin","type":"var","a":"Blizzard_CatalogShop"}
@@ -14643,9 +14653,9 @@
 {"k":"fx","id":"PVPInfoTextString","type":"xml-fontstring","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"PVPLootMixin","type":"var","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"PVPMatchResults","type":"xml-frame","a":"Blizzard_PVPMatch"}
-{"k":"fx","id":"PVPMatchResultsCurrencyRewardMixin","type":"var","a":"Blizzard_PVPMatch"}
+{"k":"fx","id":"PVPMatchResultsCurrencyRewardMixin","type":"var","a":"Blizzard_PVPMatch","forever":false}
 {"k":"fx","id":"PVPMatchResultsMixin","type":"var","a":"Blizzard_PVPMatch"}
-{"k":"fx","id":"PVPMatchResultsRatingMixin","type":"var","a":"Blizzard_PVPMatch"}
+{"k":"fx","id":"PVPMatchResultsRatingMixin","type":"var","a":"Blizzard_PVPMatch","forever":false}
 {"k":"fx","id":"PVPMatchScoreboard","type":"xml-frame","a":"Blizzard_PVPMatch"}
 {"k":"fx","id":"PVPMatchScoreboardMixin","type":"var","a":"Blizzard_PVPMatch"}
 {"k":"fx","id":"PVPMatchStyle","type":"var","a":"Blizzard_PVPMatch"}
@@ -17878,6 +17888,7 @@
 {"k":"fx","id":"SetMoneyFrameColorByFrame","type":"function","a":"Blizzard_MoneyFrame"}
 {"k":"fx","id":"SetPVPAFKQueryDelaySeconds","type":"function","a":"Blizzard_UIPanels_Game"}
 {"k":"fx","id":"SetPaperDollBackground","type":"function","a":"Blizzard_UIPanels_Game"}
+{"k":"fx","id":"SetPaperDollBackgroundOverlayAlpha","type":"function","a":"Blizzard_UIPanels_Game"}
 {"k":"fx","id":"SetPlayerInteractionConditions","type":"function","a":"Blizzard_UIPanels_Game"}
 {"k":"fx","id":"SetQuestTitleLevelAndDifficultyColor","type":"function","a":"Blizzard_FrameXMLUtil"}
 {"k":"fx","id":"SetRaidDifficulties","type":"function","a":"Blizzard_UnitPopup"}
@@ -18271,9 +18282,14 @@
 {"k":"fx","id":"SmartNavigation_AddJumpNavigationOverride","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_CallOutgoingDirNavigationCallbacks","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_CanFocusFrame","type":"function","a":"Blizzard_GamepadSmartNavigation"}
+{"k":"fx","id":"SmartNavigation_ClearDirectionBufferThresholdInDirection","type":"function","a":"Blizzard_GamepadSmartNavigation"}
+{"k":"fx","id":"SmartNavigation_ClearDirectionBufferThresholds","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_ClearIgnoreStatus","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_ClearJumpNavigationOverrides","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_ClearJumpNavigationOverridesInDirection","type":"function","a":"Blizzard_GamepadSmartNavigation"}
+{"k":"fx","id":"SmartNavigation_ClearOutgoingNavigationCallbacks","type":"function","a":"Blizzard_GamepadSmartNavigation"}
+{"k":"fx","id":"SmartNavigation_GetCustomCursorAnchorPointForFrame","type":"function","a":"Blizzard_GamepadSmartNavigation"}
+{"k":"fx","id":"SmartNavigation_GetDirectionBufferThreshold","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_GetNavigationOverrideFrame","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_IsCurrentButtonClickable","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_IsFrameBlockingSmartNavClick","type":"function","a":"Blizzard_GamepadSmartNavigation"}
@@ -18296,7 +18312,6 @@
 {"k":"fx","id":"SmartNavigation_SetButtonFrame","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_SetCustomCursorAnchorPointForFrame","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_SetDirectionBufferThreshold","type":"function","a":"Blizzard_GamepadSmartNavigation"}
-{"k":"fx","id":"SmartNavigation_SetReturnFrameFocusButton","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_ShouldScrollFrameMaintainPreviousButtonOnScroll","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmartNavigation_UseVerticalCursorForFrame","type":"function","a":"Blizzard_GamepadSmartNavigation"}
 {"k":"fx","id":"SmoothStatusBarMixin","type":"var","a":"Blizzard_SharedXML"}
@@ -18310,6 +18325,7 @@
 {"k":"fx","id":"SocialOverrides.AdjustSocialSettings","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"SocialOverrides.CreateBlockNeighborhoodInvitesSetting","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"SocialOverrides.CreateCensorMessagesSetting","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
+{"k":"fx","id":"SocialOverrides.SetupToastWindowSetting","type":"member","a":"Blizzard_SettingsDefinitions_Frame"}
 {"k":"fx","id":"SocialQueueUtil_GetHeaderName","type":"function","a":"Blizzard_UIPanels_Game","forever":false}
 {"k":"fx","id":"SocialQueueUtil_GetQueueName","type":"function","a":"Blizzard_UIPanels_Game","forever":false}
 {"k":"fx","id":"SocialQueueUtil_GetRelationshipInfo","type":"function","a":"Blizzard_UIPanels_Game","forever":false}
@@ -18933,13 +18949,13 @@
 {"k":"fx","id":"SubZoneTextFrame","type":"xml-frame","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"SubZoneTextString","type":"xml-fontstring","a":"Blizzard_FrameXML"}
 {"k":"fx","id":"SubZoneText_OnLoad","type":"function","a":"Blizzard_FrameXML"}
-{"k":"fx","id":"SubscriptionInterstitialCloseButtonMixin","type":"var","a":"Blizzard_SubscriptionInterstitialUI"}
 {"k":"fx","id":"SubscriptionInterstitialFrame","type":"xml-frame","a":"Blizzard_SubscriptionInterstitialUI"}
 {"k":"fx","id":"SubscriptionInterstitialFrameMixin","type":"var","a":"Blizzard_SubscriptionInterstitialUI"}
 {"k":"fx","id":"SubscriptionInterstitialSubscribeButtonBaseMixin","type":"var","a":"Blizzard_SubscriptionInterstitialUI"}
 {"k":"fx","id":"SubscriptionInterstitialSubscribeButtonMixin","type":"var","a":"Blizzard_SubscriptionInterstitialUI"}
 {"k":"fx","id":"SubscriptionInterstitialUpgradeButtonMixin","type":"var","a":"Blizzard_SubscriptionInterstitialUI"}
 {"k":"fx","id":"SubscriptionInterstitial_LoadUI","type":"function","a":"Blizzard_SubscriptionInterstitialUI"}
+{"k":"fx","id":"SubscriptionInterstitial_ShowSubscriptionPeriod","type":"function","a":"Blizzard_SubscriptionInterstitialUI"}
 {"k":"fx","id":"SubscriptionRequestDialog","type":"xml-frame","a":"Blizzard_GlueXML"}
 {"k":"fx","id":"SubscriptionRequestDialog_Open","type":"function","a":"Blizzard_GlueXML"}
 {"k":"fx","id":"SubstituteChatMessageBeforeSend","type":"var","a":"Blizzard_DeprecatedChatInfo","deprecated":true}
@@ -19298,6 +19314,7 @@
 {"k":"fx","id":"TalentButtonCapstonePipMixin","type":"var","a":"Blizzard_SharedTalentUI"}
 {"k":"fx","id":"TalentButtonCapstoneTooltipMixin","type":"var","a":"Blizzard_SharedTalentUI"}
 {"k":"fx","id":"TalentButtonCapstoneWithTrackMixin","type":"var","a":"Blizzard_SharedTalentUI"}
+{"k":"fx","id":"TalentButtonLegacyMixin","type":"var","a":"Blizzard_LegacySystem"}
 {"k":"fx","id":"TalentButtonSearchIconMixin","type":"var","a":"Blizzard_SharedTalentUI"}
 {"k":"fx","id":"TalentButtonSelectExpandedButtonMixin","type":"var","a":"Blizzard_SharedTalentUI"}
 {"k":"fx","id":"TalentButtonSelectExpandedDisplayMixin","type":"var","a":"Blizzard_SharedTalentUI"}
@@ -19961,6 +19978,7 @@
 {"k":"fx","id":"TruncatedTooltipFontStringWrapperMixin","type":"var","a":"Blizzard_SharedXML"}
 {"k":"fx","id":"TruncatedTooltipScript_OnEnter","type":"function","a":"Blizzard_SharedXML"}
 {"k":"fx","id":"TruncatedTooltipScript_OnLeave","type":"function","a":"Blizzard_SharedXML"}
+{"k":"fx","id":"TryAddHonorColumn","type":"function","a":"Blizzard_PVPMatch"}
 {"k":"fx","id":"TryShowAnimaDiversionFrame","type":"function","a":"Blizzard_AnimaDiversionUI"}
 {"k":"fx","id":"TryShowCovenantPreviewFrame","type":"function","a":"Blizzard_CovenantPreviewUI"}
 {"k":"fx","id":"TryUseActionButton","type":"function","a":"Blizzard_ActionBar"}
@@ -19975,6 +19993,7 @@
 {"k":"fx","id":"TutorialData.Draenei","type":"member","a":"Blizzard_BoostTutorial"}
 {"k":"fx","id":"TutorialData.DruidAnimalFormSpells","type":"member","a":"Blizzard_NewPlayerExperience"}
 {"k":"fx","id":"TutorialData.Dwarf","type":"member","a":"Blizzard_BoostTutorial"}
+{"k":"fx","id":"TutorialData.EQUIPMENT_TUTORIAL_EXEMPT_ITEM_IDS","type":"member","a":"Blizzard_NewPlayerExperience"}
 {"k":"fx","id":"TutorialData.EarlyHostileQuestCreaturesByRace","type":"member","a":"Blizzard_NewPlayerExperience"}
 {"k":"fx","id":"TutorialData.EarlyHostileQuestIDByRace","type":"member","a":"Blizzard_NewPlayerExperience"}
 {"k":"fx","id":"TutorialData.EarlyKillQuestCreaturesByRace","type":"member","a":"Blizzard_NewPlayerExperience"}
@@ -24141,7 +24160,7 @@
 {"k":"tpl","id":"GamepadActionBarPageUnitTemplate","type":"Frame","a":"Blizzard_GamepadActionBars","file":"Blizzard_GamepadActionBars/ActionBarTemplates.xml","mixin":"GamepadActionBarPageUnitMixin"}
 {"k":"tpl","id":"GamepadActionBarPetButtonTemplate","type":"CheckButton","a":"Blizzard_GamepadActionBars","file":"Blizzard_GamepadActionBars/ActionBarButton.xml","inherits":"QuickKeybindButtonTemplate, SecureFrameTemplate, ActionButtonTemplate","mixin":"GamepadActionBarPetButtonMixin"}
 {"k":"tpl","id":"GamepadActionBarTemplate","type":"Frame","a":"Blizzard_GamepadActionBars","file":"Blizzard_GamepadActionBars/ActionBarTemplates.xml","mixin":"GamepadActionBarMixin"}
-{"k":"tpl","id":"GamepadBagSlotButtonTemplate","type":"ItemButton","a":"Blizzard_MainMenuBarBagButtons","file":"Blizzard_MainMenuBarBagButtons/Camelot/MainMenuBarBagButtons.xml"}
+{"k":"tpl","id":"GamepadBagSlotButtonTemplate","type":"ItemButton","a":"Blizzard_MainMenuBarBagButtons","file":"Blizzard_MainMenuBarBagButtons/Camelot/MainMenuBarBagButtons.xml","mixin":"GamepadBagSlotMixin"}
 {"k":"tpl","id":"GamepadBaseDialogTemplate","type":"Frame","a":"Blizzard_GamepadSharedUtility","file":"Blizzard_GamepadSharedUtility/Templates/BaseDialog.xml","mixin":"GamepadBaseDialogMixin"}
 {"k":"tpl","id":"GamepadButtonIconWithTextTemplate","type":"Button","a":"Blizzard_Gamepad","file":"Blizzard_Gamepad/UI/ConsoleHUD/ConsoleTemplates.xml","mixin":"GamepadButtonIconWithTextMixin"}
 {"k":"tpl","id":"GamepadClassActionButtonTemplate","type":"CheckButton","a":"Blizzard_GamepadActionBars","file":"Blizzard_GamepadActionBars/ClassActionFlyout.xml","inherits":"GamepadActionBarButtonTemplate"}
@@ -24625,7 +24644,6 @@
 {"k":"tpl","id":"ItemAlertFrameTemplate","type":"ContainedAlertFrame","a":"Blizzard_FrameXML","file":"Blizzard_FrameXML/Mainline/AlertFrameSystems.xml","mixin":"ItemAlertFrameMixin","inherits":"AlertFrameTemplate"}
 {"k":"tpl","id":"ItemBeltButtonTemplate","type":"ItemButton","a":"Blizzard_ItemBeltFrame","file":"Blizzard_ItemBeltFrame/ItemBeltFrame.xml","forever":false,"mixin":"ItemBeltButtonMixin","inherits":"HUDInventoryButtonTemplate"}
 {"k":"tpl","id":"ItemQualityColorOverrides","type":"Frame","a":"Blizzard_SettingsDefinitions_Frame","file":"Blizzard_SettingsDefinitions_Frame/Mainline/Colorblind.xml","mixin":"ItemQualityColorOverrideMixin"}
-{"k":"tpl","id":"ItemSlotBackgroundCombinedBagsTemplate","type":"Texture","a":"Blizzard_UIPanels_Game","file":"Blizzard_UIPanels_Game/Mainline/ContainerFrame.xml"}
 {"k":"tpl","id":"ItemTextFontNormal","type":"Font","a":"Blizzard_Fonts_Shared","file":"Blizzard_Fonts_Shared/Shared/GameFontStyles.xml","inherits":"QuestFont_Large"}
 {"k":"tpl","id":"ItemUpgradeCostIconTemplate","type":"Frame","a":"Blizzard_ItemUpgradeUI","file":"Blizzard_ItemUpgradeUI/Mainline/Blizzard_ItemUpgradeUI.xml","mixin":"ItemUpgradeCostIconMixin","inherits":"CurrencyLayoutFrameIconTemplate","lod":true}
 {"k":"tpl","id":"ItemUpgradeCostQuantityTemplate","type":"FontString","a":"Blizzard_ItemUpgradeUI","file":"Blizzard_ItemUpgradeUI/Mainline/Blizzard_ItemUpgradeUI.xml","mixin":"ItemUpgradeCostQuantityMixin","inherits":"GameFontHighlight","lod":true}
@@ -24923,7 +24941,7 @@
 {"k":"tpl","id":"NameplateLevelFrame","type":"Frame","a":"Blizzard_NamePlates","file":"Blizzard_NamePlates/Camelot/Blizzard_NamePlateLevelFrame.xml","mixin":"NameplateLevelFrameMixin"}
 {"k":"tpl","id":"NarratableTooltipTemplate","type":"Frame","a":"Blizzard_SharedXML","file":"Blizzard_SharedXML/SharedTooltipTemplates.xml","mixin":"NarratableTooltipMixin"}
 {"k":"tpl","id":"NavBarTemplate","type":"Frame","a":"Blizzard_FrameXML","file":"Blizzard_FrameXML/Mainline/NavigationBar.xml"}
-{"k":"tpl","id":"NavButtonTemplate","type":"Button","a":"Blizzard_FrameXML","file":"Blizzard_FrameXML/Mainline/NavigationBar.xml","mixin":"NavButtonMixin"}
+{"k":"tpl","id":"NavButtonTemplate","type":"Button","a":"Blizzard_FrameXML","file":"Blizzard_FrameXML/Mainline/NavigationBar.xml"}
 {"k":"tpl","id":"NavigationBarButtonTemplate","type":"Button","a":"Blizzard_CatalogShop","file":"Blizzard_CatalogShop/Blizzard_CatalogShop_Elements.xml","mixin":"NavigationBarButtonMixin"}
 {"k":"tpl","id":"NavigationBarNavigationButtonTemplate","type":"Button","a":"Blizzard_CatalogShop","file":"Blizzard_CatalogShop/Blizzard_CatalogShop_Elements.xml","mixin":"NavigationBarNavigationButtonMixin"}
 {"k":"tpl","id":"NavigationBarTemplate","type":"Frame","a":"Blizzard_CatalogShop","file":"Blizzard_CatalogShop/Blizzard_CatalogShop_Elements.xml","mixin":"NavigationBarMixin","inherits":"CallbackRegistrantTemplate"}
@@ -25096,8 +25114,8 @@
 {"k":"tpl","id":"PVPInstanceListEntryButtonTemplate","type":"Button","a":"Blizzard_PVPUI","file":"Blizzard_PVPUI/Mainline/Blizzard_PVPUI.xml","forever":false,"lod":true}
 {"k":"tpl","id":"PVPInstanceListHeaderButtonTemplate","type":"Button","a":"Blizzard_PVPUI","file":"Blizzard_PVPUI/Mainline/Blizzard_PVPUI.xml","forever":false,"lod":true}
 {"k":"tpl","id":"PVPLootTemplate","type":"Button","a":"Blizzard_FrameXML","file":"Blizzard_FrameXML/PVPUITemplates.xml","inherits":"LootItemExtended","mixin":"PVPLootMixin"}
-{"k":"tpl","id":"PVPMatchResultsCurrencyRewardTemplate","type":"Button","a":"Blizzard_PVPMatch","file":"Blizzard_PVPMatch/PVPMatchResults.xml","mixin":"PVPMatchResultsCurrencyRewardMixin"}
-{"k":"tpl","id":"PVPMatchResultsLoot","type":"Button","a":"Blizzard_PVPMatch","file":"Blizzard_PVPMatch/PVPMatchResults.xml","inherits":"PVPLootTemplate"}
+{"k":"tpl","id":"PVPMatchResultsCurrencyRewardTemplate","type":"Button","a":"Blizzard_PVPMatch","file":"Blizzard_PVPMatch/PVPMatchResults.xml","forever":false,"mixin":"PVPMatchResultsCurrencyRewardMixin"}
+{"k":"tpl","id":"PVPMatchResultsLoot","type":"Button","a":"Blizzard_PVPMatch","file":"Blizzard_PVPMatch/PVPMatchResults.xml","forever":false,"inherits":"PVPLootTemplate"}
 {"k":"tpl","id":"PVPNewRatingTemplate","type":"Frame","a":"Blizzard_PVPMatch","file":"Blizzard_PVPMatch/PVPMatchTable.xml","mixin":"PVPNewRatingMixin","inherits":"PVPStringTemplate"}
 {"k":"tpl","id":"PVPQuestRewardTemplate","type":"Frame","a":"Blizzard_PVPUI","file":"Blizzard_PVPUI/Mainline/Blizzard_PVPUI.xml","forever":false,"inherits":"PVPRewardTemplate","mixin":"PVPQuestRewardMixin","lod":true}
 {"k":"tpl","id":"PVPQueueFrameButtonTemplate","type":"Button","a":"Blizzard_PVPUI","file":"Blizzard_PVPUI/Mainline/Blizzard_PVPUI.xml","forever":false,"lod":true}
