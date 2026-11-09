@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.1 (2026-11-09)
+- **What a vendor pays follows Blizzard's hotfixes.** The figure now comes from the game as soon as it knows the item,
+  and from BuffettForever's data only until then. Blizzard has hotfixed vendor prices since launch (Mild Spices went
+  from 2c to 1c); Alt+Right-click messages, AH flips, deposits and the profit math use the new figures.
+- The recipe and price data comes from the live game's build, 1.60.1.70862. Only Mild Spices changed.
+- `/bf selftest`: 143 checks (SELL-PRICE, SELL-LIVE).
+- Tested on the live client 1.60.1.70862, 2026-11-09: selftest 143/143. The 47 cached items in the data sell for
+  what the data says.
+
 ## 1.0.0 (2026-10-18)
 - First public release, with everything from 0.1.0 to 0.8.0 below:
   - Auction House prices and their history;
