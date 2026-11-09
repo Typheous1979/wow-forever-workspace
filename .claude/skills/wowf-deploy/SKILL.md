@@ -1,23 +1,26 @@
 ---
 name: wowf-deploy
-description: Install a workspace addon into the World of Warcraft Forever client by linking its folder into the client's Interface AddOns directory with a Windows directory junction (or a copy), show what is deployed, or remove a deployment safely. Handles the beta client folder _classic_beta_ and the stress-test and launch folder _forever_. Use when asked to deploy, install, link, put an addon in the game, test it in game, or check or remove what is installed.
-argument-hint: "[Addon] [--client beta|forever|all] [--remove] [--status]"
+description: Install a workspace addon into the World of Warcraft Forever client by linking its folder into the client's Interface AddOns directory with a Windows directory junction (or a copy), show what is deployed, or remove a deployment safely. Handles the launch client folder _forever_ (the default) and the beta client folder _classic_beta_. Use when asked to deploy, install, link, put an addon in the game, test it in game, or check or remove what is installed.
+argument-hint: "[Addon] [--client forever|beta|all] [--remove] [--status]"
 allowed-tools: Bash(python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" --status)
 ---
 
 # wowf-deploy
 
 Clients are auto-discovered: any `World of Warcraft\_*_\` folder with `Wow*.exe` whose folder is a Forever product.
-- **beta**: `_classic_beta_` (`WowB.exe`, product `wow_classic_beta`).
-- **forever**: `_forever_` (`Wow.exe`, product `wowf`). It appears once Justin installs the stress test (Oct 19) or launch (Nov 4).
+- **forever**: `_forever_` (`Wow.exe`, product `wowf`): the launch client (Nov 4), where Justin plays.
+- **beta**: `_classic_beta_` (`WowB.exe`, product `wow_classic_beta`). Gone from Justin's machine since launch.
+
+Without `--client`, deploy (and `logs`) use forever, else beta, else the one client found (`config.default_client`).
+Before 2026-11-09 they defaulted to beta and failed with "client 'beta' not found" once only `_forever_` was left.
 
 Extra search roots or explicit paths go in the gitignored `wowf.local.json` (`client_search_roots`, `clients`).
 
 ## Commands
 ```
 python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" --status                       # what's linked where (safe, read-only)
-python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" MusicForever                    # junction into the beta client
-python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" MusicForever --client all       # beta and forever
+python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" MusicForever                    # junction into the default client (forever)
+python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" MusicForever --client all       # every client found
 python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" WowfProbe                       # the dev probe (lives in wowf-debug/assets)
 python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" MusicForever --remove           # unlink (source untouched)
 python "${CLAUDE_SKILL_DIR}/scripts/deploy.py" MusicForever --mode copy        # copy instead of link (marker-tracked)
@@ -63,8 +66,8 @@ Done for MusicForever 0.2.0 and BuffettForever 1.0.0.
    - the game version, WoW Forever;
    - the release type, which is his call. Beta until the addon has run on the launch client is the cautious choice.
      BuffettForever 1.0.0 went up as a Release.
-6. Before launch, deploy to `_forever_` (`--client forever`) and check it there: `/reload`, the addon's self-test if
-   it has one, and a real play session.
+6. Check it on `_forever_` (the default client since launch): `/reload`, the addon's self-test if it has one, and a
+   real play session.
 
 While the release files wait for Justin's review, code still gets committed. Leave the README, the CHANGELOG, the
 page and `## Version` out of those commits. New Lua files still need their TOC lines, so stage the TOC with

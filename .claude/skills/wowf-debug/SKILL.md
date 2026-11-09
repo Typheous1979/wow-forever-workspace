@@ -15,9 +15,15 @@ python "${CLAUDE_SKILL_DIR}/scripts/savedvars.py" <Addon> --diff        # previo
 python "${CLAUDE_SKILL_DIR}/scripts/client_logs.py" crash               # last crash reports (Errors\*.txt)
 python "${CLAUDE_SKILL_DIR}/scripts/client_logs.py" taint --grep <Addon># Logs\taint.log
 python "${CLAUDE_SKILL_DIR}/scripts/client_logs.py" show Sound          # any Logs\<Name>.log (Sound, General, Client...)
+python "${CLAUDE_SKILL_DIR}/scripts/client_logs.py" show General --grep "Lua Error" --tail 80   # Lua errors, stacks follow [F-137]
 python "${CLAUDE_SKILL_DIR}/scripts/probe_report.py"                    # ingest the WowfProbe dump
 ```
-Files on disk reflect the last `/reload` or logout. The scripts warn when the game is running.
+- SavedVariables reflect the last `/reload` or logout; the scripts warn when the game is running.
+- `Logs\*.log` are written as things happen and start afresh at each client launch [F-137]: ask Justin not to restart
+  the game until they're read. A Lua error's stack lines follow its `Lua Error` line, so read them with
+  `show General --tail N` around its time.
+- `logs` uses the launch client (`_forever_`) unless `--client beta` or `--client all`. `sv` and `probe-report` read
+  every client.
 
 ## Triage ladder (stop at the first hit)
 1. **Not in the AddOns list, or "out of date":**
@@ -26,8 +32,14 @@ Files on disk reflect the last `/reload` or logout. The scripts warn when the ga
    - Is `## Interface` 16001? The TOC must not have a BOM (lint TOC00x).
    - A brand-new folder needs a client restart [F-024].
    - In game: `/dump C_AddOns.GetAddOnInfo("Name")`. The 5th return is the reason: `INTERFACE_VERSION`, `WRONG_GAME_TYPE` (an `AllowLoadGameType` issue), `DEP_*`, `DEMAND_LOADED`, `DISABLED`.
-2. **A Lua error.** Make sure errors are visible: `/console scriptErrors 1` (or BugSack). Then map the text with the catalog below. Lint the file.
-3. **Secret or taint:** "secret … value", "forbidden table", "execution tainted by". See secret-values.md. Taint log: `/console taintLog 1`, reproduce, `/reload`, then `client_logs.py taint`.
+2. **A Lua error.** Players usually hide errors, but `Logs\General.log` has each one with its stack: read it first
+   [F-137]. To see them in game: `/console scriptErrors 1` (or BugSack). Then map the text with the catalog below. Lint the file.
+3. **Secret or taint:** "secret … value", "forbidden table", "execution tainted by". See secret-values.md.
+   - The popup "<Addon> has been blocked from an action only available to the Blizzard UI" is `ADDON_ACTION_FORBIDDEN`:
+     that addon's taint reached a protected call. The Lua errors from the same path are in General.log.
+   - Taint log: `/console taintLog 1` (`2` adds global variables, `11` the most detail), `/reload`, reproduce,
+     `/reload`, then `client_logs.py taint`. Turn it off afterwards (`/console taintLog 0`); the log keeps growing.
+   - Taint lasts for the session: a `/reload` or restart clears it. Ask what was done before it first appeared.
 4. **Nothing happens, no error:**
    - Silent protected call [F-050]: watch for "Interface action failed because of an AddOn" (the counter resets only on a client restart).
    - Event misspelled (lint API007).

@@ -153,6 +153,28 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   [Community addon authors]
 - **[F-052]** Docs flag `IsProtectedFunction` (74 functions, mostly widget methods such as `Frame:SetAttribute`/`ClearAttribute`; these are blocked in combat or on protected frames) and `HasRestrictions` (276). Systems with `Environment="SecureOnly"` (e.g. `C_CombatLogSecure`) can't be called by addons. [Source]
 - **[F-053]** `C_ChatInfo.SendChatMessage` has `HasRestrictions` + `RestrictedForMacroChatMessages`. EMOTE needs a hardware event outside instances (70291). Trial accounts can't send addon messages (70291). [Source; Wiki]
+- **[F-137]** **Lua errors land in `Logs\General.log`, and Edit Mode shows taint** (Justin's live client, 70862,
+  2026-11-09):
+  - The client writes each Lua error with its whole stack to `Logs\General.log` (`[E][Lua] Lua Error: ...` lines) as it
+    happens, even with script errors hidden. `client_logs.py show General --grep "Lua Error"` reads it.
+  - The client starts `Logs\*.log` afresh at each launch, with no backup: after Justin's restart General.log was empty
+    and the 9 errors were gone. Read them before a restart. (Whether a `/reload` keeps them isn't tested.)
+  - Entering or leaving Edit Mode runs `TargetUnit`, `ClearTarget`, `FocusUnit` or `ClearFocus`
+    (RefreshTargetAndFocus, ResetTargetAndFocus), then refreshes the party frames, which compare a secret health-bar
+    colour. When that path is tainted, the player sees "<Addon> has been blocked from an action only available to the
+    Blizzard UI", and General.log gets `CompactUnitFrame.lua:698: attempt to compare local 'oldR' (a secret number value,
+    while execution tainted by '<Addon>')`. Seen once with BuffettForever 1.0.0; a client restart cleared it; cause not
+    found.
+  - How the 70450 source (its lines match the 70862 stacks) keeps addon code out of Blizzard's paths:
+    - Settings registration goes through an attribute delegate, and `Settings.OpenToCategory` calls the C function
+      `C_SettingsUtil.OpenSettingsPanel`, not the panel's Lua;
+    - tooltip post-calls run through an attribute delegate;
+    - Escape handlers run through `securecallfunction`, and `CloseSpecialWindows` through `securecall`, so an addon's
+      `UISpecialFrames` entry doesn't taint Escape;
+    - the addon compartment reads an addon's `_G` callbacks only when it calls them, and calls them insecure;
+    - the UI panel manager's delegate frame is forbidden, so `ShowUIPanel`/`HideUIPanel` start secure.
+
+  [Probe 70862; Source 70450]
 
 ## 7. Beta defects (history)
 - **[F-060]** SavedVariables were written but not restored (Sep 18–21). **Fixed in 70009** (wiki and forum). Builds have since occasionally reset interface settings. [Wiki; Community]
