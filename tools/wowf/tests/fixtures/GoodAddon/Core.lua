@@ -39,3 +39,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 end)
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterUnitEvent("UNIT_HEALTH", "player")
+local isEnhanced = Enum.ForeverExperiencePreset.Enhanced
+local mult = Constants.AuctionConstants.DEFAULT_AUCTION_PRICE_MULTIPLIER
+ns.preset, ns.mult = isEnhanced, mult

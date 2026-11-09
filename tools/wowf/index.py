@@ -69,7 +69,7 @@ def live_doc_files(cfg):
     """Doc file names on the comparison branch (tree only, no blobs)."""
     d = config.UPSTREAM_DIR
     br = cfg["upstream"].get("compare_branch", "live")
-    r = _git(["fetch", "--depth", "1", "--filter=blob:none", "origin", f"{br}:refs/remotes/origin/{br}"], d)
+    r = _git(["fetch", "--depth", "1", "--filter=blob:none", "origin", f"+{br}:refs/remotes/origin/{br}"], d)   # + : live is force-pushed upstream
     if r.returncode:
         return None
     r = _git(["ls-tree", "--name-only", f"origin/{br}", DOC_DIR.replace(os.sep, "/") + "/"], d)
@@ -484,6 +484,8 @@ def write_jsonl(path, meta, recs):
 def build(cfg, log=print, compare_live=True):
     info = upstream_info()
     live = live_doc_files(cfg) if compare_live else None
+    if compare_live and live is None:
+        log("WARNING: the live branch could not be read, so no forever_only flags this build (compared_live false)")
     doc_recs, failures, nfiles = build_docs(cfg, live, log)
     if failures:
         for f in failures:

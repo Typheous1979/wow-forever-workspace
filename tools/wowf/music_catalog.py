@@ -23,6 +23,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import config  # noqa: E402
+from recipe_catalog import check_csv  # noqa: E402
 
 MUSIC_DIR = os.path.join(config.CACHE_DIR, "music")
 WAGO = "https://wago.tools"
@@ -62,7 +63,7 @@ def fetch_tables(build, log=print):
         if os.path.isfile(path):
             continue
         data, _, _ = _get(f"{WAGO}/db2/{t}/csv?build={build}")
-        if not data.startswith(b"ID,"):
+        if not check_csv(data):
             raise SystemExit(f"music-catalog: unexpected response for {t}: {data[:80]!r}")
         with open(path, "wb") as f:
             f.write(data)

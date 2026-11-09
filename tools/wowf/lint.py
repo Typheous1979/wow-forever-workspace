@@ -317,6 +317,9 @@ class AddonLinter:
             # API007 existence (C_ namespaces)
             if head.startswith("C_") and not assigned:
                 self._check_c_api(path, t, chain)
+            # API008 Enum / Constants members (a removed member reads nil and silently never matches)
+            if head in ("Enum", "Constants") and len(chain) >= 3 and not assigned:
+                self._check_member(path, t, chain)
             # events
             if head in EVENT_REG or (len(chain) == 1 and False):
                 pass
@@ -408,6 +411,23 @@ class AddonLinter:
                         names.add(toks[j].value)
                     j += 1
         return names
+
+    def _check_member(self, path, t, chain):
+        I = self.I
+        if not I.loaded:
+            return
+        table = f"{chain[0]}.{chain[1]}"
+        kind = "enum" if chain[0] == "Enum" else "const"
+        recs = [r for r in I.lookup(table) if r.get("k") == kind]
+        if not recs:
+            if table not in I.fx and table not in I.rt:
+                self.add(path, t.line, t.col, "E", "API008", f"unknown table {table} (not in Forever docs/FrameXML/runtime)",
+                         "check `wowf-api find`; Blizzard renames these between builds")
+            return
+        members = recs[0].get("v") or {}
+        if chain[2] not in members:
+            self.add(path, t.line, t.col, "E", "API008", f"{table}.{chain[2]} does not exist on Forever: it reads nil and never matches",
+                     "members: " + ", ".join(sorted(members)[:10]))
 
     def _check_c_api(self, path, t, chain):
         I = self.I

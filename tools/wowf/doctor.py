@@ -39,7 +39,7 @@ def main(argv):
         if I.meta.get("build") and c["build"] and c["build"] != I.meta.get("build"):
             line(None, f"{key} client build {c['build']} differs from index build {I.meta.get('build')} — facts may skew; consider /wowf-refresh")
     if "forever" not in clients:
-        line(None, "no _forever_ client yet (stress test Oct 19 / launch Nov 4 install it)")
+        line(None, "no _forever_ client found (the live game since Nov 4, 2026; check client_search_roots in wowf.local.json)")
     # OneDrive dehydration check on the workspace
     import deploy
     bad = []

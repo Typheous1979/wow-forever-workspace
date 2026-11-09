@@ -17,7 +17,7 @@ I = idx.Index(CFG["_root"])
 EXPECTED_BAD = {
     "TOC001", "TOC002", "TOC003", "TOC004", "TOC005", "TOC006", "TOC007",
     "LUA001", "LUA002", "LUA003", "LUA004",
-    "API001", "API002", "API003", "API005", "API006", "API007",
+    "API001", "API002", "API003", "API005", "API006", "API007", "API008",
     "PAT001", "PAT002", "PAT003", "PAT004", "PAT005",
     "SEC001", "SEC002",
 }
@@ -42,6 +42,14 @@ class LintGolden(unittest.TestCase):
             self.skipTest("luacheck.exe not installed")
         bad = [f.text(CFG["_root"]) for f in self.ids("GoodAddon", luacheck=True) if f.sev in ("E", "W")]
         self.assertEqual(bad, [])
+
+    def test_enum_and_constants_members(self):
+        # 70862 renamed ForeverExperiencePreset.Modern to Enhanced and LevelConstsExposed to ..._Camelot (still present at runtime): an invented
+        # or removed member reads nil and never matches, with no Lua error.
+        bad = [f.text(CFG["_root"]) for f in self.ids("BadAddon") if f.id == "API008"]
+        self.assertTrue(any("Enum.ForeverExperiencePreset.Modern" in b for b in bad), bad)
+        self.assertTrue(any("Constants.NoSuchConsts" in b for b in bad), bad)
+        self.assertNotIn("API008", {f.id for f in self.ids("GoodAddon")})
 
     def test_false_positive_guards(self):
         # GoodAddon contains: ~=, os.time(), goto inside strings/comments, Interface\AddOns sound path,

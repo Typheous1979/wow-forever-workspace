@@ -238,6 +238,6 @@ def main(argv):
               "('Always keep on this device'):\n  " + "\n  ".join(hydr))
     for key, c in clients.items():
         print(f"{key}: {deploy_one(root, src, folder, c, a.mode, a.replace_copy, a.yes)}")
-    print("next: restart the client if this addon is new to it (new folders may need a restart; "
-          "/reload is enough for code edits). Enable it in the AddOns list if needed.")
+    print("next: /reload in game (a new addon folder loads on /reload [F-024]; TOC changes too). "
+          "Enable it in the AddOns list if needed.")
     return 0

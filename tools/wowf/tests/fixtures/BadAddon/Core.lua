@@ -17,3 +17,5 @@ SLASH_BADADDON1 = "/bad"
 SlashCmdList["BADADON"] = function() end
 local pct = UnitHealth("player") + 1
 ChatFrame_OpenChat("hi")
+local preset = Enum.ForeverExperiencePreset.Modern
+local lvl = Constants.NoSuchConsts.MIN_RES_SICKNESS_LEVEL
