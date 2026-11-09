@@ -199,7 +199,7 @@ def status(cfg):
 def main(argv):
     p = argparse.ArgumentParser(prog="wowf deploy", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("addon", nargs="?")
-    p.add_argument("--client", default="beta", help="beta | forever | all (default beta)")
+    p.add_argument("--client", help="beta | forever | all (default: forever, else beta, else the one installed)")
     p.add_argument("--mode", choices=["junction", "copy"], default="junction")
     p.add_argument("--remove", action="store_true")
     p.add_argument("--status", action="store_true")
@@ -225,7 +225,7 @@ def main(argv):
     if not a.addon:
         p.error("ADDON required")
     src = source_dir(root, a.addon)
-    clients = config.pick_clients(cfg, a.client)
+    clients = config.pick_default(cfg, a.client)
     if a.remove:
         folder = os.path.basename(os.path.normpath(src))
         for key, c in clients.items():

@@ -1,9 +1,11 @@
 """Client-side evidence: crash reports, taint log, client logs (read-only).
 
-  python tools/wowf/cli.py logs crash [--client beta] [--last N]   summarize Errors\\*.txt crash reports
+  python tools/wowf/cli.py logs crash [--client K] [--last N]      summarize Errors\\*.txt crash reports
   python tools/wowf/cli.py logs taint [--grep ADDON] [--tail N]     Logs\\taint.log (enable: /console taintLog 1)
   python tools/wowf/cli.py logs show NAME [--grep TEXT] [--tail N]  any Logs\\NAME.log (Sound, General, Client, ...)
   python tools/wowf/cli.py logs list                                list log files with sizes and times
+
+--client K: beta, forever or all. Default: the launch client (forever), else the beta, else the one installed.
 """
 import argparse
 import datetime
@@ -61,13 +63,13 @@ def main(argv):
     p = argparse.ArgumentParser(prog="wowf logs")
     p.add_argument("action", choices=["crash", "taint", "show", "list"])
     p.add_argument("name", nargs="?")
-    p.add_argument("--client", default="beta")
+    p.add_argument("--client", help="beta | forever | all (default: forever, else beta, else the one installed)")
     p.add_argument("--grep")
     p.add_argument("--tail", type=int, default=60)
     p.add_argument("--last", type=int, default=3)
     a = p.parse_args(argv)
     cfg = config.load()
-    for key, c in config.pick_clients(cfg, a.client).items():
+    for key, c in config.pick_default(cfg, a.client).items():
         logs = os.path.join(c["dir"], "Logs")
         if a.action == "crash":
             cmd_crash(c, a.last)

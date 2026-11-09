@@ -127,3 +127,22 @@ def pick_clients(cfg, which):
     if which not in clients:
         raise SystemExit(f"wowf: client '{which}' not found. Known: {', '.join(clients) or 'none'}")
     return {which: clients[which]}
+
+
+def default_client(clients):
+    """The client `logs` and `deploy` act on when --client isn't given: the launch client (forever),
+    else the beta, else the first one found; None when no client is installed."""
+    for key in ("forever", "beta"):
+        if key in clients:
+            return key
+    return min(clients) if clients else None
+
+
+def pick_default(cfg, which):
+    """pick_clients for the tools that act on one client unless told otherwise (logs, deploy):
+    which (a client key or "all"), or default_client's choice when it's None."""
+    if which is None:
+        which = default_client(discover_clients(cfg))
+        if which is None:
+            raise SystemExit("wowf: no Forever client found (check client_search_roots in wowf.local.json)")
+    return pick_clients(cfg, which)
