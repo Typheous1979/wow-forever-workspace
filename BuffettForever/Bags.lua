@@ -27,7 +27,7 @@ end
 
 -- " Vendor pays 1c." when the item can be sold to a vendor (0 or unknown: nothing).
 local function VendorText(itemID)
-    local sell = ns.ItemSellPrice and ns.ItemSellPrice[itemID] or select(11, C_Item.GetItemInfo(itemID))
+    local sell = ns.Items.SellPrice(itemID)
     if type(sell) ~= "number" or sell <= 0 then return "" end
     return " " .. string.format(L["Vendor pays %s."], Money.Format(sell))
 end

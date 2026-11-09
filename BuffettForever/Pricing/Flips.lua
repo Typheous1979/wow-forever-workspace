@@ -20,9 +20,7 @@ local RECHECK_TIMEOUT = 20   -- seconds to wait for the item data after a scan
 
 -- What a vendor pays for the item; nil while the item isn't cached (Flips.Recheck tries again).
 local function VendorSell(itemID)
-    local sell = ns.ItemSellPrice and ns.ItemSellPrice[itemID] or select(11, C_Item.GetItemInfo(itemID))
-    if type(sell) ~= "number" then return nil end
-    return sell
+    return ns.Items.SellPrice(itemID)
 end
 Flips.VendorSell = VendorSell
 

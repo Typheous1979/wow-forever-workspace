@@ -259,9 +259,8 @@ function Evaluator.LiveContext()
     local ctx = { settings = settings }
     ctx.vendorBuy = Lazy(function(itemID) return (ns.Merchant.Get(itemID)) end)
     ctx.vendorSell = Lazy(function(itemID)
-        local sell = ns.ItemSellPrice and ns.ItemSellPrice[itemID]
-        if not sell then sell = select(11, C_Item.GetItemInfo(itemID)) end
-        if type(sell) == "number" and sell > 0 then return sell end
+        local sell = ns.Items.SellPrice(itemID)
+        if sell and sell > 0 then return sell end
         return nil
     end)
     -- Selling: the lower of market value and min buyout; the fair value once the scan is stale.

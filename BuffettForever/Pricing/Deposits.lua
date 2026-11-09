@@ -59,8 +59,7 @@ end
 
 -- What a vendor pays, the price the deposit is a share of (0 when a vendor won't buy it).
 function Deposits.VendorSell(itemID)
-    local sell = ns.ItemSellPrice and ns.ItemSellPrice[itemID] or select(11, C_Item.GetItemInfo(itemID))
-    return type(sell) == "number" and sell or 0
+    return ns.Items.SellPrice(itemID) or 0
 end
 
 -- Whether a batch of the item goes up as one auction (a commodity) or one auction each (gear): as
