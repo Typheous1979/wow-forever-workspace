@@ -25,7 +25,11 @@ Blizzard's docs: "This function should be used in place of an 'allItem' QueryAuc
 entire auction house."
 1. `C_AuctionHouse.ReplicateItems()`, once. Inside the cooldown (over 2 min on 70425; retail: 15 min) the request
    is **ignored**: no event ever comes. Start a timeout and tell the player; 60 s is plenty, since 62k rows arrived in
-   4.7 s [F-121].
+   4.7 s on the beta and 225k in 11.8 s on live [F-121, F-143].
+   - The server can also ignore a request **outside** the cooldown: twice after the weekly restart on 70888, 9.4 h
+     after the last data [F-143]. Don't blame the cooldown in the message then. If you estimate the cooldown from
+     your requests, count no data as the cooldown only below what a request with data proved (and a cap such as
+     30 min). Otherwise one silent request inflates the estimate: BuffettForever 1.0.1 said "every 117 min".
 2. Wait for the **first** `REPLICATE_ITEM_LIST_UPDATE`. It fires again, thousands of times, as item data arrives
    for the rows you read, so ignore repeats while you read (a state flag).
 3. `n = C_AuctionHouse.GetNumReplicateItems()`, then `GetReplicateItemInfo(i)` for `i = 0 .. n-1`. The index is
@@ -308,6 +312,9 @@ Proven on 70450 from a button's click [F-134]:
 - **Key by market.** The AH is per ruleset [F-081]. Put the key in one function (realm and faction until the
   probes show what's shared) so it can change in one place, and keep Hardcore separate
   (`C_GameRules.IsHardcoreActive()`). Never key on character name-realm [F-080].
+  - The game tables give each faction its own AH per super-district, and a Blackwater (goblin) AH shared by both
+    factions with a 15% cut [F-083]. A realm + faction key mixes a Blackwater scan into the faction's prices: key by
+    the auctioneer too if you support Booty Bay, Gadgetzan or Everlook. Unverified in game.
 - **Store aggregates, not listings.** Per item and day: market value, min buyout, quantity, auction count. Keep the
   latest price ladder (up to ~8 price levels with quantities) for depth-aware costs. Prune at login (14–30 days).
   The estimators are in the `wowf-economics` skill.
@@ -350,5 +357,6 @@ index base, every request (cooldown), timings, rows missing info, the realm keys
   still open.
 - Full-scan cooldown: call `ReplicateItems` twice a few minutes apart and note whether the second returns data.
   → 70425: nothing 877 s after the last data, data 1,120 s after it, so the cooldown is between 14.6 and 18.7 min
-  (retail: 15 min) [F-121]. A request log that narrows the bounds (BuffettForever `diag.cooldown`) settles it
-  without extra effort.
+  (retail: 15 min) [F-121]. Live 70888: nothing 253 s after the last data. A request log that narrows the bounds
+  (BuffettForever `diag.cooldown`, with `Scanner.Bound`'s rule for unanswered requests [F-143]) settles it without
+  extra effort.

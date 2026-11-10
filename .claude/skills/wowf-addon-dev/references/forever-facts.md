@@ -1,6 +1,6 @@
 # WoW Forever facts ledger
 
-Facts as of **2026-11-09** (live 70862: the launch facts, the 70862 API changes and the live probes; before that §13 added and its AH probes run on 70425; earlier sections last checked 2026-10-14;
+Facts as of **2026-11-10** (live 70888: its API changes [F-144] and the live full scans [F-143]; live 70862: the launch facts, the 70862 API changes and the live probes; before that §13 added and its AH probes run on 70425; earlier sections last checked 2026-10-14;
 §13 extended through 2026-10-18 on 70450: buying, taking mail, crafting and posting from an addon). Status tags:
 - **[Probe]**: measured in the client (WowfProbe or a community probe);
 - **[Source]**: Blizzard UI source, `forever` branch of Gethe/wow-ui-source;
@@ -62,6 +62,7 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   | 70790 | Nov 4 | launch |
   | 70840 | | |
   | 70862 | Nov 7 | live server and Justin's client on Nov 9; API index rebuilt (no AH, profession, merchant or mail API changes) |
+  | 70888 | Nov 10 | live after the weekly restart, Justin's client from 12:04 ET; API index rebuilt (party invites, nameplates, target frame only [F-144]) |
 
   [Source: forever branch commits]
 - **[F-005]** Version server, Oct 14:
@@ -74,13 +75,16 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   Nov 9: `wowf` = **1.60.1.70862** (live), `wow_classic_beta` = 1.60.1.70532 (frozen), retail 12.1.5.70783. No Forever
   test product answers (`wowft`, `wowf_ptr`, `wowf_beta`).
 
+  Nov 10: `wowf` = **1.60.1.70888** (live).
+
   Endpoint: `http://us.patch.battle.net:1119/<product>/versions`. [Official data]
 - **[F-006]** Client folders:
   - beta: `World of Warcraft\_classic_beta_\` with `WowB.exe`;
   - `wowf` (stress test/launch): **`_forever_`** with `Wow.exe`.
 
   Interface, WTF and Cache are **per folder**, so addons and SavedVariables don't carry over. [Official CDN product config]
-  Since launch Justin plays on `_forever_` (70862 on 2026-11-09); his beta client is uninstalled. [Probe, local disk]
+  Since launch Justin plays on `_forever_` (70862 on 2026-11-09, 70888 on 2026-11-10); his beta client is uninstalled.
+  [Probe, local disk]
 - **[F-007]** Justin's beta client was on build 70338 (Oct 12), 70425 on Oct 16, and **70450** on Oct 17 (BuffettForever's
   selftest saved that build, and the version server's beta matched). Its install path lives in the gitignored `wowf.local.json`. Per-character data lives under `WTF\Account\<acct>\<region-id>\<Char-Realm>\`; on 70425 the "Char-Realm" folder is `<First>-<Surname>` (the surname takes the realm slot, [F-080]) under region-id `70`. Folders from older builds (`<Realm Name>\<First>`) stay beside it. [Probe, local disk 70425]
 
@@ -163,6 +167,16 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   spawn IDs (stable within a session; they can't detect layers); CVars `nameplateMaxVerticalDistance` and
   `...AtMaxRange` (0 disables); the unit frames and minimap header were reskinned, so anchors may need adjusting.
   [Official, via Wiki Patch_1.60.1/API_changes/notes]
+- **[F-144]** **70862 → 70888 API changes** (Source, compare 9dc84f0d3b...4cd0ab752a; 16 files):
+  - `PARTY_INVITE_REQUEST` gained **`isCrossShard`** after `isNativeRealm`, so `allowMultipleRoles`, `inviterGUID` and
+    `questSessionActive` each moved one place later. Read its payload by position only after checking the build.
+  - FrameXML: `GetPartyInviteString(isXRealm, isXShard)` added (Camelot returns `INVITATION_XSHARD` for a cross-shard
+    invite); `ShouldShowBattlePetIcon` removed; Camelot's `TargetFrameMixin:CheckBattlePet` hides the pet-battle icon;
+    nameplates got `NamePlateUnitFrameMixin:UpdateControlAnchors` (crowd-control icons right of the level frame).
+  - Unchanged: the AH, trade skill, merchant and mail docs and `Blizzard_AuctionHouseUI`. The AuctionHouse and
+    AuctionHouseRedirect game tables are the same as 70862's (wago.tools) [F-083].
+
+  [Source 70888]
 
 ## 5. Secret values and restrictions
 - **[F-040]** Secret values are active (Midnight rules). `C_Secrets.HasSecretRestrictions()` reports it. [Official; Source]
@@ -246,6 +260,18 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
   `"ClassicBetaPvP2"`, `UnitFactionGroup("player")` = `"Horde"`, `C_GameRules.IsHardcoreActive()` = false;
   `UnitFullName("player")` returned the first name and the surname, as [F-080] says. Launch super-district names
   and whether the AH is shared across factions or realms of one ruleset: **unmeasured**. [Probe 70425]
+  - **Live** (70862–70888): `GetRealmName()` is an internal name of the shape `"CAMWOW US<n> Realm <n> PvP"`, and
+    `GetNormalizedRealmName()` the same without spaces. [Probe 70888]
+  - **Who shares an AH, from the game tables** (AuctionHouse and AuctionHouseRedirect, the same in 70862 and 70888):
+    - each of five super-district sets (the redirect's second column: 2, 3, 4, 5, 7) has one Alliance AH (110, 111,
+      119, 112, 123) and one Horde AH (113, 114, 120, 115, 124), at a 5% deposit and a 5% cut;
+    - Blackwater (the goblin AHs: 25% deposit, 15% cut) has one per set, the same for both factions (116, 117, 121,
+      118, 125);
+    - a neutral "Auction House" (122) sends each faction to its own AH.
+
+    So one faction on one super-district should share an AH, and a Blackwater AH is a separate market. The redirect's
+    columns are unnamed (`Field_1_60_1_69876_000..003`), so this reading is unverified in game: compare a scan by
+    each faction, and one at a Blackwater auctioneer. [Source: DB2 70888]
 
 ## 10. Comms and chat
 - **[F-090]** `C_ChatInfo.SendAddonMessage(prefix ≤16, message ≤255, chatType, target)` → `Enum.SendAddonMessageResult` (11 = AddOnMessageLockdown). Throttle: 10 per prefix, regaining 1 per second. Register the prefix every session. There's a lockdown during encounters, M+ and PvP. [Wiki; Source]
@@ -597,6 +623,21 @@ Details and code: auction-house.md, professions-and-vendors.md; pricing math: th
 - **[F-142]** **The Account Bank is enabled on Forever:** `C_PlayerInfo.IsAccountBankEnabled()` returned true on live
   70862 (Justin, 2026-11-09). `C_Item.GetItemCount`'s fifth argument (includeAccountBank) counts it; BuffettForever's
   tray counts already pass it. [Probe 70862]
+- **[F-143]** **The server can ignore a full scan outside its cooldown.** BuffettForever's request log on the live
+  client (a Horde character, PvP super-district, 2026-11-10):
+  - **70862:** 220,824 listings of 4,725 items (00:50 ET) and 225,675 of 4,711 (02:47). Data came 11.8 s after
+    `ReplicateItems()`; the whole scan took 15 s (read 2.3 s, priced 0.9 s, at 8 ms a frame).
+  - **After the weekly restart and the 70888 update** (the client up at 12:04): two requests got **no event at all**,
+    and no late answer, at 12:08:42 and 12:09:57, 9.4 h after the last data. One at 12:31:53, 19 min after the last
+    attempt, got 147,434 listings of 4,723 items in 8.4 s (10.7 s in all).
+  - Inside the cooldown it behaves as on the beta: nothing 253 s after the last data.
+  - The cause is **unmeasured**: the restart, the login 3 to 5 min before, or each attempt restarting a timer.
+  - **So no answer isn't proof of the cooldown.** BuffettForever 1.0.1 counted it as one. Its lower bound became
+    33,764 s, past the 6,991 s a scan had proved, and the estimate showed "one about every 117 min". 1.0.2
+    (`Scanner.Bound`) counts no data as the cooldown only below what a request with data proved and below 30 min, and
+    logs the rest as unanswered.
+
+  [Probe 70862, 70888]
 
 ## 14. Retest checklist (run on every new build)
 
@@ -611,7 +652,8 @@ Use `/wowfprobe full`, then `cli.py probe-report`.
 8. The documented-vs-runtime namespace diff ([F-034]).
 9. Economy probes (lines in auction-house.md and professions-and-vendors.md; BuffettForever's `/bf diag` and its
    `diag` SavedVariables answer the AH ones): replicate index base and the
-   ReplicateItems cooldown ([F-121]); are reagents commodities; the AH cut from a seller invoice ([F-122]);
+   ReplicateItems cooldown ([F-121]), and whether the first full scan after a restart is answered ([F-143]); are
+   reagents commodities; the AH cut from a seller invoice ([F-122]);
    realm/faction keys and which characters share an AH ([F-081]); `GetRecipeSchematic` with the window closed
    and for an unknown recipe; `GetAllRecipeIDs` signature; `C_SpellBook.IsSpellKnown(recipeID)` for learned recipes
    ([F-123]); merchant `numAvailable` for unlimited stock ([F-124]). BuffettForever's `diag.harvest` answers the
