@@ -286,7 +286,10 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   Blizzard's hotfixes apply [F-141]; Data regenerated from live 70862 (only Mild Spices, 2c -> 1c). Tested on live 70862
   with the workspace build linked (the CurseForge copy moved aside, then restored): selftest 143/143; 47 cached items,
   none differing from the data (diag.sellPrices). Zip: dist/BuffettForever-1.0.1.zip, 45 files.
-- 1.0.2 the cooldown estimate (2026-11-10, live 70888; Justin: "now it is not able to scan").
+- **1.0.2 released** (2026-11-10, uploaded by Justin as a new file on the project; awaiting approval): the cooldown
+  estimate (live 70888; Justin: "now it is not able to scan"). Zip: dist/BuffettForever-1.0.2.zip, 45 files. The data
+  was regenerated from 70888's tables: unchanged except its build stamp. The README and docs/BuffettForever-curseforge.md
+  now say a full scan takes about 15 seconds; 5 was the beta's figure.
   - **What happened:** after the weekly restart and the 70888 update, the AH ignored two full scans (12:08, 12:09;
     no event, no late answer) [F-143]. One at 12:31 worked: 147,434 listings in 10.7 s. The update changed nothing in
     the AH API or UI [F-144].
