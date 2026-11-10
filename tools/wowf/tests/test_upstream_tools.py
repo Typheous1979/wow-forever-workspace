@@ -68,7 +68,7 @@ class SmallToolFixes(unittest.TestCase):
                 self.assertTrue(os.path.isfile(os.path.join(music_catalog.csv_dir("1.2.3"), "WMOAreaTable.csv")))
 
     def test_recipe_catalog_defaults_to_the_live_build(self):
-        self.assertEqual(recipe_catalog.DEFAULT_BUILD, "1.60.1.70862")
+        self.assertEqual(recipe_catalog.DEFAULT_BUILD, "1.60.1.70888")
 
     def test_doctor_no_longer_announces_the_stress_test(self):
         with open(doctor.__file__, encoding="utf-8") as f:

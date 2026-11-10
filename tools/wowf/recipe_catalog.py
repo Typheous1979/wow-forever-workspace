@@ -32,7 +32,7 @@ import config  # noqa: E402
 RECIPE_DIR = os.path.join(config.CACHE_DIR, "recipes")
 WAGO = "https://wago.tools"
 UA = "wowf-tools/0.1 (+https://github.com/Typheous1979/wow-forever-workspace)"
-DEFAULT_BUILD = "1.60.1.70862"
+DEFAULT_BUILD = "1.60.1.70888"
 TABLES = ("SkillLine", "SkillLineAbility", "SpellEffect", "SpellReagents", "SpellName", "ItemSparse")
 
 # Classic profession skill lines; Forever adds a child line for each (2937-2948 on 70450).
