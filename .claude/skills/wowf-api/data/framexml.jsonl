@@ -1,4 +1,4 @@
-{"k":"meta","schema":1,"branch":"forever","commit":"9dc84f0d3bbae1768ac3405b3716000bd93eda06","build":"1.60.1.70862","files":642,"parse_failures":0,"compared_live":true,"layer":"framexml"}
+{"k":"meta","schema":1,"branch":"forever","commit":"4cd0ab752a77164f654ccbca9d0c1fe8dafceebe","build":"1.60.1.70888","files":642,"parse_failures":0,"compared_live":true,"layer":"framexml"}
 {"k":"addon","id":"Blizzard_APIDocumentation","forever":true,"lod":true}
 {"k":"addon","id":"Blizzard_APIDocumentationGenerated","forever":true,"lod":true}
 {"k":"addon","id":"Blizzard_AccessibilityTemplates","forever":true}
@@ -10220,6 +10220,7 @@
 {"k":"fx","id":"GetPairsArray","type":"function","a":"Blizzard_SharedXMLBase"}
 {"k":"fx","id":"GetPaperDollSideBarFrame","type":"function","a":"Blizzard_UIPanels_Game"}
 {"k":"fx","id":"GetPartyCategoryFromChannelType","type":"function","a":"Blizzard_Channels"}
+{"k":"fx","id":"GetPartyInviteString","type":"function","a":"Blizzard_Game"}
 {"k":"fx","id":"GetPetTypeTexture","type":"function","a":"Blizzard_Collections"}
 {"k":"fx","id":"GetPlayerActorLabelTag","type":"function","a":"Blizzard_SharedXML"}
 {"k":"fx","id":"GetPlayerBottomManagedFrameContainer","type":"function","a":"Blizzard_ManagedFrameSystem"}
@@ -18155,7 +18156,6 @@
 {"k":"fx","id":"ShoppingTooltip2","type":"xml-gametooltip","a":"Blizzard_GameTooltip"}
 {"k":"fx","id":"ShouldRestedXpBarDisplayWhenOverflowing","type":"function","a":"Blizzard_StatusTrackingBar"}
 {"k":"fx","id":"ShouldShowArenaParty","type":"function","a":"Blizzard_UnitFrame"}
-{"k":"fx","id":"ShouldShowBattlePetIcon","type":"function","a":"Blizzard_UnitFrame"}
 {"k":"fx","id":"ShouldShowFollowerAbilityBorder","type":"function","a":"Blizzard_GarrisonBase"}
 {"k":"fx","id":"ShouldShowILevelInFollowerList","type":"function","a":"Blizzard_GarrisonBase"}
 {"k":"fx","id":"ShouldShowMawBuffs","type":"function","a":"Blizzard_MawBuffs"}

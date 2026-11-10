@@ -1,4 +1,4 @@
-{"k":"meta","schema":1,"branch":"forever","commit":"9dc84f0d3bbae1768ac3405b3716000bd93eda06","build":"1.60.1.70862","files":642,"parse_failures":0,"compared_live":true}
+{"k":"meta","schema":1,"branch":"forever","commit":"4cd0ab752a77164f654ccbca9d0c1fe8dafceebe","build":"1.60.1.70888","files":642,"parse_failures":0,"compared_live":true}
 {"k":"callback","id":"CraftingOrderRequestCallback","fields":[{"n":"result","t":"CraftingOrderResult"},{"n":"orderType","t":"CraftingOrderType"},{"n":"displayBuckets","t":"bool"},{"n":"expectMoreRows","t":"bool"},{"n":"offset","t":"number"},{"n":"isSorted","t":"bool"}],"file":"CraftingOrderUISharedDocumentation.lua"}
 {"k":"callback","id":"CraftingOrderRequestMyOrdersCallback","fields":[{"n":"result","t":"CraftingOrderResult"},{"n":"expectMoreRows","t":"bool"},{"n":"offset","t":"number"},{"n":"isSorted","t":"bool"}],"file":"CraftingOrderUISharedDocumentation.lua"}
 {"k":"callback","id":"EventCallbackType","file":"FrameScriptDocumentation.lua"}
@@ -2065,7 +2065,7 @@
 {"k":"event","id":"OWNED_AUCTION_BIDDER_INFO_RECEIVED","sys":"AuctionHouse","payload":[{"n":"auctionID","t":"number"},{"n":"bidderName","t":"cstring"}],"f":{"SynchronousEvent":true},"file":"AuctionHouseDocumentation.lua"}
 {"k":"event","id":"PARTY_ELIGIBILITY_FOR_DELVE_TIERS_CHANGED","sys":"DelvesUI","payload":[{"n":"playerName","t":"string"},{"n":"maxEligibleLevel","t":"number"}],"f":{"SynchronousEvent":true},"file":"DelvesUIDocumentation.lua"}
 {"k":"event","id":"PARTY_INVITE_CANCEL","sys":"PartyInfo","f":{"SynchronousEvent":true},"file":"PartyInfoDocumentation.lua"}
-{"k":"event","id":"PARTY_INVITE_REQUEST","sys":"PartyInfo","payload":[{"n":"name","t":"cstring"},{"n":"isTank","t":"bool"},{"n":"isHealer","t":"bool"},{"n":"isDamage","t":"bool"},{"n":"isNativeRealm","t":"bool"},{"n":"allowMultipleRoles","t":"bool"},{"n":"inviterGUID","t":"WOWGUID"},{"n":"questSessionActive","t":"bool"}],"f":{"SynchronousEvent":true},"file":"PartyInfoDocumentation.lua"}
+{"k":"event","id":"PARTY_INVITE_REQUEST","sys":"PartyInfo","payload":[{"n":"name","t":"cstring"},{"n":"isTank","t":"bool"},{"n":"isHealer","t":"bool"},{"n":"isDamage","t":"bool"},{"n":"isNativeRealm","t":"bool"},{"n":"isCrossShard","t":"bool"},{"n":"allowMultipleRoles","t":"bool"},{"n":"inviterGUID","t":"WOWGUID"},{"n":"questSessionActive","t":"bool"}],"f":{"SynchronousEvent":true},"file":"PartyInfoDocumentation.lua"}
 {"k":"event","id":"PARTY_KILL","sys":"Unit","payload":[{"n":"attackerGUID","t":"WOWGUID"},{"n":"targetGUID","t":"WOWGUID"}],"f":{"SecretWhenUnitIdentityRestricted":true,"SynchronousEvent":true},"file":"UnitDocumentation.lua"}
 {"k":"event","id":"PARTY_LEADER_CHANGED","sys":"PartyInfo","f":{"UniqueEvent":true},"file":"PartyInfoDocumentation.lua"}
 {"k":"event","id":"PARTY_LFG_RESTRICTED","sys":"PartyInfo","f":{"SynchronousEvent":true},"file":"PartyInfoDocumentation.lua"}
