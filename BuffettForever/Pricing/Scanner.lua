@@ -6,7 +6,9 @@ local addonName, ns = ...
 --   -> price each item, time-sliced (finishes even if the AH closes) -> PriceDB.Record.
 -- States: idle -> waiting -> reading -> pricing -> idle. Inside the full-scan cooldown the
 -- server ignores the request (no event at all [F-121]), so no data within REPLICATE_TIMEOUT
--- seconds ends the scan with a message; data that arrives late is still read.
+-- seconds ends the scan with a message; data that arrives late is still read. The server can
+-- also ignore a request outside the cooldown (twice on 70888, after a restart [F-143]):
+-- Scanner.Bound keeps those out of the cooldown estimate.
 -- The scanner also fills BuffettForeverDB.diag, which answers the open AH probes in CLAUDE.md:
 -- the replicate index base, the cooldown (every request, with bounds derived from them),
 -- scan timings, rows missing info, the market-key inputs per character, SupportsCopperValues,
@@ -23,7 +25,8 @@ local events = ns.events
 local BUDGET_MS = 8            -- work per frame
 local OWN_MAX_AGE = 30 * 60    -- your auctions list is used to clean a scan only when it's this fresh
 local REPLICATE_TIMEOUT = 60   -- seconds to wait for REPLICATE_ITEM_LIST_UPDATE
-local COOLDOWN_GUESS = 15 * 60 -- retail's full-scan cooldown; Forever's is over 2 min [F-121]
+local COOLDOWN_GUESS = 15 * 60 -- retail's full-scan cooldown; 14.6 to 18.7 min on the beta [F-121]
+local SILENT_CAP = 30 * 60     -- no data this long after the last data isn't the cooldown [F-143]
 local DIAG_KEEP = 20           -- entries kept in each diagnostics list
 -- Linen Cloth, Copper Ore, Copper Bar, Peacebloom, Light Leather: are reagents commodities?
 local PROBE_ITEMS = { 2589, 2770, 2840, 2447, 2318 }
@@ -37,18 +40,49 @@ local function NowMs()
     return debugprofilestop()
 end
 
--- Cooldown bounds from the request log, for logs written before diag.cooldown existed:
--- a request that got data after s seconds proves cooldown <= s; one that got none, > s.
+-- ---------------------------------------------------------------- cooldown bounds (pure: the selftest runs them)
+
+-- A lower bound the evidence rules out: at or past what a request with data proved (atMost), or past
+-- SILENT_CAP. Only bounds saved before Scanner.Bound's rule hold one (live 70888: over 33,764 s, at most 6,991 s).
+local function ImpossibleOver(cooldown)
+    local over = cooldown.over
+    return over ~= nil and (over >= SILENT_CAP or (cooldown.atMost ~= nil and over >= cooldown.atMost))
+end
+
+-- What a request's outcome, `since` seconds after the last data, says about the cooldown (over < cooldown <=
+-- atMost). Data proves cooldown <= since, and rules out a lower bound at or past it. No data counts as the
+-- cooldown only below atMost and SILENT_CAP: the server also ignores requests for other reasons [F-143], and
+-- those are counted as unanswered instead. Returns "data", "cooldown" or "unanswered" (nil: no last data yet).
+function Scanner.Bound(cooldown, since, gotData)
+    if type(since) ~= "number" then return nil end
+    if gotData then
+        cooldown.atMost = math.min(cooldown.atMost or since, since)
+        if ImpossibleOver(cooldown) then cooldown.over = nil end
+        return "data"
+    end
+    if since < math.min(cooldown.atMost or SILENT_CAP, SILENT_CAP) then
+        cooldown.over = math.max(cooldown.over or 0, since)
+        return "cooldown"
+    end
+    cooldown.unanswered = (cooldown.unanswered or 0) + 1
+    return "unanswered"
+end
+
+-- The cooldown estimate in seconds: retail's 15 min, kept inside the bounds (over < cooldown <= atMost).
+function Scanner.Estimate(cooldown)
+    local over = not ImpossibleOver(cooldown) and cooldown.over or 0
+    return math.min(cooldown.atMost or math.huge, math.max(COOLDOWN_GUESS, over))
+end
+
+-- ---------------------------------------------------------------- diagnostics
+
+-- Cooldown bounds from the request log: for logs written before diag.cooldown existed, and for bounds
+-- saved before Scanner.Bound's rule. Requests it doesn't count as the cooldown are marked unanswered.
 local function SeedCooldown(diag)
     local cooldown, lastData = {}, nil
     for _, r in ipairs(diag.requests) do
         if lastData and r.t and r.data ~= nil then
-            local since = r.t - lastData
-            if r.data then
-                cooldown.atMost = math.min(cooldown.atMost or since, since)
-            else
-                cooldown.over = math.max(cooldown.over or 0, since)
-            end
+            if Scanner.Bound(cooldown, r.t - lastData, r.data) == "unanswered" then r.unanswered = true end
         end
         if r.data then lastData = r.t end
     end
@@ -62,7 +96,7 @@ local function Diag()
     diag.scans = diag.scans or {}
     diag.chars = diag.chars or {}
     diag.probeItems = diag.probeItems or {}
-    if not diag.cooldown then SeedCooldown(diag) end
+    if not diag.cooldown or (ImpossibleOver(diag.cooldown) and not ns.readOnlyDB) then SeedCooldown(diag) end
     return diag
 end
 
@@ -80,18 +114,10 @@ local function Progress(phase, done, total)
     ns.Fire("SCAN_PROGRESS", phase, done, total)
 end
 
--- A request's outcome narrows the cooldown: data after s seconds means cooldown <= s.
+-- A request's outcome narrows the cooldown (Scanner.Bound); data also starts the next one.
 local function NoteOutcome(request, gotData)
     local diag = Diag()
-    local cooldown = diag.cooldown
-    local since = request.sinceData
-    if since then
-        if gotData then
-            cooldown.atMost = math.min(cooldown.atMost or since, since)
-        else
-            cooldown.over = math.max(cooldown.over or 0, since)
-        end
-    end
+    if Scanner.Bound(diag.cooldown, request.sinceData, gotData) == "unanswered" then request.unanswered = true end
     if gotData then diag.lastData = request.t end
 end
 
@@ -328,8 +354,14 @@ local function OnTimeout(s)
     state = "idle"
     scan = nil
     Push(Diag().scans, { t = s.t, timeout = true })
-    SetNotice(string.format(L["No data came back from the Auction House in %d s (probably the full-scan cooldown). Try again later."],
-        REPLICATE_TIMEOUT))
+    if s.request.early then
+        SetNotice(string.format(L["No data came back from the Auction House in %d s (probably the full-scan cooldown). Try again later."],
+            REPLICATE_TIMEOUT))
+    else
+        -- the cooldown should have been over: the server ignored it for another reason [F-143]
+        SetNotice(string.format(L["The Auction House didn't answer in %d s, though its full-scan cooldown should be over. Try again in about %d min."],
+            REPLICATE_TIMEOUT, math.floor(COOLDOWN_GUESS / 60)))
+    end
     ns.Fire("SCAN_DONE", { timeout = true })
 end
 
@@ -369,13 +401,11 @@ function Scanner.IsBusy()
     return state ~= "idle"
 end
 
--- Seconds until a full scan is likely to get data again (0: now), and the cooldown estimate:
--- retail's 15 min, kept inside the measured bounds (over < cooldown <= atMost).
+-- Seconds until a full scan is likely to get data again (0: now), and the cooldown estimate (Scanner.Estimate).
 function Scanner.CooldownLeft()
     if not ns.db then return 0, COOLDOWN_GUESS end
     local diag = Diag()
-    local cooldown = diag.cooldown
-    local estimate = math.min(cooldown.atMost or math.huge, math.max(COOLDOWN_GUESS, cooldown.over or 0))
+    local estimate = Scanner.Estimate(diag.cooldown)
     if not diag.lastData then return 0, estimate end
     return math.max(0, estimate - (GetServerTime() - diag.lastData)), estimate
 end
@@ -403,12 +433,12 @@ function Scanner.Start()
         ns.Print(why)
         return false
     end
+    ExpireLateRequest()   -- first: a timed-out request's outcome can move the estimate
     local hint = Scanner.CooldownHint()
     if hint then ns.Print(hint .. " " .. L["Trying anyway; it will probably get no data."]) end
-    ExpireLateRequest()
     local now = GetServerTime()
     local diag = Diag()
-    local request = { t = now }
+    local request = { t = now, early = hint and true or nil }   -- early: inside the estimated cooldown
     if diag.lastRequest then request.sincePrev = now - diag.lastRequest end
     if diag.lastData then request.sinceData = now - diag.lastData end
     diag.lastRequest = now
@@ -476,13 +506,15 @@ function Scanner.PrintDiag()
     end
     for i = math.max(1, #diag.requests - 4), #diag.requests do
         local q = diag.requests[i]
-        out("request %s: %s s after the last data, data %s, wait %s ms, n %s%s%s", date("%H:%M:%S", q.t),
+        out("request %s: %s s after the last data, data %s, wait %s ms, n %s%s%s%s", date("%H:%M:%S", q.t),
             tostring(q.sinceData or "-"), tostring(q.data), tostring(q.waitMs or "-"), tostring(q.n or "-"),
-            q.lateSeconds and (", late " .. q.lateSeconds .. " s") or "", q.aborted and ", AH closed" or "")
+            q.lateSeconds and (", late " .. q.lateSeconds .. " s") or "", q.aborted and ", AH closed" or "",
+            q.unanswered and ", unanswered outside the cooldown" or "")
     end
     local cooldown = diag.cooldown
-    out("cooldown: over %s s, at most %s s; next scan in about %d s", tostring(cooldown.over or "?"),
-        tostring(cooldown.atMost or "?"), (Scanner.CooldownLeft()))
+    out("cooldown: over %s s, at most %s s, %d unanswered outside it; next scan in about %d s",
+        tostring(cooldown.over or "?"), tostring(cooldown.atMost or "?"), cooldown.unanswered or 0,
+        (Scanner.CooldownLeft()))
     local s = diag.scans[#diag.scans]
     if s then
         if s.timeout then
@@ -508,6 +540,51 @@ function Scanner.PrintDiag()
         out("replicate updates: %d extra during a scan, %d unrequested", diag.extraUpdates or 0,
             diag.unrequestedUpdates or 0)
     end
+end
+
+-- ---------------------------------------------------------------- self test
+
+-- /bf selftest: the cooldown bounds on the beta's measurements and on live 70888's unanswered requests.
+function Scanner.SelfTest(report)
+    local passed, failed = 0, 0
+    local function check(name, ok, detail)
+        if ok then passed = passed + 1 else failed = failed + 1 end
+        report(name, ok, detail)
+    end
+    -- Bound over a copy of `start`, one {since, gotData} step at a time: the bounds, what each step was taken for,
+    -- and the estimate.
+    local function run(start, steps)
+        local cooldown, taken = {}, {}
+        for k, v in pairs(start) do cooldown[k] = v end
+        for _, step in ipairs(steps) do
+            taken[#taken + 1] = tostring(Scanner.Bound(cooldown, step[1], step[2]))
+        end
+        return cooldown, table.concat(taken, ", "), Scanner.Estimate(cooldown)
+    end
+    -- the beta (70425): no data 877 s after the last data, data 1,120 s after it [F-121]
+    local c, taken, estimate = run({}, { { 877, false }, { 1120, true } })
+    check("COOLDOWN-BOUNDS", c.over == 877 and c.atMost == 1120 and estimate == 900,
+        string.format("no data at 877 s, data at 1,120 s: %s; over %s, at most %s; estimate %d s", taken,
+            tostring(c.over), tostring(c.atMost), estimate))
+    -- live 70888: data 6,991 s after the last data, then nothing 33,689 and 33,764 s after it [F-143]
+    c, taken, estimate = run({ atMost = 6991 }, { { 33689, false }, { 33764, false } })
+    check("COOLDOWN-SILENT", c.over == nil and c.unanswered == 2 and estimate == 900,
+        string.format("no data 9.4 h after the last data, once data came after 6,991 s: %s; over %s; estimate %d s, "
+            .. "not 6,991 s (117 min)", taken, tostring(c.over), estimate))
+    -- the bounds 1.0.1 saved from them
+    estimate = Scanner.Estimate({ atMost = 6991, over = 33764 })
+    check("COOLDOWN-SAVED", estimate == 900,
+        string.format("saved over 33,764 s, at most 6,991 s: estimate %d s", estimate))
+    -- nothing proven yet: no data at 2 h isn't the cooldown, no data at 1,000 s is
+    c, taken, estimate = run({}, { { 7200, false }, { 1000, false } })
+    check("COOLDOWN-CAP", c.over == 1000 and c.unanswered == 1 and estimate == 1000,
+        string.format("no data at 2 h, then at 1,000 s: %s; over %s; estimate %d s", taken, tostring(c.over), estimate))
+    -- data inside an earlier lower bound: that bound wasn't the cooldown
+    c, taken, estimate = run({ over = 1500 }, { { 1200, true } })
+    check("COOLDOWN-HEAL", c.over == nil and c.atMost == 1200 and estimate == 900,
+        string.format("over 1,500 s, then data at 1,200 s: %s; over %s, at most %s; estimate %d s", taken,
+            tostring(c.over), tostring(c.atMost), estimate))
+    return passed, failed
 end
 
 ns.On("AH_OPEN", function()

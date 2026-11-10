@@ -286,6 +286,23 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   Blizzard's hotfixes apply [F-141]; Data regenerated from live 70862 (only Mild Spices, 2c -> 1c). Tested on live 70862
   with the workspace build linked (the CurseForge copy moved aside, then restored): selftest 143/143; 47 cached items,
   none differing from the data (diag.sellPrices). Zip: dist/BuffettForever-1.0.1.zip, 45 files.
+- 1.0.2 the cooldown estimate (2026-11-10, live 70888; Justin: "now it is not able to scan").
+  - **What happened:** after the weekly restart and the 70888 update, the AH ignored two full scans (12:08, 12:09;
+    no event, no late answer) [F-143]. One at 12:31 worked: 147,434 listings in 10.7 s. The update changed nothing in
+    the AH API or UI [F-144].
+  - **The bug:** 1.0.1 took the ignored requests as cooldown evidence. The lower bound went to 33,764 s, past the
+    6,991 s upper bound, so the status line said "the Auction House allows one about every 117 min".
+  - **The fix:**
+    - `Scanner.Bound` counts no data as the cooldown only below `atMost` and SILENT_CAP (30 min), and logs the rest
+      as unanswered (`cooldown.unanswered`, `request.unanswered`);
+    - `Scanner.Estimate` ignores an impossible lower bound;
+    - Diag() rebuilds saved bounds that hold one from the request log;
+    - a timeout outside the estimated cooldown (`request.early` unset) says the cooldown should be over and to try
+      again in about 15 min;
+    - selftest 148 (COOLDOWN-BOUNDS, -SILENT, -SAVED, -CAP, -HEAL).
+  - **Tested on 70888** with the workspace build linked (the CurseForge copy moved aside, then restored): selftest
+    148/148. The saved bounds were rebuilt to at most 6,991 s, over 253 s (a 12:36 click inside the cooldown) and
+    2 unanswered, so the estimate is back to 15 min.
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). From pass 3 (2026-10-18): Buy greyed out with "Not
   enough gold" when Crafts makes the cost more than your gold, and a quote left to run out (the last 10 s counted
@@ -298,11 +315,16 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
 ## At the Auction House on the live client (logged 2026-11-09; run when Justin says he's at one)
 Justin is levelling, away from Auction Houses. When he's at one, go through these in order: he does the clicks, and Igor
 reads `diag` with savedvars.py after his `/reload`. Read General.log before any client restart [F-137].
-1. **The first full scan on live 70862:** Scan (the window, or the button under the AH frame). From diag.scanner: the
-   listings, items and seconds (the beta had 61,933 listings and 2,998 items in 5.5 s), the market key (the live
-   realm and faction), and the saved file's size (SAVED_VARIABLES_TOO_LARGE pauses scanning).
+1. **Done (2026-11-10):** the first full scans on live. 70862: 220,824 listings of 4,725 items in 15.0 s (11.8 s of
+   it waiting). 70888, after the weekly restart: 147,434 of 4,723 in 10.7 s [F-143]. The market key is
+   `<internal realm name>-Horde` (the shape is in [F-083]). The account file is 1.0 MB with 2 scan days and no
+   SAVED_VARIABLES_TOO_LARGE. Still to watch: a full scan right after the next weekly restart (answered, or ignored as
+   on Nov 10?).
 2. **Who shares the AH** (sets `marketKey`, open since M1): scan with a character of the other faction on the same realm
-   and compare the ladders. Live realms are one mega-realm per ruleset [F-081].
+   and compare the ladders. Live realms are one mega-realm per ruleset [F-081]. The game tables say one AH per faction
+   per super-district, plus a Blackwater AH shared by both factions [F-083]. If that holds, the key is right for the
+   faction AHs, but a scan at Booty Bay, Gadgetzan or Everlook would mix into the faction's prices. Scan once at a
+   Blackwater auctioneer to check.
 3. **Deposits:** Alt+Right-click a stack in the bags (Linen Cloth; Mild Spices if carried, hotfixed to a 1c sell price
    on Nov 6) and compare the printed deposit with diag.deposits. Also
    `/run print(C_AuctionHouse.CalculateCommodityDeposit(2589,1,1))` at the AH: nil at login away from it on 70862
