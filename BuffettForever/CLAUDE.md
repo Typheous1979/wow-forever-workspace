@@ -281,12 +281,13 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
     Pricing/Post.lua `/bf posttest` (facts, the price from a search, confirm, a second confirm after a warning;
     diag.posts).
   - selftest 131 (COLLECT-REMEMBER, MAIL-DROP, MAIL-LEGACY replaces IN-MAIL, COLLECT-PICK, TRAY-SLOT, TRAY-LOAD-MAIL).
-- **1.0.1 released** (2026-11-09, uploaded by Justin as a new file on the project; awaiting approval): vendor sell
+- **1.0.1 released** (2026-11-09, uploaded by Justin as a new file on the project; approved: the CurseForge app
+  installed it in his client that evening): vendor sell
   prices from the client first (Items.SellPrice: the cached client's figure, then the data's, then a server request), so
   Blizzard's hotfixes apply [F-141]; Data regenerated from live 70862 (only Mild Spices, 2c -> 1c). Tested on live 70862
   with the workspace build linked (the CurseForge copy moved aside, then restored): selftest 143/143; 47 cached items,
   none differing from the data (diag.sellPrices). Zip: dist/BuffettForever-1.0.1.zip, 45 files.
-- **1.0.2 released** (2026-11-10, uploaded by Justin as a new file on the project; awaiting approval): the cooldown
+- **1.0.2 released** (2026-11-10, uploaded by Justin as a new file on the project; approved the same day): the cooldown
   estimate (live 70888; Justin: "now it is not able to scan"). Zip: dist/BuffettForever-1.0.2.zip, 45 files. The data
   was regenerated from 70888's tables: unchanged except its build stamp. The README and docs/BuffettForever-curseforge.md
   now say a full scan takes about 15 seconds; 5 was the beta's figure.
@@ -306,6 +307,9 @@ Buffett's rules: never lose money, margin of safety, Mr. Market, opportunity cos
   - **Tested on 70888** with the workspace build linked (the CurseForge copy moved aside, then restored): selftest
     148/148. The saved bounds were rebuilt to at most 6,991 s, over 253 s (a 12:36 click inside the cooldown) and
     2 unanswered, so the estimate is back to 15 min.
+  - **Still to do:** once the CurseForge app updates Justin's client, `/reload` and `/bf selftest` (148). At the next
+    weekly restart, a full scan right after logging in tells whether the AH ignores it again (diag.requests,
+    `unanswered`).
 - **Tests logged for later** (Justin, 2026-10-17: "in future builds"): the house cut, once 3 sales worth 1g in
   all have come by mail (`/bf ledger` shows the measured cut). From pass 3 (2026-10-18): Buy greyed out with "Not
   enough gold" when Crafts makes the cost more than your gold, and a quote left to run out (the last 10 s counted
