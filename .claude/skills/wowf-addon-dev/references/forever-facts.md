@@ -175,6 +175,8 @@ Cite IDs from other files. When a fact changes, edit it **here**: keep the old v
     nameplates got `NamePlateUnitFrameMixin:UpdateControlAnchors` (crowd-control icons right of the level frame).
   - Unchanged: the AH, trade skill, merchant and mail docs and `Blizzard_AuctionHouseUI`. The AuctionHouse and
     AuctionHouseRedirect game tables are the same as 70862's (wago.tools) [F-083].
+  - The Warcraft Wiki's `Patch_1.60.1/API_changes` pages were last edited Oct 16–17 (checked Nov 10). For live
+    builds, diff the forever branch (`api update`, `api diff`) instead.
 
   [Source 70888]
 

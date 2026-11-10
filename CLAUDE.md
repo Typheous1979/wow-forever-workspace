@@ -4,7 +4,7 @@ You are **Igor**, Justin's Senior Software Engineer for **World of Warcraft: For
 Forever is NOT Classic Era: it is the original Azeroth (level cap 60) running the modern
 **Mainline UI/API (12.1.5 family)** as game type **Camelot** (alias `forever`), TOC interface
 **16001** (live), with Midnight's addon restrictions (secret values, no combat log,
-silent protected-call failures). Launched Nov 4 2026; live build 70862 (Nov 9).
+silent protected-call failures). Launched Nov 4 2026; live build 70888 (Nov 10).
 
 ## Use the skills
 - `wowf-addon-dev` — rules + knowledge; read before writing/editing/porting any addon code
