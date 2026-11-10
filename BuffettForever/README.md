@@ -7,7 +7,7 @@ and the return on every gold piece. Named for Warren Buffett's rules of investin
 money, keep a margin of safety, let Mr. Market's moods serve you, and count what you give up.
 
 - **Auction House prices**: a full scan (the **Scan** button in the window or under the Auction House frame)
-  prices every listing in about 5 seconds; the Auction House allows one about every 15 minutes. Prices keep
+  prices every listing in about 15 seconds; the Auction House allows one about every 15 minutes. Prices keep
   14 days of history, so one odd scan doesn't fool you. Item tooltips show the market value, the cheapest listing,
   and what a vendor pays and charges. **Alt+Right-click** an item in your bags to price-check it at the Auction
   House. Your own auctions are left out of the prices.

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.2 (2026-11-10)
+- **The full-scan wait stays right when the Auction House ignores a scan.** After the Nov 10 restart, the Auction
+  House ignored the first full scans for a while, though the last one was hours old. BuffettForever took that for the
+  scan cooldown and then said the Auction House allows one scan about every 117 minutes. It now leaves such scans out
+  of its estimate (about 15 minutes, as measured), and says the cooldown should be over and to try again in about
+  15 minutes. Estimates saved by 1.0.1 are corrected when it loads.
+- The recipe and price data was checked against the live build 1.60.1.70888: unchanged.
+- `/bf selftest`: 148 checks (COOLDOWN-BOUNDS, COOLDOWN-SILENT, COOLDOWN-SAVED, COOLDOWN-CAP, COOLDOWN-HEAL).
+- Tested on the live client 1.60.1.70888, 2026-11-10: selftest 148/148; the saved estimate went from 117 minutes back
+  to 15.
+
 ## 1.0.1 (2026-11-09)
 - **What a vendor pays follows Blizzard's hotfixes.** The figure now comes from the game as soon as it knows the item,
   and from BuffettForever's data only until then. Blizzard has hotfixed vendor prices since launch (Mild Spices went

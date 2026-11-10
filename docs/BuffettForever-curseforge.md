@@ -7,7 +7,7 @@ Drop your materials into the tray and see every recipe they make, what each cost
 ## Features
 
 ### Auction House prices
-- **Full scan in about 5 seconds**, from the Scan button in the window or under the Auction House frame. The Auction House allows one about every 15 minutes.
+- **Full scan in about 15 seconds**, from the Scan button in the window or under the Auction House frame. The Auction House allows one about every 15 minutes.
 - **14 days of price history** per item: the market value, the cheapest listing, and the listings behind them.
 - **Alt+Right-click** an item in your bags to price-check it at the Auction House, or to add it to the tray anywhere.
 - **Tooltips** show Auction House and vendor prices.
